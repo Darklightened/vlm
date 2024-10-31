@@ -1,0 +1,3 @@
+backpack
+bed
+cat

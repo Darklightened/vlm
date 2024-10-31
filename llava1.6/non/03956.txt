@@ -1,0 +1,3 @@
+keyboard
+traffic light
+bicycle

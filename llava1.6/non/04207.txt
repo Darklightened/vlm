@@ -1,0 +1,3 @@
+umbrella
+tennis racket
+hot dog

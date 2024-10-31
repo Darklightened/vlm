@@ -1,0 +1,3 @@
+person
+laptop
+bird

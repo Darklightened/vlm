@@ -1,0 +1,3 @@
+truck
+oven
+sink

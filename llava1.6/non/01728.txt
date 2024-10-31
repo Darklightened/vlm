@@ -1,0 +1,3 @@
+dog
+hot dog
+fork

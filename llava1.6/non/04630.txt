@@ -1,0 +1,3 @@
+bottle
+frisbee
+hot dog

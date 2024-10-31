@@ -1,0 +1,3 @@
+motorcycle
+truck
+sports ball

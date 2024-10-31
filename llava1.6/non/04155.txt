@@ -1,0 +1,3 @@
+remote
+stop sign
+cow

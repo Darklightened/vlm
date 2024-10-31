@@ -1,0 +1,3 @@
+book
+sports ball
+chair

@@ -1,0 +1,3 @@
+umbrella
+fire hydrant
+sports ball

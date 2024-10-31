@@ -1,0 +1,3 @@
+mouse
+bed
+cup

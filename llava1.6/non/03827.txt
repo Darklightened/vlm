@@ -1,0 +1,3 @@
+umbrella
+donut
+carrot

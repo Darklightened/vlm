@@ -1,0 +1,3 @@
+cat
+truck
+vase

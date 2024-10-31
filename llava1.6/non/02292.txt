@@ -1,0 +1,3 @@
+toaster
+scissors
+boat

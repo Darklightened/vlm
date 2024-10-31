@@ -1,0 +1,3 @@
+backpack
+carrot
+cat

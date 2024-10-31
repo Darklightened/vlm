@@ -1,0 +1,3 @@
+umbrella
+broccoli
+potted plant

@@ -1,0 +1,3 @@
+motorcycle
+bench
+bicycle

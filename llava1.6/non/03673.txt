@@ -1,0 +1,3 @@
+tie
+broccoli
+apple

@@ -1,0 +1,3 @@
+cat
+bicycle
+dining table

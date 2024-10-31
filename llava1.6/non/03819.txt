@@ -1,0 +1,3 @@
+cat
+book
+knife

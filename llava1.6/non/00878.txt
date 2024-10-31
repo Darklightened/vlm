@@ -1,0 +1,3 @@
+bird
+horse
+stop sign

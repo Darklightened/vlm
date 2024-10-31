@@ -1,0 +1,3 @@
+truck
+couch
+umbrella

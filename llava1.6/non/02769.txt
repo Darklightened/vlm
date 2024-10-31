@@ -1,0 +1,3 @@
+bench
+remote
+dining table

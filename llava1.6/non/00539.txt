@@ -1,0 +1,3 @@
+couch
+bird
+potted plant

@@ -1,0 +1,3 @@
+bus
+traffic light
+toilet

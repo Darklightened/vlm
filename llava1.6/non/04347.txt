@@ -1,0 +1,3 @@
+person
+parking meter
+sports ball

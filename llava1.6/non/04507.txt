@@ -1,0 +1,3 @@
+toaster
+oven
+potted plant

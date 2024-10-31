@@ -1,0 +1,3 @@
+bench
+parking meter
+sheep

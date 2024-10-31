@@ -1,0 +1,3 @@
+apple
+bus
+cat

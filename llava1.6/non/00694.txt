@@ -1,0 +1,3 @@
+truck
+carrot
+potted plant

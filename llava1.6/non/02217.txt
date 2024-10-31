@@ -1,0 +1,3 @@
+bottle
+knife
+scissors

@@ -1,0 +1,3 @@
+person
+elephant
+bed

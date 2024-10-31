@@ -1,0 +1,3 @@
+truck
+fork
+bottle

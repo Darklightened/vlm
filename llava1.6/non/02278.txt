@@ -1,0 +1,3 @@
+bird
+traffic light
+bicycle

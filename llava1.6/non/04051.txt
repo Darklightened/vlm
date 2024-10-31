@@ -1,0 +1,3 @@
+elephant
+apple
+cat

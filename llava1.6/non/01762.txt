@@ -1,0 +1,3 @@
+bicycle
+toilet
+traffic light

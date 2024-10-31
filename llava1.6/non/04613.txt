@@ -1,0 +1,3 @@
+suitcase
+bottle
+traffic light

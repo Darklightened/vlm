@@ -1,0 +1,3 @@
+spoon
+wine glass
+chair

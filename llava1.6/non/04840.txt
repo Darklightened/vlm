@@ -1,0 +1,3 @@
+clock
+refrigerator
+dining table

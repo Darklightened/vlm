@@ -1,0 +1,3 @@
+bottle
+truck
+parking meter

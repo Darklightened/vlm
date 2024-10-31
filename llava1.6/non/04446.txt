@@ -1,0 +1,3 @@
+clock
+tv
+chair

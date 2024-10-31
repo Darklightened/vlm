@@ -1,0 +1,3 @@
+remote
+dog
+baseball bat

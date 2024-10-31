@@ -1,0 +1,3 @@
+bench
+suitcase
+tennis racket

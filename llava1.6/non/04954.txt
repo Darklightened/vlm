@@ -1,0 +1,3 @@
+bicycle
+zebra
+parking meter

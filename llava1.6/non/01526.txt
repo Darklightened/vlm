@@ -1,0 +1,3 @@
+bench
+wine glass
+umbrella

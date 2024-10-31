@@ -1,0 +1,3 @@
+umbrella
+potted plant
+elephant

@@ -1,0 +1,3 @@
+umbrella
+kite
+sports ball

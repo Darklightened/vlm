@@ -1,0 +1,3 @@
+bowl
+car
+carrot

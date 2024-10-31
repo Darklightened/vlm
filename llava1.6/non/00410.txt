@@ -1,0 +1,3 @@
+motorcycle
+skateboard
+traffic light

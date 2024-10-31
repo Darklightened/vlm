@@ -1,0 +1,3 @@
+umbrella
+bus
+dining table

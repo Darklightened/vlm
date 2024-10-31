@@ -1,0 +1,3 @@
+bottle
+sandwich
+cell phone
