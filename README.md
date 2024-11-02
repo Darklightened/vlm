@@ -1,6 +1,6 @@
 # install lmms-eval
 
-git clone https://github.com/EvolvingLMMs-Lab/lmms-eval
+<!-- git clone https://github.com/EvolvingLMMs-Lab/lmms-eval -->
 
 cd lmms-eval
 
