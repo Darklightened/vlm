@@ -131,11 +131,15 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
         modalities = kwargs.pop("modalities", None) if "modalities" in kwargs and modalities is None else modalities
         position_ids = kwargs.pop("position_ids", None)
         attention_mask = kwargs.pop("attention_mask", None)
+        image_mask = kwargs.pop("image_mask", None)
+        generation_type = kwargs.pop("generation_type", None)    
+
         if "inputs_embeds" in kwargs:
             raise NotImplementedError("`inputs_embeds` is not supported")
 
-        if images is not None:
-            (inputs, position_ids, attention_mask, _, inputs_embeds, _) = self.prepare_inputs_labels_for_multimodal(inputs, position_ids, attention_mask, None, None, images, modalities, image_sizes=image_sizes)
+        if images is not None:            
+            (inputs, position_ids, attention_mask, _, inputs_embeds, _) = self.prepare_inputs_labels_for_multimodal(inputs, position_ids, attention_mask, None, None, images, 
+            modalities, image_sizes=image_sizes, image_mask=image_mask, generation_type=generation_type)
         else:
             inputs_embeds = self.get_model().embed_tokens(inputs)
 

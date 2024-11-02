@@ -234,6 +234,7 @@ def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, l
             else:
                 try:
                     from llava.model.language_model.llava_llama import LlavaConfig
+                    print("loding from here")
 
                     tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False)
                     if customized_config is None:

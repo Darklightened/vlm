@@ -30,6 +30,10 @@ try:
         get_model_name_from_path,
         process_images,
         tokenizer_image_token,
+        show_mask_on_image,
+        get_heatmap,
+        make_square,
+        process_anyres_image
     )
     from llava.model.builder import load_pretrained_model
 except Exception as e:
@@ -65,6 +69,12 @@ class Llava(lmms):
         tie_weights: bool = True,
         truncate_context=False,  # whether to truncate the context in generation, set it False for LLaVA-1.6
         customized_config=None,  # ends in json
+        generation_type="default",
+        fix_grid="default",
+        attention_thresholding_type="layer_mean",
+        attention_threshold="0.1",
+        remove_unpadding=False,
+        regenerate_condition="all",
         **kwargs,
     ) -> None:
         super().__init__()
@@ -111,6 +121,24 @@ class Llava(lmms):
         self.conv_template = conv_template
         self.use_cache = use_cache
         self.truncate_context = truncate_context
+
+        # additional parameters for recursion
+        self.generation_type = generation_type        
+        self.fix_grid = fix_grid
+        self.attention_thresholding_type = attention_thresholding_type
+        self.attention_threshold = attention_threshold
+        self.regenerate_condition = regenerate_condition
+
+        print(f"generation_type: {generation_type}")
+        print(f"fix_grid: {fix_grid}")
+        print(f"attention_thresholding_type: {attention_thresholding_type}")
+        print(f"attention_threshold: {attention_threshold}")
+        print(f"regenerate_condition: {regenerate_condition}")
+        
+        if remove_unpadding == True:
+            print("remove unpadding=True, change to 'spatial'")
+            self._model.config.mm_patch_merge_type = "spatial"
+
         # assert self.batch_size_per_gpu == 1, "Llava currently does not support batched generation. See https://github.com/haotian-liu/LLaVA/issues/754. HF Llava also has this issue."
         if accelerator.num_processes > 1:
             assert accelerator.distributed_type in [DistributedType.FSDP, DistributedType.MULTI_GPU, DistributedType.DEEPSPEED], "Unsupported distributed type provided. Only DDP and FSDP are supported."
@@ -309,7 +337,13 @@ class Llava(lmms):
             task = task[0]
             split = split[0]
             batched_visuals = [doc_to_visual[0](self.task_dict[task][split][ids]) for ids in doc_id]  # [B, N]
-            flattened_visuals = self.flatten(batched_visuals)  # [B*N]
+            flattened_visuals = self.flatten(batched_visuals)  # [B*N]      
+
+            if self.fix_grid == "2x2":
+                flattened_visuals = [make_square(visual, min_size=224) for visual in flattened_visuals]
+            else:
+                pass
+
             # we assume all gen kwargs in the batch are the same
             # this is safe to assume because the `grouper` object ensures it.
             gen_kwargs = all_gen_kwargs[0]
@@ -384,21 +418,95 @@ class Llava(lmms):
             attention_masks = input_ids.ne(pad_token_ids).to(self.device)
             # These steps are not in LLaVA's original code, but are necessary for generation to work
             # TODO: attention to this major generation step...
-            try:
-                cont = self.model.generate(
-                    input_ids,
-                    attention_mask=attention_masks,
-                    pad_token_id=pad_token_ids,
-                    images=image_tensor,
-                    image_sizes=gen_kwargs["image_sizes"],
-                    do_sample=True if gen_kwargs["temperature"] > 0 else False,
-                    temperature=gen_kwargs["temperature"],
-                    top_p=gen_kwargs["top_p"],
-                    num_beams=gen_kwargs["num_beams"],
-                    max_new_tokens=gen_kwargs["max_new_tokens"],
-                    use_cache=self.use_cache,
-                )
-                text_outputs = self.tokenizer.batch_decode(cont, skip_special_tokens=True)
+            try:   
+                if "recursion" in self.generation_type:
+                    cont = self.model.generate(
+                        input_ids,
+                        attention_mask=attention_masks,
+                        pad_token_id=pad_token_ids,
+                        images=image_tensor,
+                        image_sizes=gen_kwargs["image_sizes"],
+                        do_sample=True if gen_kwargs["temperature"] > 0 else False,
+                        temperature=gen_kwargs["temperature"],
+                        top_p=gen_kwargs["top_p"],
+                        num_beams=gen_kwargs["num_beams"],
+                        max_new_tokens=gen_kwargs["max_new_tokens"],
+                        use_cache=self.use_cache,
+                        generation_type=self.generation_type,
+                        return_dict_in_generate=True,
+                        output_attentions=True,
+                    )
+                    #text_outputs = self.tokenizer.batch_decode(cont, skip_special_tokens=True)
+                    text_outputs = self.tokenizer.decode(cont["sequences"][0], skip_special_tokens=True).strip()
+
+                    # print("regenerating with attention threshold")
+                    # print(f"question_input: {question_input[0]}")                    
+
+                    #image = process_anyres_image(flattened_visuals[0], self._image_processor, self._config.image_grid_pinpoints)   
+                    #print("image")
+                    #print(image.shape)
+
+                    ret_attn = get_heatmap(self.model, cont, self.tokenizer, question_input[0], input_ids)
+                    del cont
+                    del text_outputs
+
+                    if self.attention_thresholding_type == "layer_mean":
+                        med = torch.stack(ret_attn, dim=0)
+                        med = med.mean(dim=0)
+                        attn = ret_attn[1] - med
+                        attn = torch.relu(attn)
+                        attn = attn / attn.max()
+
+                        image_mask_list = []
+                        for row in range(attn.shape[0]):
+                            for col in range(attn.shape[1]):
+                                if attn[row, col] > self.attention_threshold:
+                                    #print(f"attention value: {attn[row,col]}")
+                                    image_mask_list.append(torch.LongTensor([[row, col]]))
+                        image_mask = torch.cat(image_mask_list)
+                        #print(f"num_divided: {len(image_mask_list)}")
+                    else:
+                        image_mask = None
+                
+                    ## regenerate with image mask
+                    cont = self.model.generate(
+                        input_ids,
+                        attention_mask=attention_masks,
+                        pad_token_id=pad_token_ids,
+                        images=image_tensor,
+                        image_sizes=gen_kwargs["image_sizes"],
+                        do_sample=True if gen_kwargs["temperature"] > 0 else False,
+                        temperature=gen_kwargs["temperature"],
+                        top_p=gen_kwargs["top_p"],
+                        num_beams=gen_kwargs["num_beams"],
+                        max_new_tokens=gen_kwargs["max_new_tokens"],
+                        use_cache=self.use_cache,
+                        generation_type=self.generation_type,
+                        # return_dict_in_generate=True,
+                        # output_attentions=True,
+                        image_mask = image_mask,
+                    )
+                    text_outputs = self.tokenizer.batch_decode(cont, skip_special_tokens=True)
+
+                else:
+                    cont = self.model.generate(
+                        input_ids,
+                        attention_mask=attention_masks,
+                        pad_token_id=pad_token_ids,
+                        images=image_tensor,
+                        image_sizes=gen_kwargs["image_sizes"],
+                        do_sample=True if gen_kwargs["temperature"] > 0 else False,
+                        temperature=gen_kwargs["temperature"],
+                        top_p=gen_kwargs["top_p"],
+                        num_beams=gen_kwargs["num_beams"],
+                        max_new_tokens=gen_kwargs["max_new_tokens"],
+                        use_cache=self.use_cache,
+                        generation_type=self.generation_type,
+                        # return_dict_in_generate=True,
+                        # output_attentions=True,
+                    )
+                    text_outputs = self.tokenizer.batch_decode(cont, skip_special_tokens=True)
+
             except Exception as e:
                 raise e
                 eval_logger.error(f"Error {e} in generating")

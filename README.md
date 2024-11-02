@@ -15,3 +15,6 @@ cd lmms-eval
 git clone https://github.com/LLaVA-VL/LLaVA-NeXT
 cd LLaVA-NeXT
 pip install -e .
+
+\\
+requires higginface-cli login
