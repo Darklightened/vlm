@@ -295,6 +295,20 @@ def parse_eval_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--detection",
+        type=bool,
+        default=False,
+        help="activate detection - bool",
+    )
+    
+    parser.add_argument(
+        "--detection_threshold",
+        type=float,
+        default=0.8,
+        help="detection threshold - float",
+    )
+        
+    parser.add_argument(
         "--remove_unpadding",
         type=bool,
         default=False,
@@ -306,6 +320,27 @@ def parse_eval_args() -> argparse.Namespace:
         type=str,
         default="all",
         help="currently, always regenerate when generation type includes 'recursion'",
+    )
+
+    parser.add_argument(
+        "--save_output",
+        type=bool,
+        default=False,
+        help="save_output - bool",
+    )
+
+    parser.add_argument(
+        "--output_csv_path",
+        type=str,
+        default="generation_output.csv",
+        help="output_csv_path - str",
+    )
+
+    parser.add_argument(
+        "--target_token_selection_strategy",
+        type=str,
+        default="default",
+        help="target_token_selection_strategy - str",
     )
 
 

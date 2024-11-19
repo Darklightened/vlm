@@ -1,3 +1,0 @@
-microwave
-cat
-mouse

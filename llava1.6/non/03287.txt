@@ -1,3 +1,0 @@
-clock
-wine glass
-fork

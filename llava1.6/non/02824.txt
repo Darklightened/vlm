@@ -1,3 +1,0 @@
-remote
-umbrella
-fire hydrant

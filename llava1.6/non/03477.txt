@@ -1,3 +1,0 @@
-knife
-traffic light
-motorcycle

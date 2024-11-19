@@ -1,3 +1,0 @@
-sink
-remote
-cell phone

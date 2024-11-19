@@ -1,3 +1,0 @@
-person
-bench
-apple

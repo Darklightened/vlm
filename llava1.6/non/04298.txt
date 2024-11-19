@@ -1,3 +1,0 @@
-bicycle
-fork
-carrot

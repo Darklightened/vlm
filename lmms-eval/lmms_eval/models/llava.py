@@ -18,6 +18,17 @@ from lmms_eval.api.instance import Instance
 from lmms_eval.api.model import lmms
 from lmms_eval.api.registry import register_model
 from lmms_eval.utils import stop_sequences_criteria
+from lmms_eval.recursion_utils import (
+    calculate_entropy_for_attn_threshold, 
+    entropy_based_threshold, 
+    confidence_based_threshold, 
+    calculate_entropy_and_all_confidences
+)
+
+import numpy as np
+import torch.nn.functional as F
+import csv
+from pathlib import Path
 
 warnings.filterwarnings("ignore")
 
@@ -33,7 +44,8 @@ try:
         show_mask_on_image,
         get_heatmap,
         make_square,
-        process_anyres_image
+        process_anyres_image,
+        get_heatmap_with_layer_visualization
     )
     from llava.model.builder import load_pretrained_model
 except Exception as e:
@@ -68,13 +80,22 @@ class Llava(lmms):
         use_cache=True,
         tie_weights: bool = True,
         truncate_context=False,  # whether to truncate the context in generation, set it False for LLaVA-1.6
-        customized_config=None,  # ends in json
+        customized_config=None,  # ends in json        
+        ## new args for recursive generation
         generation_type="default",
         fix_grid="default",
         attention_thresholding_type="layer_mean",
         attention_threshold="0.1",
-        remove_unpadding=False,
-        regenerate_condition="all",
+        remove_unpadding=False,    
+        detection_strategy="none",
+        detection_threshold=0.8,
+        save_output=True,
+        output_csv_path = "generation_output.csv",
+        target_token_selection_strategy="first",
+        resized_image_sizes=[168, 336],
+        positional_embedding_type="default",
+        recursion_stages=[336],   
+
         **kwargs,
     ) -> None:
         super().__init__()
@@ -126,18 +147,103 @@ class Llava(lmms):
         self.generation_type = generation_type        
         self.fix_grid = fix_grid
         self.attention_thresholding_type = attention_thresholding_type
-        self.attention_threshold = attention_threshold
-        self.regenerate_condition = regenerate_condition
-
+        self.attention_threshold = attention_threshold        
+        self.detection_strategy = detection_strategy
+        self.detection_threshold = detection_threshold 
+        self.save_output = save_output
+        self.output_csv_path = output_csv_path
+        self.target_token_selection_strategy = target_token_selection_strategy
+        self.resized_image_sizes = resized_image_sizes
+        self.positional_embedding_type = positional_embedding_type
+        self.recursion_stages = recursion_stages
+        
         print(f"generation_type: {generation_type}")
         print(f"fix_grid: {fix_grid}")
         print(f"attention_thresholding_type: {attention_thresholding_type}")
         print(f"attention_threshold: {attention_threshold}")
-        print(f"regenerate_condition: {regenerate_condition}")
+        print(f"detection_strategy: {detection_strategy}")        
+        print(f"detection_threshold: {detection_threshold}")
+        print(f"save_output: {save_output}")
+        print(f"output_csv_path: {output_csv_path}")
+        print(f"target_token_selection_strategy: {target_token_selection_strategy}")
+        print(f"resized_image_sizes: {resized_image_sizes}")
+        print(f"positional_embedding_type: {positional_embedding_type}")
+        print(f"recursion_stages: {recursion_stages}")
+
+        use_all = []
+        for image_size in self.resized_image_sizes:
+            if image_size not in self.recursion_stages:
+                use_all.append(image_size)
         
+        for image_size in self.recursion_stages:
+            assert image_size in self.resized_image_sizes, f"Image size {image_size} in recursion_stages is not in resized_image_sizes"                
+        
+        print(f"Use for recursion: {recursion_stages}, Use all: {use_all}")
+        
+        ## default = "spatial_unpad" for llava1.6
+        ## To remove unpadding, set remove_unpadding=True -> mm.path_merge_type will be 'spatial'
         if remove_unpadding == True:
             print("remove unpadding=True, change to 'spatial'")
-            self._model.config.mm_patch_merge_type = "spatial"
+            self._model.config.mm_patch_merge_type = "spatial"      
+        
+        ## save output confidences to csv
+        if self.save_output:
+            assert self.output_csv_path is not None, "Output CSV path is not provided."
+
+            self.output_csv_path = Path(self.output_csv_path)
+
+        if not self.output_csv_path.exists():
+            with open(self.output_csv_path, mode="w", newline="") as file:
+                writer = csv.writer(file)
+                headers = ["Doc ID", "Stage", "Text Output"]   
+                headers += [f"Cumulative Confidence {i+1}" for i in range(10)]
+                writer.writerow(headers)
+
+        ## modify positional embedding for resized image sizes
+        if self.positional_embedding_type == "default":
+            assert resized_image_sizes==[336], "default embedding only allows size of 336"
+        else:
+            print(f"change positional embedding to {positional_embedding_type}")
+            ## except for default size of 336
+            self.model.model.downsampled_vision_towers = [copy.deepcopy(self.model.model.vision_tower) for _ in range(len(self.resized_image_sizes)-1)]
+
+            # Default configurations of model position embedding
+            patch_size = 14
+
+            for idx, image_size in enumerate(self.resized_image_sizes[:-1]):
+                num_patches = (image_size // patch_size) ** 2
+                num_positions = num_patches + 1
+                embed_dim = self.model.model.downsampled_vision_tower.vision_tower.vision_model.embeddings.embed_dim
+
+                self.model.model.downsampled_vision_towers[idx].vision_tower.vision_model.embeddings.image_size = image_size
+                self.model.model.downsampled_vision_towers[idx].vision_tower.vision_model.embeddings.num_patches = num_patches
+                self.model.model.downsampled_vision_towers[idx].vision_tower.vision_model.embeddings.num_positions = num_positions
+                self.model.model.downsampled_vision_towers[idx].vision_tower.vision_model.embeddings.register_buffer("position_ids", torch.arange(num_positions).expand((1, -1)), persistent=False)
+            
+                # Modify positional embedding to match the resized image size
+                if positional_embedding_type == "zero":       
+                    self.model.model.downsampled_vision_towers[idx].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions, embed_dim).to(dtype=torch.float16, device=device)
+                    torch.nn.init.constant_(self.model.model.downsampled_vision_towers[idx].vision_tower.vision_model.embeddings.position_embedding.weight, 0)
+                elif positional_embedding_type == "interpolation":
+                    # Interpolate from the pretrained positional embedding
+                    original_embedding = self.model.model.downsampled_vision_towers[idx].vision_tower.vision_model.embeddings.position_embedding.weight.data
+                    original_num_positions = original_embedding.size(0)
+                    new_embedding = torch.nn.functional.interpolate(
+                        original_embedding.unsqueeze(0).transpose(1, 2), 
+                        size=(num_positions,), 
+                        mode='linear', 
+                        align_corners=False
+                    ).transpose(1, 2).squeeze(0)
+                    self.model.model.downsampled_vision_towers[idx].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions, embed_dim).to(dtype=torch.float16, device=device)
+                    self.model.model.downsampled_vision_towers[idx].vision_tower.vision_model.embeddings.position_embedding.weight.data.copy_(new_embedding)
+                elif positional_embedding_type == "reduced":
+                    print("Reduced embedding type.")
+                    # Reduce the pretrained embedding by truncating
+                    original_embedding = self.model.model.downsampled_vision_towers[idx].vision_tower.vision_model.embeddings.position_embedding.weight.data
+                    self.model.model.downsampled_vision_towers[idx].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions, embed_dim).to(dtype=torch.float16, device=device)
+                    self.model.model.downsampled_vision_towers[idx].vision_tower.vision_model.embeddings.position_embedding.weight.data.copy_(original_embedding[:num_positions])
+                                
+            self.model.to(device)
 
         # assert self.batch_size_per_gpu == 1, "Llava currently does not support batched generation. See https://github.com/haotian-liu/LLaVA/issues/754. HF Llava also has this issue."
         if accelerator.num_processes > 1:
@@ -171,6 +277,15 @@ class Llava(lmms):
             self.model.to(self._device)
             self._rank = 0
             self._world_size = 1
+    
+    # Method to log each stage's results
+    def save_stage_to_csv(self, doc_id, stage, text_output, cumulative_confidences):
+        with open(self.output_csv_path, mode="a", newline="") as file:
+            writer = csv.writer(file)
+
+            # Prepare the row with doc_id, stage, and text_output, followed by each cumulative confidence as separate columns
+            row = [doc_id, stage, text_output] + cumulative_confidences
+            writer.writerow(row)
 
     @property
     def config(self):
@@ -339,8 +454,11 @@ class Llava(lmms):
             batched_visuals = [doc_to_visual[0](self.task_dict[task][split][ids]) for ids in doc_id]  # [B, N]
             flattened_visuals = self.flatten(batched_visuals)  # [B*N]      
 
+            ## original model accepts several diffrent grids (e.g. 1x2, 1x3, 2x2)
+            ## for recursive implementation, we only use 2x2 grid (might be updated in future)
+            ## Set grid to 2x2 for recursive generation, else default
             if self.fix_grid == "2x2":
-                flattened_visuals = [make_square(visual, min_size=224) for visual in flattened_visuals]
+                flattened_visuals = [make_square(visual, min_size=336) for visual in flattened_visuals]
             else:
                 pass
 
@@ -370,6 +488,12 @@ class Llava(lmms):
                     image_tensor = [_image.to(dtype=torch.float16, device=self.device) for _image in image_tensor]
                 else:
                     image_tensor = image_tensor.to(dtype=torch.float16, device=self.device)
+                    downsampled_image_tensors = []
+                    for idx, image_size in enumerate(self.resized_image_sizes[:-1]):
+                        downsampled_image_tensor = F.interpolate(image_tensor[0], size=(image_size, image_size), mode='bilinear', align_corners=False)
+                        downsampled_image_tensor = downsampled_image_tensor.unsqueeze(0)
+                        downsampled_image_tensor = downsampled_image_tensor.to(dtype=torch.float16, device=self.device)
+                        downsampled_image_tensors.append(downsampled_image_tensor)
             else:
                 image_tensor = None
 
@@ -418,8 +542,143 @@ class Llava(lmms):
             attention_masks = input_ids.ne(pad_token_ids).to(self.device)
             # These steps are not in LLaVA's original code, but are necessary for generation to work
             # TODO: attention to this major generation step...
-            try:   
-                if "recursion" in self.generation_type:
+            
+            ## main generation part
+            #try:   
+            if "recursion" in self.generation_type:
+                cont = self.model.generate(
+                    input_ids,
+                    attention_mask=attention_masks,
+                    pad_token_id=pad_token_ids,
+                    images=image_tensor,
+                    image_sizes=gen_kwargs["image_sizes"],
+                    do_sample=True if gen_kwargs["temperature"] > 0 else False,
+                    temperature=gen_kwargs["temperature"],
+                    top_p=gen_kwargs["top_p"],
+                    num_beams=gen_kwargs["num_beams"],
+                    max_new_tokens=gen_kwargs["max_new_tokens"],
+                    use_cache=self.use_cache,
+                    generation_type=self.generation_type,
+                    return_dict_in_generate=True,
+                    output_attentions=True,
+                    output_scores=True,
+                )
+                #text_outputs = self.tokenizer.batch_decode(cont, skip_special_tokens=True) 
+                #print("recursive 1st stage")
+                # if cont["sequences"][0][0] == 1:
+                #     cont["sequences"] = cont["sequences"][0][1:].unsqueeze(0)
+                print(cont['sequences'][0])
+                text_outputs = self.tokenizer.decode(cont["sequences"][0], skip_special_tokens=True).strip()
+                scores = cont.scores
+                #print(text_outputs) 
+                # print(f"input_ids shape: {input_ids[0].shape}")                    
+
+                # Calculate entropy and all cumulative confidences
+                P_T_given_I_Q_full, entropy_sum, cumulative_confidences = calculate_entropy_and_all_confidences(
+                    cont["sequences"][0], scores = scores
+                )
+                #print(text_outputs)                    
+                
+                # Save first stage results to CSV
+                self.save_stage_to_csv("Stage 1", doc_id, text_outputs, cumulative_confidences)
+
+                #print("regenerating with attention threshold")        
+
+                ## returns attention over image tokens
+                ret_attn = get_heatmap(self.model, cont, self.tokenizer, question_input[0], input_ids)   
+
+                img_save_path = f"./results/{doc_id}"   
+                image = flattened_visuals[0]
+                get_heatmap_with_layer_visualization(self.model, cont, self.tokenizer, question_input[0], input_ids, image, img_save_path)              
+                #del text_outputs
+                target_output_indices = []
+
+                ## target token selection strategy
+                if self.target_token_selection_strategy == "first":
+                    target_output_indices.append(0)
+
+                elif self.target_token_selection_strategy == "all":
+                    target_output_indices = [i for i, _ in enumerate(text_outputs)]
+
+                elif self.target_token_selection_strategy == "min_confidence":
+                    # Find the index of the token with the minimum confidence score
+                    min_conf_index = scores.index(min(scores))
+                    target_output_indices.append(min_conf_index)
+                elif self.target_token_selection_strategy == "classifier_based":
+                    pass
+                elif self.target_token_selection_strategy == "max_attn_variance":
+                    pass
+                elif self.target_token_selection_strategy == "prompt_attn":
+                    pass
+
+                else:
+                    # Default or fallback behavior if strategy is unspecified
+                    target_output_indices = [0]  
+
+                ## averages attention over the layers to determine threshold
+                if self.attention_thresholding_type == "layer_mean":
+                    med = torch.stack(ret_attn, dim=0)
+                    med = med.mean(dim=0)
+                    # [0] indicates the first token generated (change to [1] if output includes <s>)
+                    attn = ret_attn[0] - med
+                    attn = torch.relu(attn)
+                    attn = attn / attn.max()
+
+                    image_mask_list = []
+                    for row in range(attn.shape[0]):
+                        for col in range(attn.shape[1]):
+                            #print(f"attention value: {attn[row,col]}")
+                            if attn[row, col] > self.attention_threshold:
+                                #print(f"attention value: {attn[row,col]}")
+                                image_mask_list.append(torch.LongTensor([[row, col]]))
+                    #print(image_mask_list)
+                    image_mask = torch.cat(image_mask_list)
+                    #print(f"num_divided: {len(image_mask_list)}")
+                elif self.attention_thresholding_type == "layer_mean_with_top_k":  
+                    attn = ret_attn[0]
+                    print(self.attention_threshold)
+
+                    top_k_percent = self.attention_threshold
+                    ## Setting Threshold (Top 20%)
+                    flattened_attn = attn.view(-1) 
+                    flattened_attn = flattened_attn.float()
+                    threshold_index = int(len(flattened_attn) * (1 - top_k_percent)) 
+                    threshold_value = torch.topk(flattened_attn, threshold_index).values[-1]
+
+                    image_mask_list = []
+                    for row in range(attn.shape[0]):
+                        for col in range(attn.shape[1]):
+                            if attn[row, col] > threshold_value:
+                                image_mask_list.append(torch.LongTensor([[row, col]]))
+                    image_mask = torch.cat(image_mask_list)
+                    
+                elif self.attention_thresholding_type == "entropy_based_topk":  
+                    print(f"Entropy-based Top-K threshold (Base topk={self.attention_threshold}).")
+                    attn = ret_attn[0]
+                    calculated_threshold = entropy_based_threshold(attn, base_threshold=0.2, scaling_factor=0.5)
+                    print(f"Calculated Threshold: {calculated_threshold}")
+                    flattened_attn = attn.view(-1).float()
+                    threshold_index = int(len(flattened_attn) * (1 - calculated_threshold))
+                    threshold_value = torch.topk(flattened_attn, threshold_index).values[-1]
+
+                    image_mask_list = []
+                    for row in range(attn.shape[0]):
+                        for col in range(attn.shape[1]):
+                            if attn[row, col] > threshold_value:
+                                image_mask_list.append(torch.LongTensor([[row, col]]))
+                    image_mask = torch.cat(image_mask_list)
+                    
+                else:
+                    image_mask = None
+                
+                if self.detection and cumulative_confidences[0] > self.detection_threshold:
+                    print("score over threshold, do not recurse")
+                    text_outputs = self.tokenizer.batch_decode(cont['sequences'], skip_special_tokens=True)
+                    # Save second stage result as None to CSV
+                    self.save_stage_to_csv("Stage 2", doc_id, ["No recurse"], cumulative_confidences)
+                else:   
+                    ## regenerate with image mask
+                    ## remove output_attentions for efficient generation
                     cont = self.model.generate(
                         input_ids,
                         attention_mask=attention_masks,
@@ -434,84 +693,74 @@ class Llava(lmms):
                         use_cache=self.use_cache,
                         generation_type=self.generation_type,
                         return_dict_in_generate=True,
-                        output_attentions=True,
-                    )
-                    #text_outputs = self.tokenizer.batch_decode(cont, skip_special_tokens=True)
-                    text_outputs = self.tokenizer.decode(cont["sequences"][0], skip_special_tokens=True).strip()
-
-                    # print("regenerating with attention threshold")
-                    # print(f"question_input: {question_input[0]}")                    
-
-                    #image = process_anyres_image(flattened_visuals[0], self._image_processor, self._config.image_grid_pinpoints)   
-                    #print("image")
-                    #print(image.shape)
-
-                    ret_attn = get_heatmap(self.model, cont, self.tokenizer, question_input[0], input_ids)
-                    del cont
-                    del text_outputs
-
-                    if self.attention_thresholding_type == "layer_mean":
-                        med = torch.stack(ret_attn, dim=0)
-                        med = med.mean(dim=0)
-                        attn = ret_attn[1] - med
-                        attn = torch.relu(attn)
-                        attn = attn / attn.max()
-
-                        image_mask_list = []
-                        for row in range(attn.shape[0]):
-                            for col in range(attn.shape[1]):
-                                if attn[row, col] > self.attention_threshold:
-                                    #print(f"attention value: {attn[row,col]}")
-                                    image_mask_list.append(torch.LongTensor([[row, col]]))
-                        image_mask = torch.cat(image_mask_list)
-                        #print(f"num_divided: {len(image_mask_list)}")
-                    else:
-                        image_mask = None
-                
-                    ## regenerate with image mask
-                    cont = self.model.generate(
-                        input_ids,
-                        attention_mask=attention_masks,
-                        pad_token_id=pad_token_ids,
-                        images=image_tensor,
-                        image_sizes=gen_kwargs["image_sizes"],
-                        do_sample=True if gen_kwargs["temperature"] > 0 else False,
-                        temperature=gen_kwargs["temperature"],
-                        top_p=gen_kwargs["top_p"],
-                        num_beams=gen_kwargs["num_beams"],
-                        max_new_tokens=gen_kwargs["max_new_tokens"],
-                        use_cache=self.use_cache,
-                        generation_type=self.generation_type,
-                        # return_dict_in_generate=True,
                         # output_attentions=True,
                         image_mask = image_mask,
+                        output_scores=True,
                     )
-                    text_outputs = self.tokenizer.batch_decode(cont, skip_special_tokens=True)
-
-                else:
-                    cont = self.model.generate(
-                        input_ids,
-                        attention_mask=attention_masks,
-                        pad_token_id=pad_token_ids,
-                        images=image_tensor,
-                        image_sizes=gen_kwargs["image_sizes"],
-                        do_sample=True if gen_kwargs["temperature"] > 0 else False,
-                        temperature=gen_kwargs["temperature"],
-                        top_p=gen_kwargs["top_p"],
-                        num_beams=gen_kwargs["num_beams"],
-                        max_new_tokens=gen_kwargs["max_new_tokens"],
-                        use_cache=self.use_cache,
-                        generation_type=self.generation_type,
-                        # return_dict_in_generate=True,
-                        # output_attentions=True,
+                    #print("recursive 2nd stage")
+                    text_outputs = self.tokenizer.batch_decode(cont['sequences'], skip_special_tokens=True)
+                    #print(text_outputs)    
+                    
+                    P_T_given_I_Q_full, entropy_sum, cumulative_confidences = calculate_entropy_and_all_confidences(
+                        cont["sequences"][0], scores = cont.scores
                     )
-                    text_outputs = self.tokenizer.batch_decode(cont, skip_special_tokens=True)
+                    
+                    # Save second stage results to CSV
+                    self.save_stage_to_csv("Stage 2", doc_id, text_outputs, cumulative_confidences)                        
 
-            except Exception as e:
-                raise e
-                eval_logger.error(f"Error {e} in generating")
-                cont = ""
-                text_outputs = [""]
+            ## no recursion: remove output_attentions, return_dict params since passing them requires additional memory
+            else:
+                #print("no recursion")
+                cont = self.model.generate(
+                    input_ids,
+                    attention_mask=attention_masks,
+                    pad_token_id=pad_token_ids,
+                    images=image_tensor,
+                    image_sizes=gen_kwargs["image_sizes"],
+                    do_sample=True if gen_kwargs["temperature"] > 0 else False,
+                    temperature=gen_kwargs["temperature"],
+                    top_p=gen_kwargs["top_p"],
+                    num_beams=gen_kwargs["num_beams"],
+                    max_new_tokens=gen_kwargs["max_new_tokens"],
+                    use_cache=self.use_cache,
+                    generation_type=self.generation_type,
+                    return_dict_in_generate=True,
+                    # output_attentions=True,
+                    output_scores=True
+                )
+                text_outputs = self.tokenizer.batch_decode(cont['sequences'], skip_special_tokens=True)
+                #print(text_outputs)                     
+                
+                # Calculate entropy and all cumulative confidences
+                P_T_given_I_Q_full, entropy_sum, cumulative_confidences = calculate_entropy_and_all_confidences(
+                    cont["sequences"][0], cont.scores
+                )
+                # Save non-recursive results to CSV
+                self.save_stage_to_csv("Non-recursive", doc_id, text_outputs, cumulative_confidences)
+
+            # except Exception as e:
+            #     cont = self.model.generate(
+            #             input_ids,
+            #             attention_mask=attention_masks,
+            #             pad_token_id=pad_token_ids,
+            #             images=image_tensor,
+            #             image_sizes=gen_kwargs["image_sizes"],
+            #             do_sample=True if gen_kwargs["temperature"] > 0 else False,
+            #             temperature=gen_kwargs["temperature"],
+            #             top_p=gen_kwargs["top_p"],
+            #             num_beams=gen_kwargs["num_beams"],
+            #             max_new_tokens=gen_kwargs["max_new_tokens"],
+            #             use_cache=self.use_cache,
+            #             generation_type="default",
+            #             # return_dict_in_generate=True,
+            #             # output_attentions=True,
+            #         )
+            #     text_outputs = self.tokenizer.batch_decode(cont, skip_special_tokens=True)
+            #     #raise e
+            #     eval_logger.error(f"Error {e} in generating, generate with default")
+            #     # cont = ""
+            #     # text_outputs = [""]
+                
 
             # cont_toks_list = cont.tolist()
             # for cont_toks, context in zip(cont_toks_list, contexts):

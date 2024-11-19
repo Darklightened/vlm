@@ -13,6 +13,8 @@ import requests
 import torch.nn.functional as F
 import numpy as np
 import cv2
+import matplotlib.pyplot as plt
+from torchvision.transforms import ToPILImage
 
 
 def resize_and_center_crop(image, shortest_edge_length):
@@ -425,7 +427,35 @@ def aggregate_llm_attention(attn):
             torch.tensor([0.]),
         ))
         avged.append(vec / vec.sum())
+    
+    #print(f"Aggregated attention shape: {torch.stack(avged).mean(dim=0).shape}")
     return torch.stack(avged).mean(dim=0)
+
+def aggregate_llm_attention_single_layer(layer):
+    """
+    Extract average attention vector for a single layer.
+    Args:
+        layer: The attention matrix for a single layer. Shape [batch_size, num_heads, seq_len, seq_len].
+    Returns:
+        Aggregated attention vector for the given layer.
+    """
+    #print(f"Processing single layer attention with shape: {layer.shape}")
+    layer_attns = layer.squeeze(0)  # Remove batch dimension
+    #print(f"Layer attention shape after squeeze: {layer_attns.shape}")
+    attns_per_head = layer_attns.mean(dim=0)  # Average across attention heads
+    #print(f"Attention per head shape: {attns_per_head.shape}")
+    vec = torch.concat((
+        # We zero the first entry because it's called null attention
+        torch.tensor([0.]),
+        # Take [-1], the last row corresponding to the current token
+        attns_per_head[-1][1:].cpu(),
+        # Add zero for the final generated token, which never gets attention
+        torch.tensor([0.]),
+    ))
+    #print(f"Vector shape before normalization: {vec.shape}")
+    normalized_vec = vec / vec.sum()
+    #print(f"Vector shape after normalization: {normalized_vec.shape}")
+    return normalized_vec
 
 
 def aggregate_vit_attention(attn, select_layer=-2, all_prev_layers=True):
@@ -464,125 +494,211 @@ def show_mask_on_image(img, mask):
     cam = cam / np.max(cam)
     return np.uint8(255 * cam), heatmap
 
-def get_heatmap(model, outputs, tokenizer, prompt, input_ids):
-    # constructing the llm attention matrix
+def get_heatmap(model, outputs, tokenizer, prompt, input_ids, llm_layer_weights=None, image_layer_weights=None):
+    # Constructing the LLM attention matrix
     aggregated_prompt_attention = []
     for i, layer in enumerate(outputs["attentions"][0]):
         layer_attns = layer.squeeze(0)
+        #print(f"Layer {i} attention shape after squeeze: {layer_attns.shape}")
         attns_per_head = layer_attns.mean(dim=0)
+        #print(f"Layer {i} attention per head shape: {attns_per_head.shape}")
         cur = attns_per_head[:-1].cpu().clone()
-        # following the practice in `aggregate_llm_attention`
-        # we are zeroing out the attention to the first <bos> token
-        # for the first row `cur[0]` (corresponding to the next token after <bos>), however,
-        # we don't do this because <bos> is the only token that it can attend to
-        cur[1:, 0] = 0.
+        #print(f"Layer {i} attention shape after slicing: {cur.shape}")
+        # Following the practice in `aggregate_llm_attention`
+        cur[1:, 0] = 0.0
         cur[1:] = cur[1:] / cur[1:].sum(-1, keepdim=True)
+        #print(f"Layer {i} normalized attention shape: {cur.shape}")
         aggregated_prompt_attention.append(cur)
+    
     aggregated_prompt_attention = torch.stack(aggregated_prompt_attention).mean(dim=0)
+    # print(f"Aggregated prompt attention shape: {aggregated_prompt_attention.shape}")
 
-    # llm_attn_matrix will be of torch.Size([N, N])
-    # where N is the total number of input (both image and text ones) + output tokens
+    # print(len(list(map(aggregate_llm_attention, outputs["attentions"]))))
+    # print(f"{list(map(aggregate_llm_attention, outputs['attentions']))[0].shape}")
+    # print(f"{list(map(aggregate_llm_attention, outputs['attentions']))[1].shape}")
+
+    # Constructing the LLM attention matrix
     llm_attn_matrix = heterogenous_stack(
         [torch.tensor([1])]
         + list(aggregated_prompt_attention) 
         + list(map(aggregate_llm_attention, outputs["attentions"]))
     )
+    #print(f"LLM attention matrix shape: {llm_attn_matrix.shape}")
 
-    # identify length or index of tokens
-    input_token_len = model.get_vision_tower().num_patches + len(input_ids[0]) - 1 # -1 for the <image> token
+    # Identify length or index of tokens
+    input_token_len = model.get_vision_tower().num_patches + len(input_ids[0]) - 1  # -1 for the <image> token
+    #print(f"Input token length: {input_token_len}")
+    vision_token_start = len(tokenizer(prompt.split("<image>")[0], return_tensors='pt')["input_ids"][0])
+    vision_token_end = vision_token_start + model.get_vision_tower().num_patches
+    output_token_len = len(outputs["sequences"][0])
+    # print(f"Vision token start: {vision_token_start}, Vision token end: {vision_token_end}")
+    # print(f"Output token length: {output_token_len}")
+    output_token_start = input_token_len
+    output_token_end = output_token_start + output_token_len
+    #print(f"Output token start: {output_token_start}, Output token end: {output_token_end}")
+
+    output_token_inds = list(range(output_token_start, output_token_end))
+    #print(f"Output token indices: {output_token_inds}")
+
+    # Connect with the vision encoder attention
+    image_attentions = []
+    for i, layer in enumerate(model.get_vision_tower().image_attentions):
+        layer = layer[0, ...].unsqueeze(0)
+        #print(f"Vision layer {i} shape after squeeze: {layer.shape}")
+        image_attentions.append(layer)
+
+    vis_attn_matrix = aggregate_vit_attention(
+        image_attentions,
+        select_layer=model.get_vision_tower().select_layer,
+        all_prev_layers=True
+    )
+    #print(f"Vision attention matrix shape: {vis_attn_matrix.shape}")
+
+    grid_size = model.get_vision_tower().num_patches_per_side
+    #print(f"Grid size: {grid_size}")
+
+    # Initialize results
+    heat_torch_stack = []
+    ret_attn = []
+
+    # Output
+    for i in range(len(output_token_inds)):
+        target_token_ind = output_token_inds[i]
+        #print(f"Target token index: {target_token_ind}")
+        attn_weights_over_vis_tokens = llm_attn_matrix[target_token_ind][vision_token_start:vision_token_end]
+        #print(f"Attention weights over vision tokens shape: {attn_weights_over_vis_tokens.shape}")
+        attn_weights_over_vis_tokens = attn_weights_over_vis_tokens / attn_weights_over_vis_tokens.sum()
+
+        attn_over_image = []
+        for weight, vis_attn in zip(attn_weights_over_vis_tokens, vis_attn_matrix):
+            vis_attn = vis_attn.reshape(grid_size, grid_size)
+            #print(f"Vision attention shape after reshaping: {vis_attn.shape}")
+            attn_over_image.append(vis_attn * weight)
+
+        attn_over_image = torch.stack(attn_over_image).sum(dim=0)
+        #print(f"Aggregated attention over image shape: {attn_over_image.shape}")
+        attn_over_image = attn_over_image / attn_over_image.max()
+        ret_attn.append(attn_over_image)
+
+    return ret_attn
+
+def get_heatmap_with_layer_visualization(
+    model, outputs, tokenizer, prompt, input_ids, image,
+    save_path=None  # Folder path to save individual heatmaps
+):
+    if save_path:
+        import os
+        os.makedirs(save_path, exist_ok=True)
+
+    # Convert image tensor to PIL image
+    image_pil = ToPILImage()(image.cpu().squeeze(0)) if isinstance(image, torch.Tensor) else image
+
+    # Initialize storage for results
+    layerwise_results = {"llm_layers": []}
+
+    # Aggregate LLM attention
+    llm_layer_heatmaps = []
+    for layer_index, layer in enumerate(outputs["attentions"][0]):  # Assuming [batch, num_heads, seq_len, seq_len]
+        layer_attns = layer.squeeze(0)  # Remove batch dimension
+        #print(f"Layer {layer_index} attention shape after squeeze: {layer_attns.shape}")
+        attns_per_head = layer_attns.mean(dim=0)  # Average across attention heads
+        #print(f"Layer {layer_index} attention per head shape: {attns_per_head.shape}")
+        cur = attns_per_head[:-1].cpu().clone()  # Exclude padding tokens
+        #print(f"Layer {layer_index} attention shape after removing padding tokens: {cur.shape}")
+        cur[1:, 0] = 0.0  # Zero attention to <bos> token except for the first token
+        cur[1:] /= cur[1:].sum(dim=-1, keepdim=True)
+        #print(f"Layer {layer_index} normalized attention shape: {cur.shape}")
+        llm_layer_heatmaps.append(cur)
+
+    # Generate LLM attention matrix per layer
+    llm_attn_matrices = []
+    for layer_index, aggregated_prompt_attention in enumerate(llm_layer_heatmaps):  # llm_layer_heatmaps is per layer
+        #print(f"Constructing LLM attention matrix for layer {layer_index}")
+        llm_attn_matrix = heterogenous_stack(
+            [torch.tensor([1])]  # The first entry
+            + list(aggregated_prompt_attention)  # Aggregated prompt attention for the current layer
+            + [aggregate_llm_attention_single_layer(outputs["attentions"][i][layer_index]) for i in range(len(outputs["attentions"]))]  # Aggregate attention for the same layer
+        )
+        #print(f"Layer {layer_index} LLM attention matrix shape: {llm_attn_matrix.shape}")
+        llm_attn_matrices.append(llm_attn_matrix)
+    
+    # Identify token ranges
+    input_token_len = model.get_vision_tower().num_patches + len(input_ids[0]) - 1  # -1 for <image> token
     vision_token_start = len(tokenizer(prompt.split("<image>")[0], return_tensors='pt')["input_ids"][0])
     vision_token_end = vision_token_start + model.get_vision_tower().num_patches
     output_token_len = len(outputs["sequences"][0])
     output_token_start = input_token_len
     output_token_end = input_token_len + output_token_len
 
-    # look at the attention weights over the vision tokens
-    overall_attn_weights_over_vis_tokens = []
-    for i, (row, token) in enumerate(
-        zip(
-            llm_attn_matrix[input_token_len:], 
-            outputs["sequences"][0].tolist()
-        )
-    ):
-        overall_attn_weights_over_vis_tokens.append(
-            row[vision_token_start:vision_token_end].sum().item()
-        )
-
     # Connect with the vision encoder attention
-    # to visualize the attention over the image.
-    # vis_attn_matrix will be of torch.Size([N, N])
-    # where N is the number of vision tokens/patches
-    # `all_prev_layers=True` will average attention from all layers until the selected layer
-    # otherwise only the selected layer's attention will be used
-    # print(len(model.get_vision_tower().image_attentions), model.get_vision_tower().select_layer)
-    # print(model.get_vision_tower().image_attentions[0].shape)
     image_attentions = []
-    for layer in model.get_vision_tower().image_attentions:
+    for i, layer in enumerate(model.get_vision_tower().image_attentions):
         layer = layer[0, ...].unsqueeze(0)
+        #print(f"Vision layer {i} shape after squeeze: {layer.shape}")
         image_attentions.append(layer)
-        # print(layer.shape)
-    # vis_attn_matrix = aggregate_vit_attention(
-    #     model.get_vision_tower().image_attentions,
-    #     select_layer=model.get_vision_tower().select_layer,
-    #     all_prev_layers=True
-    # )
+
     vis_attn_matrix = aggregate_vit_attention(
         image_attentions,
         select_layer=model.get_vision_tower().select_layer,
         all_prev_layers=True
     )
-    # print(vis_attn_matrix.shape)
+    
     grid_size = model.get_vision_tower().num_patches_per_side
 
-    # whether visualize the attention heatmap or 
-    # the image with the attention heatmap overlayed
-
-    output_token_inds = list(range(output_token_start, output_token_end))
     heat_torch_stack = []
-    
-    ####
-    #### input / ouput swap 가능
-    ####
-    ## output
-    ret_attn = []
-    for i in range(len(output_token_inds)):
-    ## input
-    # for i, ax in enumerate(input_ids[0]):
 
-        # target_token_ind = i
-        target_token_ind = output_token_inds[i] - 1
-        attn_weights_over_vis_tokens = llm_attn_matrix[target_token_ind][vision_token_start:vision_token_end]
-        attn_weights_over_vis_tokens = attn_weights_over_vis_tokens / attn_weights_over_vis_tokens.sum()
+    for layer_index, llm_attn_matrix in enumerate(llm_attn_matrices):
+        #print(f"Processing layer {layer_index} for output tokens")
+        
+        output_token_inds = list(range(output_token_start, output_token_end))  # Output tokens for this layer
+        for token_index in output_token_inds:
+            attn_weights_over_vis_tokens = llm_attn_matrix[token_index][vision_token_start:vision_token_end]
+            attn_weights_over_vis_tokens /= attn_weights_over_vis_tokens.sum()
 
-        attn_over_image = []
-        for weight, vis_attn in zip(attn_weights_over_vis_tokens, vis_attn_matrix):
-            vis_attn = vis_attn.reshape(grid_size, grid_size)
-            # vis_attn = vis_attn / vis_attn.max()
-            # attn_over_image.append(vis_attn)
-            attn_over_image.append(vis_attn * weight)
-        attn_over_image = torch.stack(attn_over_image).sum(dim=0)
-        # print("max: ", attn_over_image.max(), "min :", attn_over_image.min())
-        attn_over_image = attn_over_image / attn_over_image.max()
-        ret_attn.append(attn_over_image)
-        attn_over_image = attn_over_image.to(torch.float32)
+            attn_over_image = []
+            for weight, vis_attn in zip(attn_weights_over_vis_tokens, vis_attn_matrix):
+                vis_attn = vis_attn.reshape(grid_size, grid_size)
+                attn_over_image.append(vis_attn * weight)
 
-    #     attn_over_image = F.interpolate(
-    #         attn_over_image.unsqueeze(0).unsqueeze(0), 
-    #         size=image.size, 
-    #         mode='nearest', 
-    #         # mode='bicubic',
-    #         # align_corners=True
-    #     ).squeeze()
-    #     heat_torch_stack.append(attn_over_image)
+            attn_over_image = torch.stack(attn_over_image).sum(dim=0)
+            attn_over_image /= attn_over_image.max()
 
-    # np_img = np.array(image)[:, :, ::-1]
-    # attn_tot = sum(heat_torch_stack)
-    # img_with_attn, heatmap = show_mask_on_image(np_img, attn_tot.numpy())
-    # # tt = tokenizer.decode(outputs["sequences"][0][i], add_special_tokens=False).strip()
-    # # tt = tokenizer.decode(input_ids[0][i], add_special_tokens=False).strip()
-    # img_with_attn = cv2.cvtColor(img_with_attn, cv2.COLOR_BGR2RGB)
+            # Resize the heatmap to match the original image size
+            resized_heatmap = F.interpolate(
+                attn_over_image.unsqueeze(0).unsqueeze(0),  # Add batch and channel dimensions
+                size=(image_pil.height, image_pil.width),  # Resize to match image dimensions
+                mode='nearest',
+                #align_corners=True
+            ).squeeze().numpy()
 
-    return ret_attn
+            # Normalize the resized heatmap
+            resized_heatmap /= resized_heatmap.max()
+
+            np_img = np.array(image_pil)[:, :, ::-1]
+            img_with_attn, heatmap = show_mask_on_image(np_img, resized_heatmap)
+            img_with_attn = cv2.cvtColor(img_with_attn, cv2.COLOR_BGR2RGB)
+            # # Generate the overlay
+            # overlay = plt.cm.jet(resized_heatmap)[:, :, :3] * 255  # Convert heatmap to RGB
+            # blended = (0.5 * np.array(image_pil) + 0.5 * overlay).astype(np.uint8)
+
+            # Save attention visualization for the current token and layer
+            if save_path:
+                plt.figure(figsize=(8, 8))
+                plt.imshow(img_with_attn )
+                plt.title(f"Layer {layer_index}, Token {token_index}")
+                plt.axis("off")
+                plt.savefig(f"{save_path}/layer_{layer_index}_token_{token_index}.png")
+                plt.close()
+
+            # Store heatmap
+            heat_torch_stack.append({
+                "layer_index": layer_index,
+                "token_index": token_index,
+                "heatmap": torch.tensor(resized_heatmap)
+            })
+
+    return layerwise_results
+
 
 def make_square(im, min_size=200, fill_color=(0, 0, 0)):
     x, y = im.size

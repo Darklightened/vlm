@@ -171,7 +171,7 @@ def simple_evaluate(
     task_dict = get_task_dict(tasks, task_manager)
 
     if model == "llava":
-        print("initialize llava model with modofication")
+        print("initialize llava model with modification")
 
         ModelClass = get_model(model)
         lm = ModelClass.create_from_arg_string(
@@ -185,6 +185,11 @@ def simple_evaluate(
                 "attention_threshold": cli_args.attention_threshold,
                 "remove_unpadding": cli_args.remove_unpadding,
                 "regenerate_condition": cli_args.regenerate_condition,
+                "detection_threshold": cli_args.detection_threshold,
+                "detection": cli_args.detection,
+                "save_output": cli_args.save_output,
+                "output_csv_path": cli_args.output_csv_path,
+                "target_token_selection_strategy": cli_args.target_token_selection_strategy,
             },
         )
 

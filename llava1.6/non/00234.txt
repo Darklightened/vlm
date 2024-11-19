@@ -1,3 +1,0 @@
-umbrella
-train
-cell phone

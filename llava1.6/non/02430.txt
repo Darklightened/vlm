@@ -1,3 +1,0 @@
-bus
-zebra
-stop sign

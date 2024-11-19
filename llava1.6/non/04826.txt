@@ -1,3 +1,0 @@
-cat
-bicycle
-dining table

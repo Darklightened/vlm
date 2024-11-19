@@ -1,3 +1,0 @@
-toaster
-horse
-remote

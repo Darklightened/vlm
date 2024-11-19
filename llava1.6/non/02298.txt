@@ -1,3 +1,0 @@
-bench
-stop sign
-boat

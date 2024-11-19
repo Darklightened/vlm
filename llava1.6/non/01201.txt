@@ -1,3 +1,0 @@
-knife
-zebra
-donut

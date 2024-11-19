@@ -1,3 +1,0 @@
-train
-hot dog
-wine glass

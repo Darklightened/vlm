@@ -1,3 +1,0 @@
-knife
-bear
-sheep

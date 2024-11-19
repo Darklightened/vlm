@@ -1,3 +1,0 @@
-mouse
-horse
-zebra

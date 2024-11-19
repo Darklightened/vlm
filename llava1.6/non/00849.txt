@@ -1,3 +1,0 @@
-person
-cat
-wine glass

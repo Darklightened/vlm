@@ -1,3 +1,0 @@
-umbrella
-car
-train

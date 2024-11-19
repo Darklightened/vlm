@@ -1,3 +1,0 @@
-cat
-traffic light
-motorcycle

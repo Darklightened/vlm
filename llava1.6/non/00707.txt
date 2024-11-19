@@ -1,3 +1,0 @@
-bus
-traffic light
-refrigerator

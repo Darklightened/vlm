@@ -1,3 +1,0 @@
-bicycle
-elephant
-traffic light

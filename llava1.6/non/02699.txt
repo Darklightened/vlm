@@ -1,3 +1,0 @@
-giraffe
-remote
-wine glass

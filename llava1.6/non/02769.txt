@@ -1,3 +1,0 @@
-bench
-remote
-dining table

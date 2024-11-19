@@ -1,3 +1,0 @@
-car
-cow
-remote
