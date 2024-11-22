@@ -453,7 +453,6 @@ def aggregate_vit_attention(attn, select_layer=-2, all_prev_layers=True):
         vec = attns_per_head[1:, 1:].cpu()
         return vec / vec.sum(-1, keepdim=True)
 
-
 def heterogenous_stack(vecs):
     '''Pad vectors with zeros then stack'''
     max_length = max(v.shape[0] for v in vecs)
@@ -512,8 +511,8 @@ def get_heatmap(
     output_token_start = input_token_len
     output_token_end = output_token_start + output_token_len
     
-    input_token_len = vision_tower.vision_tower.vision_model.embeddings.num_patches + len(input_ids[0]) - 1 + 144
-    vision_token_start = len(tokenizer(prompt.split("<image>")[0], return_tensors='pt')["input_ids"][0]) + 144
+    input_token_len = vision_tower.vision_tower.vision_model.embeddings.num_patches + len(input_ids[0]) - 1 + 144 
+    vision_token_start = len(tokenizer(prompt.split("<image>")[0], return_tensors='pt')["input_ids"][0]) + 144  
     vision_token_end = vision_token_start + 576
     output_token_len = len(outputs["sequences"][0])
     output_token_start = input_token_len
@@ -527,6 +526,12 @@ def get_heatmap(
             outputs["sequences"][0].tolist()
         )
     ):
+        # print(f'num_patches: {vision_tower.vision_tower.vision_model.embeddings.num_patches}')
+        # print(f'input_token_len: {input_token_len}')
+        # print(f'vision_token_start: {vision_token_start}')
+        # print(f'ision_token_end: {vision_token_end}')
+        # print(f'len(row): {len(row)}')
+        
         overall_attn_weights_over_vis_tokens.append(
             row[vision_token_start:vision_token_end].sum().item()
         )
@@ -554,12 +559,37 @@ def get_heatmap(
     for layer in vision_tower.image_attentions:
         layer = layer[0, ...].unsqueeze(0)
         image_attentions.append(layer)
-        
+
+    # image_attentions2 = []
+    # for layer in downsampled_vision_tower.image_attentions:
+    #     layer = layer[0, ...].unsqueeze(0)
+    #     image_attentions.append(layer)
+    
+    # image_attentions3 = []
+    # for layer in downsampled_vision_tower2.image_attentions:
+    #     layer = layer[0, ...].unsqueeze(0)
+    #     image_attentions.append(layer)
+                
     vis_attn_matrix = aggregate_vit_attention(
         image_attentions,
         select_layer=vision_tower.select_layer,
         all_prev_layers=True
     )
+    # downsampled_vis_attn_matrix = aggregate_vit_attention(
+    #     image_attentions2,
+    #     select_layer=downsampled_vision_tower.select_layer,
+    #     all_prev_layers=True
+    # )
+    # downsampled_vis_attn_matrix2 = aggregate_vit_attention(
+    #     image_attentions3,
+    #     select_layer=downsampled_vision_tower2.select_layer,
+    #     all_prev_layers=True
+    # )
+    
+    # print(f'vis_attn_matrix: {vis_attn_matrix.shape}')
+    # print(f'downsampled_vis_attn_matrix: {downsampled_vis_attn_matrix.shape}')
+    # print(f'downsampled_vis_attn_matrix2: {downsampled_vis_attn_matrix2.shape}')
+    
     grid_size = int(math.sqrt(vision_tower.vision_tower.vision_model.embeddings.num_patches))
 
     # whether visualize the attention heatmap or 
@@ -580,12 +610,13 @@ def get_heatmap(
         #print(f"target_token_indices: {target_token_ind}")        
         attn_weights_over_vis_tokens = llm_attn_matrix[target_token_ind][vision_token_start:vision_token_end]
         attn_weights_over_vis_tokens = attn_weights_over_vis_tokens / attn_weights_over_vis_tokens.sum()
-
         attn_over_image = []
+
         for weight, vis_attn in zip(attn_weights_over_vis_tokens, vis_attn_matrix):
             vis_attn = vis_attn.reshape(grid_size, grid_size)            
             # vis_attn = vis_attn / vis_attn.max()
             attn_over_image.append(vis_attn * weight)
+            # attn_over_image.append(vis_attn * torch.exp(weight))
             
         attn_over_image = torch.stack(attn_over_image).sum(dim=0)
         attn_over_image = attn_over_image / attn_over_image.max()

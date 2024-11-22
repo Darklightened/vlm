@@ -577,7 +577,7 @@ class Llava(lmms):
                         input_ids,
                         attention_mask=attention_masks,
                         pad_token_id=pad_token_ids,
-                        downsampled_image=downsampled_image_tensor,
+                        downsampled_image=None,
                         images=image_tensor,
                         image_sizes=gen_kwargs["image_sizes"],
                         do_sample=True if gen_kwargs["temperature"] > 0 else False,
@@ -586,7 +586,7 @@ class Llava(lmms):
                         num_beams=gen_kwargs["num_beams"],
                         max_new_tokens=gen_kwargs["max_new_tokens"],
                         use_cache=self.use_cache,
-                        generation_type="downsampled",
+                        generation_type=self.generation_type,
                         # return_dict_in_generate=True,
                         # output_attentions=True,
                         # output_scores=True,
@@ -675,7 +675,7 @@ class Llava(lmms):
                         ## Setting Threshold (Top 20%)
                         flattened_attn = attn.view(-1) 
                         flattened_attn = flattened_attn.float()
-                        threshold_index = int(len(flattened_attn) * (1 - top_k_percent)) 
+                        threshold_index = int(len(flattened_attn) * top_k_percent)
                         threshold_value = torch.topk(flattened_attn, threshold_index).values[-1]
 
                         image_mask_list = []
@@ -709,11 +709,6 @@ class Llava(lmms):
                     # text_outputs = [self.tokenizer.decode(cont["sequences"][0], skip_special_tokens=True).strip()]
                     text_outputs = self.tokenizer.batch_decode(cont, skip_special_tokens=True) 
                     del cont
-                    # print("recursive 2nd stage")
-                    # print()
-                    # print(text_outputs)
-                    # print()
-                    # exit()
                 #################################################
                 #################################################
                 #################################################

@@ -800,6 +800,9 @@ class LlavaMetaForCausalLM(ABC):
                             else:
                                 image_feature = image_feature.permute(0, 2, 1, 3, 4).contiguous()
                                 image_feature = image_feature.flatten(0, 3)
+                        elif generation_type == "baseline":
+                            image_feature = image_feature.permute(0, 2, 1, 3, 4).contiguous()
+                            image_feature = image_feature.flatten(0, 3)
                         if "nobase" in mm_patch_merge_type:
                             pass
                         else:
@@ -841,7 +844,6 @@ class LlavaMetaForCausalLM(ABC):
                                 image_feature = image_feature
                             ## no recursion - default: concat base, split
                             else:
-                                #print("no recursion - default")
                                 image_feature = torch.cat((base_image_feature, image_feature), dim=0)
                         new_image_features.append(image_feature)
                     else:  # single image operations

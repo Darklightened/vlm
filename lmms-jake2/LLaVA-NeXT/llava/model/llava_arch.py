@@ -42,6 +42,7 @@ class LlavaMetaModel:
             self.vision_tower = build_vision_tower(config, delay_load=delay_load)
             self.downsampled_vision_tower = None
             self.downsampled_vision_tower2 = None
+            self.downsampled_vision_tower3 = None
             # self.downsampled_vision_tower = build_vision_tower(config, delay_load=delay_load)
             # self.downsampled_vision_tower = copy.deepcopy(self.vision_tower)
             self.vision_resampler = build_vision_resampler(config, vision_tower=self.vision_tower)
@@ -67,7 +68,13 @@ class LlavaMetaModel:
         if type(downsampled_vision_tower2) is list:
             downsampled_vision_tower2 = downsampled_vision_tower2[0]
         return downsampled_vision_tower2
-    
+
+    def get_downsampled_vision_tower3(self):
+        downsampled_vision_tower3 = getattr(self, "downsampled_vision_tower3", None)
+        if type(downsampled_vision_tower3) is list:
+            downsampled_vision_tower3 = downsampled_vision_tower3[0]
+        return downsampled_vision_tower3
+       
     def initialize_vision_modules(self, model_args, fsdp=None):
         vision_tower = model_args.vision_tower
         mm_vision_select_layer = model_args.mm_vision_select_layer
@@ -191,6 +198,8 @@ class LlavaMetaForCausalLM(ABC):
     def get_downsampled_vision_tower2(self):
         return self.get_model().get_downsampled_vision_tower2()
 
+    # def get_downsampled_vision_tower3(self):
+    #     return self.get_model().get_downsampled_vision_tower3()
 
     def get_2dPool(self, image_feature, stride=2):
         height = width = self.get_vision_tower().num_patches_per_side
@@ -230,7 +239,13 @@ class LlavaMetaForCausalLM(ABC):
         # image_features = self.get_model().vision_resampler(image_features, images=images)
         image_features = self.get_model().mm_projector(image_features)
         return image_features
-       
+ 
+    # def encode_downsampled_images3(self, images):
+    #     image_features = self.get_model().get_downsampled_vision_tower3()(images)
+    #     # image_features = self.get_model().vision_resampler(image_features, images=images)
+    #     image_features = self.get_model().mm_projector(image_features)
+    #     return image_features
+          
     def encode_multimodals(self, videos_or_images, video_idx_in_batch, split_sizes=None):
         videos_or_images_features = self.get_model().get_vision_tower()(videos_or_images)
         per_videos_or_images_features = torch.split(videos_or_images_features, split_sizes, dim=0)  # tuple, (dim_1, 576, 4096)
@@ -591,7 +606,7 @@ class LlavaMetaForCausalLM(ABC):
     #     return None, position_ids, attention_mask, past_key_values, new_input_embeds, new_labels
 
     def prepare_inputs_labels_for_multimodal(self, input_ids, position_ids, attention_mask, past_key_values, 
-    labels, images, downsampled_image=None, downsampled_image2=None,divide_shape=None, modalities=["image"], image_sizes=None, image_mask=None, generation_type="default"):
+    labels, images, downsampled_image=None, downsampled_image2=None, divide_shape=None, modalities=["image"], image_sizes=None, image_mask=None, generation_type="default"):
 
         vision_tower = self.get_vision_tower()
         # rank_print(modalities)
@@ -627,7 +642,10 @@ class LlavaMetaForCausalLM(ABC):
             
             if downsampled_image2 is not None:
                 encoded_downsampled_image_features2 = self.encode_downsampled_images2(downsampled_image2.squeeze(0))
-            
+
+            # if downsampled_image3 is not None:
+            #     encoded_downsampled_image_features3 = self.encode_downsampled_images3(downsampled_image3.squeeze(0))
+                        
             # image_features,all_faster_video_features = self.encode_multimodals(concat_images, video_idx_in_batch, split_sizes)
 
             # This is a list, each element is [num_images, patch * patch, dim]
@@ -701,27 +719,35 @@ class LlavaMetaForCausalLM(ABC):
                     elif image_feature.shape[0] > 1:  # multi patches and multi images operations
                         #print("divide into several patches")
                         # rank0_print("Single-images")
-
+                        # print(image_feature.shape)
+                        # print(image_feature[0].shape)
+                        # print(image_feature[1].shape)
+                        
                         ## retain or exclude base_image_feature
                         if generation_type == "downsampled":
                             downsampled_base_image_feature = encoded_downsampled_image_features[0]
                             downsampled_base_image_feature2 = encoded_downsampled_image_features2[0]
+                            # downsampled_base_image_feature3 = encoded_downsampled_image_features3[0]
                             base_image_feature = image_feature[0]
                         elif generation_type == "recursion_stage1":
                             downsampled_base_image_feature = encoded_downsampled_image_features[0]
                             downsampled_base_image_feature2 = encoded_downsampled_image_features2[0]
+                            # downsampled_base_image_feature3 = encoded_downsampled_image_features3[0]
                             base_image_feature = image_feature[0]
                         elif generation_type == "recursion_stage2":
                             downsampled_base_image_feature = encoded_downsampled_image_features[0]
                             downsampled_base_image_feature2 = encoded_downsampled_image_features2[0]
+                            # downsampled_base_image_feature3 = encoded_downsampled_image_features3[0]
                             base_image_feature = image_feature[0]
                         elif generation_type == "downsampled_base":
                             downsampled_base_image_feature = encoded_downsampled_image_features[0]
                             downsampled_base_image_feature2 = encoded_downsampled_image_features2[0]
+                            # downsampled_base_image_feature3 = encoded_downsampled_image_features3[0]
                             base_image_feature = image_feature[0]
                         elif generation_type == "downsampled_tot":
                             downsampled_base_image_feature = encoded_downsampled_image_features[0]
                             downsampled_base_image_feature2 = encoded_downsampled_image_features2[0]
+                            # downsampled_base_image_feature3 = encoded_downsampled_image_features3[0]
                             base_image_feature = image_feature[0]
                         elif (image_mask == None) or (generation_type == "recursion_retain_base"):
                             base_image_feature = image_feature[0]

@@ -5,6 +5,7 @@ import math
 import ast
 import re
 import torch
+import copy
 from transformers import StoppingCriteria
 from llava.constants import IMAGE_TOKEN_INDEX
 
@@ -15,7 +16,59 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 from torchvision.transforms import ToPILImage
+from matplotlib import cm
 
+def init_downsampled_vision_towers(vision_tower, stages, positional_embedding_type):
+    print(vision_tower.vision_model)
+    exit()
+    print(f"change positional embedding to {positional_embedding_type}")
+    downsampled_vision_towers = dict()
+    for stage in stages:
+        if stage == 0:
+            break
+        downsampled_vision_towers[stage] = copy.deepcopy(vision_tower)
+
+    # Default configurations of model position embedding
+    patch_size = 14
+    image_size = vision_tower.vision_model.image_size
+
+    for stage in stages:
+        if stage == 0:
+            break
+        downsampled_image_size = image_size * pow(2, stage)
+        assert (downsampled_image_size // patch_size) == (downsampled_image_size / patch_size), f"unavailable stage: {stage}"
+        num_patches = (downsampled_image_size // patch_size) ** 2
+        num_positions = num_patches + 1
+        embed_dim = vision_tower.vision_model.embeddings.embed_dim
+
+        downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.image_size = downsampled_image_size
+        downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.num_patches = num_patches
+        downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.num_positions = num_positions
+        downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.register_buffer("position_ids", torch.arange(num_positions).expand((1, -1)), persistent=False)
+    
+        # Modify positional embedding to match the resized image size
+        if positional_embedding_type == "zero":       
+            downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions, embed_dim).to(dtype=torch.float16)
+            torch.nn.init.constant_(downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding.weight, 0)
+        elif positional_embedding_type == "interpolation":
+            # Interpolate from the pretrained positional embedding
+            original_embedding = downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding.weight.data
+            original_num_positions = original_embedding.size(0)
+            new_embedding = torch.nn.functional.interpolate(
+                original_embedding.unsqueeze(0).transpose(1, 2), 
+                size=(num_positions,), 
+                mode='linear', 
+                align_corners=False
+            ).transpose(1, 2).squeeze(0)
+            downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions, embed_dim).to(dtype=torch.float16)
+            downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding.weight.data.copy_(new_embedding)
+        elif positional_embedding_type == "reduced":
+            print("Reduced embedding type.")
+            # Reduce the pretrained embedding by truncating
+            original_embedding = downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding.weight.data
+            downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions, embed_dim).to(dtype=torch.float16)
+            downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding.weight.data.copy_(original_embedding[:num_positions])
+    return downsampled_vision_towers                                
 
 def resize_and_center_crop(image, shortest_edge_length):
     # Calculate new dimensions and resize
@@ -494,51 +547,43 @@ def show_mask_on_image(img, mask):
     cam = cam / np.max(cam)
     return np.uint8(255 * cam), heatmap
 
-def get_heatmap(model, outputs, tokenizer, prompt, input_ids, llm_layer_weights=None, image_layer_weights=None):
+def get_heatmap(model, outputs, tokenizer, prompt, input_ids, num_current_patches, input_offset=0, image=None, save_path=None, llm_layer_weights=None, image_layer_weights=None):
     # Constructing the LLM attention matrix
     aggregated_prompt_attention = []
     for i, layer in enumerate(outputs["attentions"][0]):
-        layer_attns = layer.squeeze(0)
-        #print(f"Layer {i} attention shape after squeeze: {layer_attns.shape}")
+        layer_attns = layer.squeeze(0)        
         attns_per_head = layer_attns.mean(dim=0)
-        #print(f"Layer {i} attention per head shape: {attns_per_head.shape}")
         cur = attns_per_head[:-1].cpu().clone()
-        #print(f"Layer {i} attention shape after slicing: {cur.shape}")
-        # Following the practice in `aggregate_llm_attention`
         cur[1:, 0] = 0.0
         cur[1:] = cur[1:] / cur[1:].sum(-1, keepdim=True)
-        #print(f"Layer {i} normalized attention shape: {cur.shape}")
         aggregated_prompt_attention.append(cur)
     
-    aggregated_prompt_attention = torch.stack(aggregated_prompt_attention).mean(dim=0)
-    # print(f"Aggregated prompt attention shape: {aggregated_prompt_attention.shape}")
-
-    # print(len(list(map(aggregate_llm_attention, outputs["attentions"]))))
-    # print(f"{list(map(aggregate_llm_attention, outputs['attentions']))[0].shape}")
-    # print(f"{list(map(aggregate_llm_attention, outputs['attentions']))[1].shape}")
+    aggregated_prompt_attention = torch.stack(aggregated_prompt_attention).mean(dim=0)    
 
     # Constructing the LLM attention matrix
     llm_attn_matrix = heterogenous_stack(
         [torch.tensor([1])]
         + list(aggregated_prompt_attention) 
         + list(map(aggregate_llm_attention, outputs["attentions"]))
-    )
-    #print(f"LLM attention matrix shape: {llm_attn_matrix.shape}")
+    )    
 
     # Identify length or index of tokens
-    input_token_len = model.get_vision_tower().num_patches + len(input_ids[0]) - 1  # -1 for the <image> token
-    #print(f"Input token length: {input_token_len}")
-    vision_token_start = len(tokenizer(prompt.split("<image>")[0], return_tensors='pt')["input_ids"][0])
-    vision_token_end = vision_token_start + model.get_vision_tower().num_patches
+    # input_token_len = model.get_vision_tower().num_patches + len(input_ids[0]) - 1  # -1 for the <image> token    
+    # vision_token_start = len(tokenizer(prompt.split("<image>")[0], return_tensors='pt')["input_ids"][0])
+    # vision_token_end = vision_token_start + model.get_vision_tower().num_patches
+    # output_token_len = len(outputs["sequences"][0])
+
+    ########### check ############
+    ## input offset = token length if images that are not to be processed
+    ## num_current_patches = image tokens that are to be recursed (cutting target image)
+    input_token_len = num_current_patches + len(input_ids[0]) - 1 + input_offset  # -1 for the <image> token    
+    vision_token_start = len(tokenizer(prompt.split("<image>")[0], return_tensors='pt')["input_ids"][0]) + input_offset
+    vision_token_end = vision_token_start + num_current_patches
     output_token_len = len(outputs["sequences"][0])
-    # print(f"Vision token start: {vision_token_start}, Vision token end: {vision_token_end}")
-    # print(f"Output token length: {output_token_len}")
+   
     output_token_start = input_token_len
     output_token_end = output_token_start + output_token_len
-    #print(f"Output token start: {output_token_start}, Output token end: {output_token_end}")
-
-    output_token_inds = list(range(output_token_start, output_token_end))
-    #print(f"Output token indices: {output_token_inds}")
+    output_token_inds = list(range(output_token_start, output_token_end))    
 
     # Connect with the vision encoder attention
     image_attentions = []
@@ -561,24 +606,57 @@ def get_heatmap(model, outputs, tokenizer, prompt, input_ids, llm_layer_weights=
     heat_torch_stack = []
     ret_attn = []
 
+    # if image is not None:
+    #     image_pil = ToPILImage()(image.cpu().squeeze(0)) if isinstance(image, torch.Tensor) else image
+
+    # if save_path:
+    #     import os
+    #     os.makedirs(save_path, exist_ok=True)
+
     # Output
     for i in range(len(output_token_inds)):
-        target_token_ind = output_token_inds[i]
-        #print(f"Target token index: {target_token_ind}")
-        attn_weights_over_vis_tokens = llm_attn_matrix[target_token_ind][vision_token_start:vision_token_end]
-        #print(f"Attention weights over vision tokens shape: {attn_weights_over_vis_tokens.shape}")
+        target_token_ind = output_token_inds[i]        
+        attn_weights_over_vis_tokens = llm_attn_matrix[target_token_ind][vision_token_start:vision_token_end]        
         attn_weights_over_vis_tokens = attn_weights_over_vis_tokens / attn_weights_over_vis_tokens.sum()
 
         attn_over_image = []
         for weight, vis_attn in zip(attn_weights_over_vis_tokens, vis_attn_matrix):
             vis_attn = vis_attn.reshape(grid_size, grid_size)
-            #print(f"Vision attention shape after reshaping: {vis_attn.shape}")
+            
             attn_over_image.append(vis_attn * weight)
 
-        attn_over_image = torch.stack(attn_over_image).sum(dim=0)
-        #print(f"Aggregated attention over image shape: {attn_over_image.shape}")
+        attn_over_image = torch.stack(attn_over_image).sum(dim=0)        
         attn_over_image = attn_over_image / attn_over_image.max()
         ret_attn.append(attn_over_image)
+
+        # if image is not None:
+        #     # Resize the heatmap to match the original image size
+        #     resized_heatmap = F.interpolate(
+        #         attn_over_image.unsqueeze(0).unsqueeze(0),  # Add batch and channel dimensions
+        #         size=(image_pil.height, image_pil.width),  # Resize to match image dimensions
+        #         mode='bilinear',  # Use bilinear for smoother heatmap
+        #         align_corners=True
+        #     ).squeeze().numpy()
+
+        #     # Normalize the resized heatmap
+        #     resized_heatmap -= resized_heatmap.min()
+        #     resized_heatmap /= resized_heatmap.max()
+
+        #     np_img = np.array(image_pil)[:, :, ::-1]
+        #     heatmap = (cm.jet(resized_heatmap)[:, :, :3] * 255).astype(np.uint8)
+        #     blended = cv2.addWeighted(np_img, 0.5, heatmap, 0.5, 0)
+        #     img_with_attn = cv2.cvtColor(blended, cv2.COLOR_BGR2RGB)
+        #     # img_with_attn, heatmap = show_mask_on_image(np_img, resized_heatmap)
+        #     # img_with_attn = cv2.cvtColor(img_with_attn, cv2.COLOR_BGR2RGB)
+            
+        #     # Save attention visualization for the current token and layer
+        #     if save_path:
+        #         plt.figure(figsize=(8, 8))
+        #         plt.imshow(img_with_attn )
+        #         plt.title(f"Token {target_token_ind}")
+        #         plt.axis("off")
+        #         plt.savefig(f"{save_path}/token_{target_token_ind}.png")
+        #         plt.close()
 
     return ret_attn
 

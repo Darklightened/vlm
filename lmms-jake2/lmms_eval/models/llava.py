@@ -263,7 +263,8 @@ class Llava(lmms):
             print(f"change positional embedding to {positional_embedding_type}")
             self.model.model.downsampled_vision_tower = copy.deepcopy(self.model.model.vision_tower)
             self.model.model.downsampled_vision_tower2 = copy.deepcopy(self.model.model.vision_tower)
-            
+            # self.model.model.downsampled_vision_tower3 = copy.deepcopy(self.model.model.vision_tower)
+                       
             # Default configurations of model position embedding
             patch_size = 14
             num_patches = (resized_image_size // patch_size) ** 2
@@ -285,6 +286,15 @@ class Llava(lmms):
             self.model.model.downsampled_vision_tower2.vision_tower.vision_model.embeddings.num_positions = num_positions2
             self.model.model.downsampled_vision_tower2.vision_tower.vision_model.embeddings.register_buffer("position_ids", torch.arange(num_positions2).expand((1, -1)), persistent=False)
 
+            # # 168 // 2 = 42
+            # num_patches3 = ((resized_image_size // 4) // patch_size) ** 2
+            # num_positions3 = num_patches3 + 1
+            # embed_dim3 = self.model.model.downsampled_vision_tower3.vision_tower.vision_model.embeddings.embed_dim
+
+            # self.model.model.downsampled_vision_tower3.vision_tower.vision_model.embeddings.image_size = resized_image_size // 4
+            # self.model.model.downsampled_vision_tower3.vision_tower.vision_model.embeddings.num_patches = num_patches3
+            # self.model.model.downsampled_vision_tower3.vision_tower.vision_model.embeddings.num_positions = num_positions3
+            # self.model.model.downsampled_vision_tower3.vision_tower.vision_model.embeddings.register_buffer("position_ids", torch.arange(num_positions3).expand((1, -1)), persistent=False)
 
             # Modify positional embedding to match the resized image size
             if positional_embedding_type == "zero":       
@@ -293,15 +303,36 @@ class Llava(lmms):
             elif positional_embedding_type == "interpolation":
                 # Interpolate from the pretrained positional embedding
                 original_embedding = self.model.model.downsampled_vision_tower.vision_tower.vision_model.embeddings.position_embedding.weight.data
-                original_num_positions = original_embedding.size(0)
-                new_embedding = torch.nn.functional.interpolate(
-                    original_embedding.unsqueeze(0).transpose(1, 2), 
-                    size=(num_positions,), 
-                    mode='linear', 
-                    align_corners=False
-                ).transpose(1, 2).squeeze(0)
-                self.model.model.downsampled_vision_tower.vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions, embed_dim).to(dtype=torch.float16, device=device)
+                cls_token = original_embedding[:1, :]
+                original_embedding = original_embedding[1:, :]  # Skip CLS
+                original_embedding = original_embedding.view(24, 24, -1).permute(2, 0, 1).unsqueeze(0) # (1, 1024, 24, 24)
+                new_height, new_width = 12, 12
+                resized_positional_embeddings = torch.nn.functional.interpolate(
+                                                original_embedding,
+                                                size=(new_height, new_width),  # (12, 12)로 변경
+                                                mode='bilinear',
+                                                align_corners=False
+                                            )  # (1, 1024, 12, 12)
+                resized_positional_embeddings = resized_positional_embeddings.squeeze(0).permute(1, 2, 0).reshape(-1, 1024) # (144, 1024)
+                new_embedding = torch.cat([cls_token, resized_positional_embeddings], dim=0)  # (257, 1024)
+                self.model.model.downsampled_vision_tower.vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(145, embed_dim).to(dtype=torch.float16, device=device)
                 self.model.model.downsampled_vision_tower.vision_tower.vision_model.embeddings.position_embedding.weight.data.copy_(new_embedding)
+            
+                original_embedding2 = self.model.model.downsampled_vision_tower2.vision_tower.vision_model.embeddings.position_embedding.weight.data
+                original_embedding2 = original_embedding2[1:, :] # Skip CLS
+                original_embedding2 = original_embedding2.view(24, 24, -1).permute(2, 0, 1).unsqueeze(0) # (1, 1024, 24, 24)
+                new_height, new_width = 6, 6
+                resized_positional_embeddings2 = torch.nn.functional.interpolate(
+                                                original_embedding2,
+                                                size=(new_height, new_width),  # (6, 6)로 변경
+                                                mode='bilinear',
+                                                align_corners=False
+                                            )  # (1, 1024, 6, 6)
+                resized_positional_embeddings2 = resized_positional_embeddings2.squeeze(0).permute(1, 2, 0).reshape(-1, 1024) # (36, 1024)
+                new_embedding2 = torch.cat([cls_token, resized_positional_embeddings2], dim=0)  # (257, 1024)
+                self.model.model.downsampled_vision_tower2.vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(37, embed_dim).to(dtype=torch.float16, device=device)
+                self.model.model.downsampled_vision_tower2.vision_tower.vision_model.embeddings.position_embedding.weight.data.copy_(new_embedding2)
+            
             elif positional_embedding_type == "reduced":
                 print("Reduced embedding type.")
                 # Reduce the pretrained embedding by truncating
@@ -312,7 +343,71 @@ class Llava(lmms):
                 original_embedding = self.model.model.downsampled_vision_tower2.vision_tower.vision_model.embeddings.position_embedding.weight.data
                 self.model.model.downsampled_vision_tower2.vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions2, embed_dim2).to(dtype=torch.float16, device=device)
                 self.model.model.downsampled_vision_tower2.vision_tower.vision_model.embeddings.position_embedding.weight.data.copy_(original_embedding[:num_positions2])
-           
+
+                # original_embedding = self.model.model.downsampled_vision_tower3.vision_tower.vision_model.embeddings.position_embedding.weight.data
+                # self.model.model.downsampled_vision_tower3.vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions3, embed_dim3).to(dtype=torch.float16, device=device)
+                # self.model.model.downsampled_vision_tower3.vision_tower.vision_model.embeddings.position_embedding.weight.data.copy_(original_embedding[:num_positions3])
+
+            elif positional_embedding_type == "reduced_skip_cls":
+                print("Reduced embedding type.")
+                # Reduce the pretrained embedding by truncating
+                original_embedding = self.model.model.downsampled_vision_tower.vision_tower.vision_model.embeddings.position_embedding.weight.data
+                self.model.model.downsampled_vision_tower.vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions, embed_dim).to(dtype=torch.float16, device=device)
+                self.model.model.downsampled_vision_tower.vision_tower.vision_model.embeddings.position_embedding.weight.data.copy_(original_embedding[1:num_positions+1])
+                
+                original_embedding = self.model.model.downsampled_vision_tower2.vision_tower.vision_model.embeddings.position_embedding.weight.data
+                self.model.model.downsampled_vision_tower2.vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions2, embed_dim2).to(dtype=torch.float16, device=device)
+                self.model.model.downsampled_vision_tower2.vision_tower.vision_model.embeddings.position_embedding.weight.data.copy_(original_embedding[1:num_positions2+1])
+
+            elif positional_embedding_type == "average":
+                print("Average embedding type.")
+                
+                # Original embedding for first vision tower
+                original_embedding = self.model.model.downsampled_vision_tower.vision_tower.vision_model.embeddings.position_embedding.weight.data
+                original_positions = original_embedding.size(0)
+                print(f"168 original positions : {original_positions}")
+
+                # Separate CLS token and patch tokens
+                cls_token = original_embedding[0].clone()  # CLS token
+                patch_tokens = original_embedding[1:]  # Patch tokens only
+
+                # Create new positional embedding
+                self.model.model.downsampled_vision_tower.vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions, embed_dim).to(dtype=torch.float16, device=device)
+                new_embedding = self.model.model.downsampled_vision_tower.vision_tower.vision_model.embeddings.position_embedding.weight.data
+
+                # Calculate averaged embeddings for patch tokens
+                step = (patch_tokens.size(0) / (num_positions - 1))  # Exclude CLS token
+                print(f"168 Average Poition Step: {step}")
+
+                new_embedding[0] = cls_token  # Retain CLS token
+                for i in range(1, num_positions):
+                    start = int((i - 1) * step)
+                    end = int(min(i * step, patch_tokens.size(0)))
+                    new_embedding[i] = patch_tokens[start:end].mean(dim=0)
+
+                # Original embedding for second vision tower
+                original_embedding2 = self.model.model.downsampled_vision_tower2.vision_tower.vision_model.embeddings.position_embedding.weight.data
+                original_positions2 = original_embedding2.size(0)
+                print(f"84 original positions : {original_positions2}")
+
+                # Separate CLS token and patch tokens
+                cls_token2 = original_embedding2[0].clone()  # CLS token
+                patch_tokens2 = original_embedding2[1:]  # Patch tokens only
+
+                # Create new positional embedding
+                self.model.model.downsampled_vision_tower2.vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions2, embed_dim2).to(dtype=torch.float16, device=device)
+                new_embedding2 = self.model.model.downsampled_vision_tower2.vision_tower.vision_model.embeddings.position_embedding.weight.data
+
+                # Calculate averaged embeddings for patch tokens
+                step2 = (patch_tokens2.size(0) / (num_positions2 - 1))  # Exclude CLS token
+                print(f"84 Average Poition Step: {step2}")
+
+                new_embedding2[0] = cls_token2  # Retain CLS token
+                for i in range(1, num_positions2):
+                    start = int((i - 1) * step2)
+                    end = int(min(i * step2, patch_tokens2.size(0)))
+                    new_embedding2[i] = patch_tokens2[start:end].mean(dim=0)
+                    
             self.model.to(device)
     
     # Method to log each stage's results
@@ -536,6 +631,11 @@ class Llava(lmms):
                     # downsampled_image_tensor = F.interpolate(image_tensor[0], size=(self.resized_image_size, self.resized_image_size), mode='bilinear', align_corners=False)
                     downsampled_image_tensor2 = downsampled_image_tensor2.unsqueeze(0)
                     downsampled_image_tensor2 = downsampled_image_tensor2.to(dtype=torch.float16, device=self.device)
+                    
+                    # downsampled_image_tensor3 = F.interpolate(image_tensor[0], size=(self.resized_image_size // 4, self.resized_image_size // 4), mode='bilinear', align_corners=False)
+                    # # downsampled_image_tensor = F.interpolate(image_tensor[0], size=(self.resized_image_size, self.resized_image_size), mode='bilinear', align_corners=False)
+                    # downsampled_image_tensor3 = downsampled_image_tensor3.unsqueeze(0)
+                    # downsampled_image_tensor3 = downsampled_image_tensor3.to(dtype=torch.float16, device=self.device)
             else:
                 image_tensor = None
 
@@ -595,6 +695,7 @@ class Llava(lmms):
                         pad_token_id=pad_token_ids,
                         downsampled_image=downsampled_image_tensor,
                         downsampled_image2=downsampled_image_tensor2,
+                        # downsampled_image3=downsampled_image_tensor3,
                         images=image_tensor,
                         image_sizes=gen_kwargs["image_sizes"],
                         do_sample=True if gen_kwargs["temperature"] > 0 else False,
@@ -617,6 +718,7 @@ class Llava(lmms):
                         pad_token_id=pad_token_ids,
                         downsampled_image=downsampled_image_tensor,
                         downsampled_image2=downsampled_image_tensor2,
+                        # downsampled_image3=downsampled_image_tensor3,
                         images=image_tensor,
                         image_sizes=gen_kwargs["image_sizes"],
                         do_sample=True if gen_kwargs["temperature"] > 0 else False,
@@ -654,7 +756,7 @@ class Llava(lmms):
                     )              
                     # # Save first stage results to CSV
                     # self.save_stage_to_csv("Stage 1", doc_id, text_outputs, cumulative_confidences)
-
+                
                     # returns attention over image tokens
                     image = flattened_visuals[0]
                     # folder = f"/home/aidas_intern_1/woohyeon/lmms-woohyeon/vis"
@@ -677,6 +779,7 @@ class Llava(lmms):
                     med = torch.stack(heat_torch_stack, dim=0)
                     med = med.mean(dim=0)
                     np_img = np.array(image)[:, :, ::-1]
+                    
                     for i, attn in enumerate(heat_torch_stack):
                         attn -= med
                         attn = torch.relu(attn)
@@ -697,7 +800,6 @@ class Llava(lmms):
                         attn = ret_attn[0] - med
                         attn = torch.relu(attn)
                         attn = attn / attn.max()
-
                         image_mask_list = []
                         for row in range(attn.shape[0]):
                             for col in range(attn.shape[1]):
@@ -707,6 +809,7 @@ class Llava(lmms):
                             image_mask = None
                         else:
                             image_mask = torch.cat(image_mask_list)
+                            
                     elif self.attention_thresholding_type == "layer_mean_with_top_k":  
                         attn = ret_attn[0]
 
@@ -714,7 +817,7 @@ class Llava(lmms):
                         ## Setting Threshold (Top 20%)
                         flattened_attn = attn.view(-1) 
                         flattened_attn = flattened_attn.float()
-                        threshold_index = int(len(flattened_attn) * (1 - top_k_percent)) 
+                        threshold_index = int(len(flattened_attn) * (top_k_percent)) 
                         threshold_value = torch.topk(flattened_attn, threshold_index).values[-1]
 
                         image_mask_list = []
@@ -730,7 +833,7 @@ class Llava(lmms):
                         calculated_threshold = confidence_based_threshold(cumulative_confidences, base_threshold=self.attention_threshold)
                         print(f"Calculated Threshold: {calculated_threshold}")
                         flattened_attn = attn.view(-1).float()
-                        threshold_index = int(len(flattened_attn) * (1 - calculated_threshold))
+                        threshold_index = int(len(flattened_attn) * (calculated_threshold))
                         print(f"threshold_index: {threshold_index}")
                         threshold_value = torch.topk(flattened_attn, threshold_index).values[-1]
 
@@ -750,6 +853,7 @@ class Llava(lmms):
                         pad_token_id=pad_token_ids,
                         downsampled_image=downsampled_image_tensor,
                         downsampled_image2=downsampled_image_tensor2,
+                        # downsampled_image3=downsampled_image_tensor3,
                         images=image_tensor,
                         image_sizes=gen_kwargs["image_sizes"],
                         do_sample=True if gen_kwargs["temperature"] > 0 else False,
@@ -766,7 +870,21 @@ class Llava(lmms):
                     )
                     # text_outputs = [self.tokenizer.decode(cont["sequences"][0], skip_special_tokens=True).strip()]
                     text_outputs = self.tokenizer.batch_decode(cont, skip_special_tokens=True) 
+                    # scores = cont.scores                 
+
+                    # # # Calculate entropy and all cumulative confidences
+                    # P_T_given_I_Q_full2, entropy_sum, cumulative_confidences = calculate_entropy_and_all_confidences(
+                    #     cont["sequences"][0], scores = scores
+                    # )  
                     del cont
+                    
+                    # if P_T_given_I_Q_full - P_T_given_I_Q_full2 >= 0.3 : 
+                    #     text_outpts = text_outputs
+                    #     print('Using 1st Round Result')
+                    # else:
+                    #     text_outputs = text_outputs2
+                    #     print('Using 2nd Round Result')
+                        
                     # print("recursive 2nd stage")
                     # print()
                     # print(text_outputs)
@@ -896,3 +1014,4 @@ class Llava(lmms):
 
     def generate_until_multi_round(self, requests) -> List[str]:
         raise NotImplementedError("TODO: Implement multi-round generation for LLaVA")
+    

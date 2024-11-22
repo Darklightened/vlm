@@ -39,6 +39,7 @@ class LlavaMetaModel:
         if hasattr(config, "mm_vision_tower"):
             delay_load = getattr(config, "delay_load", False)
             self.vision_tower = build_vision_tower(config, delay_load=delay_load)
+            self.downsampled_vision_towers = dict()
             self.vision_resampler = build_vision_resampler(config, vision_tower=self.vision_tower)
             self.mm_projector = build_vision_projector(config, vision_cfg=self.vision_tower.config)
 
@@ -50,6 +51,12 @@ class LlavaMetaModel:
         if type(vision_tower) is list:
             vision_tower = vision_tower[0]
         return vision_tower
+    
+    def get_downsampled_vision_towers(self, stage=-1):
+        downsampled_vision_towers = getattr(self, "downsampled_vision_towers", None)
+        assert type(downsampled_vision_towers) is dict, "Must be dict"
+        downsampled_vision_tower = downsampled_vision_towers[stage]
+        return downsampled_vision_tower
 
     def initialize_vision_modules(self, model_args, fsdp=None):
         vision_tower = model_args.vision_tower
@@ -167,6 +174,13 @@ class LlavaMetaForCausalLM(ABC):
 
     def get_vision_tower(self):
         return self.get_model().get_vision_tower()
+    
+    def get_downsampled_vision_towers(self, stage=-1):
+        # stage -2:  84
+        # stage -1: 168
+        # stage  0: 336
+        # stage  1: 672
+        return self.get_model().get_downsampled_vision_towers(stage)
 
     def get_2dPool(self, image_feature, stride=2):
         height = width = self.get_vision_tower().num_patches_per_side
@@ -191,6 +205,16 @@ class LlavaMetaForCausalLM(ABC):
 
     def encode_images(self, images):
         image_features = self.get_model().get_vision_tower()(images)
+        # image_features = self.get_model().vision_resampler(image_features, images=images)
+        image_features = self.get_model().mm_projector(image_features)
+        return image_features
+    
+    def encode_downsampled_images(self, images, stage):
+        # stage -2:  84
+        # stage -1: 168
+        # stage  0: 336
+        # stage  1: 672
+        image_features = self.get_model().get_downsampled_vision_towers(stage)(images)
         # image_features = self.get_model().vision_resampler(image_features, images=images)
         image_features = self.get_model().mm_projector(image_features)
         return image_features
@@ -247,316 +271,13 @@ class LlavaMetaForCausalLM(ABC):
         image_feature =  torch.cat((image_feature, self.model.image_newline[:, None, None].expand(*image_feature.shape[:-1], 1).to(image_feature.device)), dim=-1)
         image_feature = image_feature.permute(1, 2, 0).contiguous()
         return image_feature
+    
 
-    # def prepare_inputs_labels_for_multimodal(self, input_ids, position_ids, attention_mask, past_key_values, labels, images, modalities=["image"], image_sizes=None):
-    #     vision_tower = self.get_vision_tower()
-    #     # rank_print(modalities)
-    #     if vision_tower is None or images is None or input_ids.shape[1] == 1:
-    #         return input_ids, position_ids, attention_mask, past_key_values, None, labels
-
-    #     if isinstance(modalities, str):
-    #         modalities = [modalities]
-
-    #     # import pdb; pdb.set_trace()
-    #     if type(images) is list or images.ndim == 5:
-    #         if type(images) is list:
-    #             images = [x.unsqueeze(0) if x.ndim == 3 else x for x in images]
-
-    #         video_idx_in_batch = []
-    #         for _ in range(len(modalities)):
-    #             if modalities[_] == "video":
-    #                 video_idx_in_batch.append(_)
-
-    #         images_list = []
-    #         for image in images:
-    #             if image.ndim == 4:
-    #                 images_list.append(image)
-    #             else:
-    #                 images_list.append(image.unsqueeze(0))
-
-    #         concat_images = torch.cat([image for image in images_list], dim=0)
-    #         split_sizes = [image.shape[0] for image in images_list]
-    #         encoded_image_features = self.encode_images(concat_images)
-    #         # image_features,all_faster_video_features = self.encode_multimodals(concat_images, video_idx_in_batch, split_sizes)
-
-    #         # This is a list, each element is [num_images, patch * patch, dim]
-    #         # rank_print(f"Concat images : {concat_images.shape}")
-    #         encoded_image_features = torch.split(encoded_image_features, split_sizes)
-    #         image_features = []
-    #         for idx, image_feat in enumerate(encoded_image_features):
-    #             if idx in video_idx_in_batch:
-    #                 image_features.append(self.get_2dPool(image_feat))
-    #             else:
-    #                 image_features.append(image_feat)
-    #         # image_features = self.encode_multimodals(concat_images, video_idx_in_batch, split_sizes)
-    #         # rank_print(f"Encoded image feats : {[x.shape for x in image_features]}")
-    #         # image_features = torch.split(image_features, split_sizes, dim=0)
-    #         mm_patch_merge_type = getattr(self.config, "mm_patch_merge_type", "flat")
-    #         image_aspect_ratio = getattr(self.config, "image_aspect_ratio", "square")
-    #         mm_newline_position = getattr(self.config, "mm_newline_position", "one_token")
-
-    #         if mm_patch_merge_type == "flat":
-    #             image_features = [x.flatten(0, 1) for x in image_features]
-
-    #         elif mm_patch_merge_type.startswith("spatial"):
-    #             new_image_features = []
-    #             for image_idx, image_feature in enumerate(image_features):
-    #                 # FIXME: now assume the image is square, and split to 2x2 patches
-    #                 # num_patches = h * w, where h = w = sqrt(num_patches)
-    #                 # currently image_feature is a tensor of shape (4, num_patches, hidden_size)
-    #                 # we want to first unflatten it to (2, 2, h, w, hidden_size)
-    #                 # rank0_print("At least we are reaching here")
-    #                 # import pdb; pdb.set_trace()
-    #                 if image_idx in video_idx_in_batch:  # video operations
-    #                     # rank0_print("Video")
-    #                     if mm_newline_position == "grid":
-    #                         # Grid-wise
-    #                         image_feature = self.add_token_per_grid(image_feature)
-    #                         if getattr(self.config, "add_faster_video", False):
-    #                             faster_video_feature = self.add_token_per_grid(all_faster_video_features[image_idx])
-    #                             # Add a token for each frame
-    #                             concat_slow_fater_token = []
-    #                             # import pdb; pdb.set_trace()
-    #                             for _ in range(image_feature.shape[0]):
-    #                                 if _ % self.config.faster_token_stride == 0:
-    #                                     concat_slow_fater_token.append(torch.cat((image_feature[_], self.model.faster_token[None].to(image_feature.device)), dim=0))
-    #                                 else:
-    #                                     concat_slow_fater_token.append(torch.cat((faster_video_feature[_], self.model.faster_token[None].to(image_feature.device)), dim=0))
-    #                             # import pdb; pdb.set_trace()
-    #                             image_feature = torch.cat(concat_slow_fater_token)
-
-    #                             # print("!!!!!!!!!!!!")
-                        
-    #                         new_image_features.append(image_feature)
-    #                     elif mm_newline_position == "frame":
-    #                         # Frame-wise
-    #                         image_feature = self.add_token_per_frame(image_feature)
-
-    #                         new_image_features.append(image_feature.flatten(0, 1))
-                            
-    #                     elif mm_newline_position == "one_token":
-    #                         # one-token
-    #                         image_feature = image_feature.flatten(0, 1)
-    #                         if 'unpad' in mm_patch_merge_type:
-    #                             image_feature = torch.cat((
-    #                                 image_feature,
-    #                                 self.model.image_newline[None].to(image_feature.device)
-    #                             ), dim=0)
-    #                         new_image_features.append(image_feature)      
-    #                     elif mm_newline_position == "no_token":
-    #                         new_image_features.append(image_feature.flatten(0, 1))
-    #                     else:
-    #                         raise ValueError(f"Unexpected mm_newline_position: {mm_newline_position}")
-    #                 elif image_feature.shape[0] > 1:  # multi patches and multi images operations
-    #                     # rank0_print("Single-images")
-    #                     base_image_feature = image_feature[0]
-    #                     image_feature = image_feature[1:]
-    #                     height = width = self.get_vision_tower().num_patches_per_side
-    #                     assert height * width == base_image_feature.shape[0]
-
-    #                     if "anyres_max" in image_aspect_ratio:
-    #                         matched_anyres_max_num_patches = re.match(r"anyres_max_(\d+)", image_aspect_ratio)
-    #                         if matched_anyres_max_num_patches:
-    #                             max_num_patches = int(matched_anyres_max_num_patches.group(1))
-
-    #                     if image_aspect_ratio == "anyres" or "anyres_max" in image_aspect_ratio:
-    #                         if hasattr(self.get_vision_tower(), "image_size"):
-    #                             vision_tower_image_size = self.get_vision_tower().image_size
-    #                         else:
-    #                             raise ValueError("vision_tower_image_size is not found in the vision tower.")
-    #                         try:
-    #                             num_patch_width, num_patch_height = get_anyres_image_grid_shape(image_sizes[image_idx], self.config.image_grid_pinpoints, vision_tower_image_size)
-    #                         except Exception as e:
-    #                             rank0_print(f"Error: {e}")
-    #                             num_patch_width, num_patch_height = 2, 2
-    #                         image_feature = image_feature.view(num_patch_height, num_patch_width, height, width, -1)
-    #                     else:
-    #                         image_feature = image_feature.view(2, 2, height, width, -1)
-
-    #                     if "maxpool2x2" in mm_patch_merge_type:
-    #                         image_feature = image_feature.permute(4, 0, 2, 1, 3).contiguous()
-    #                         image_feature = image_feature.flatten(1, 2).flatten(2, 3)
-    #                         image_feature = nn.functional.max_pool2d(image_feature, 2)
-    #                         image_feature = image_feature.flatten(1, 2).transpose(0, 1)
-    #                     elif "unpad" in mm_patch_merge_type and "anyres_max" in image_aspect_ratio and matched_anyres_max_num_patches:
-    #                         unit = image_feature.shape[2]
-    #                         image_feature = image_feature.permute(4, 0, 2, 1, 3).contiguous()
-    #                         image_feature = image_feature.flatten(1, 2).flatten(2, 3)
-    #                         image_feature = unpad_image(image_feature, image_sizes[image_idx])
-    #                         c, h, w = image_feature.shape
-    #                         times = math.sqrt(h * w / (max_num_patches * unit**2))
-    #                         if times > 1.1:
-    #                             image_feature = image_feature[None]
-    #                             image_feature = nn.functional.interpolate(image_feature, [int(h // times), int(w // times)], mode="bilinear")[0]
-    #                         image_feature = torch.cat((image_feature, self.model.image_newline[:, None, None].expand(*image_feature.shape[:-1], 1).to(image_feature.device)), dim=-1)
-    #                         image_feature = image_feature.flatten(1, 2).transpose(0, 1)
-    #                     elif "unpad" in mm_patch_merge_type:
-    #                         image_feature = image_feature.permute(4, 0, 2, 1, 3).contiguous()
-    #                         image_feature = image_feature.flatten(1, 2).flatten(2, 3)
-    #                         image_feature = unpad_image(image_feature, image_sizes[image_idx])
-    #                         image_feature = torch.cat((image_feature, self.model.image_newline[:, None, None].expand(*image_feature.shape[:-1], 1).to(image_feature.device)), dim=-1)
-    #                         image_feature = image_feature.flatten(1, 2).transpose(0, 1)
-    #                     else:
-    #                         image_feature = image_feature.permute(0, 2, 1, 3, 4).contiguous()
-    #                         image_feature = image_feature.flatten(0, 3)
-    #                     if "nobase" in mm_patch_merge_type:
-    #                         pass
-    #                     else:
-    #                         image_feature = torch.cat((base_image_feature, image_feature), dim=0)
-    #                     new_image_features.append(image_feature)
-    #                 else:  # single image operations
-    #                     image_feature = image_feature[0]
-    #                     if "unpad" in mm_patch_merge_type:
-    #                         image_feature = torch.cat((image_feature, self.model.image_newline[None]), dim=0)
-
-    #                     new_image_features.append(image_feature)
-    #             image_features = new_image_features
-    #         else:
-    #             raise ValueError(f"Unexpected mm_patch_merge_type: {self.config.mm_patch_merge_type}")
-    #     else:
-    #         image_features = self.encode_images(images)
-
-    #     # TODO: image start / end is not implemented here to support pretraining.
-    #     if getattr(self.config, "tune_mm_mlp_adapter", False) and getattr(self.config, "mm_use_im_start_end", False):
-    #         raise NotImplementedError
-    #     # rank_print(f"Total images : {len(image_features)}")
-
-    #     # Let's just add dummy tensors if they do not exist,
-    #     # it is a headache to deal with None all the time.
-    #     # But it is not ideal, and if you have a better idea,
-    #     # please open an issue / submit a PR, thanks.
-    #     _labels = labels
-    #     _position_ids = position_ids
-    #     _attention_mask = attention_mask
-    #     if attention_mask is None:
-    #         attention_mask = torch.ones_like(input_ids, dtype=torch.bool)
-    #     else:
-    #         attention_mask = attention_mask.bool()
-    #     if position_ids is None:
-    #         position_ids = torch.arange(0, input_ids.shape[1], dtype=torch.long, device=input_ids.device)
-    #     if labels is None:
-    #         labels = torch.full_like(input_ids, IGNORE_INDEX)
-
-    #     # remove the padding using attention_mask -- FIXME
-    #     _input_ids = input_ids
-    #     input_ids = [cur_input_ids[cur_attention_mask] for cur_input_ids, cur_attention_mask in zip(input_ids, attention_mask)]
-    #     labels = [cur_labels[cur_attention_mask] for cur_labels, cur_attention_mask in zip(labels, attention_mask)]
-
-    #     new_input_embeds = []
-    #     new_labels = []
-    #     cur_image_idx = 0
-    #     # rank_print("Inserting Images embedding")
-    #     for batch_idx, cur_input_ids in enumerate(input_ids):
-    #         num_images = (cur_input_ids == IMAGE_TOKEN_INDEX).sum()
-    #         # rank0_print(num_images)
-    #         if num_images == 0:
-    #             cur_image_features = image_features[cur_image_idx]
-    #             cur_input_embeds_1 = self.get_model().embed_tokens(cur_input_ids)
-    #             cur_input_embeds = torch.cat([cur_input_embeds_1, cur_image_features[0:0]], dim=0)
-    #             new_input_embeds.append(cur_input_embeds)
-    #             new_labels.append(labels[batch_idx])
-    #             cur_image_idx += 1
-    #             continue
-
-    #         image_token_indices = [-1] + torch.where(cur_input_ids == IMAGE_TOKEN_INDEX)[0].tolist() + [cur_input_ids.shape[0]]
-    #         cur_input_ids_noim = []
-    #         cur_labels = labels[batch_idx]
-    #         cur_labels_noim = []
-    #         for i in range(len(image_token_indices) - 1):
-    #             cur_input_ids_noim.append(cur_input_ids[image_token_indices[i] + 1 : image_token_indices[i + 1]])
-    #             cur_labels_noim.append(cur_labels[image_token_indices[i] + 1 : image_token_indices[i + 1]])
-    #         split_sizes = [x.shape[0] for x in cur_labels_noim]
-    #         cur_input_embeds = self.get_model().embed_tokens(torch.cat(cur_input_ids_noim))
-    #         cur_input_embeds_no_im = torch.split(cur_input_embeds, split_sizes, dim=0)
-    #         cur_new_input_embeds = []
-    #         cur_new_labels = []
-
-    #         for i in range(num_images + 1):
-    #             cur_new_input_embeds.append(cur_input_embeds_no_im[i])
-    #             cur_new_labels.append(cur_labels_noim[i])
-    #             if i < num_images:
-    #                 try:
-    #                     cur_image_features = image_features[cur_image_idx]
-    #                 except IndexError:
-    #                     cur_image_features = image_features[cur_image_idx - 1]
-    #                 cur_image_idx += 1
-    #                 cur_new_input_embeds.append(cur_image_features)
-    #                 cur_new_labels.append(torch.full((cur_image_features.shape[0],), IGNORE_INDEX, device=cur_labels.device, dtype=cur_labels.dtype))
-
-    #         cur_new_input_embeds = [x.to(self.device) for x in cur_new_input_embeds]
-
-    #         # import pdb; pdb.set_trace()
-    #         cur_new_input_embeds = torch.cat(cur_new_input_embeds)
-    #         cur_new_labels = torch.cat(cur_new_labels)
-
-    #         new_input_embeds.append(cur_new_input_embeds)
-    #         new_labels.append(cur_new_labels)
-
-    #     # Truncate sequences to max length as image embeddings can make the sequence longer
-    #     tokenizer_model_max_length = getattr(self.config, "tokenizer_model_max_length", None)
-    #     # rank_print("Finishing Inserting")
-
-    #     new_input_embeds = [x[:tokenizer_model_max_length] for x, modality in zip(new_input_embeds, modalities)]
-    #     new_labels = [x[:tokenizer_model_max_length] for x, modality in zip(new_labels, modalities)]
-    #     # TODO: Hard code for control loss spike
-    #     # if tokenizer_model_max_length is not None:
-    #     #     new_input_embeds = [x[:4096] if modality != "video" else x[:tokenizer_model_max_length] for x, modality in zip(new_input_embeds, modalities)]
-    #     #     new_labels = [x[:4096] if modality != "video" else x[:tokenizer_model_max_length] for x, modality in zip(new_labels, modalities)]
-
-    #     # Combine them
-    #     max_len = max(x.shape[0] for x in new_input_embeds)
-    #     batch_size = len(new_input_embeds)
-
-    #     new_input_embeds_padded = []
-    #     new_labels_padded = torch.full((batch_size, max_len), IGNORE_INDEX, dtype=new_labels[0].dtype, device=new_labels[0].device)
-    #     attention_mask = torch.zeros((batch_size, max_len), dtype=attention_mask.dtype, device=attention_mask.device)
-    #     position_ids = torch.zeros((batch_size, max_len), dtype=position_ids.dtype, device=position_ids.device)
-    #     # rank0_print("Prepare pos id")
-
-    #     for i, (cur_new_embed, cur_new_labels) in enumerate(zip(new_input_embeds, new_labels)):
-    #         cur_len = cur_new_embed.shape[0]
-    #         if getattr(self.config, "tokenizer_padding_side", "right") == "left":
-    #             new_input_embeds_padded.append(torch.cat((torch.zeros((max_len - cur_len, cur_new_embed.shape[1]), dtype=cur_new_embed.dtype, device=cur_new_embed.device), cur_new_embed), dim=0))
-    #             if cur_len > 0:
-    #                 new_labels_padded[i, -cur_len:] = cur_new_labels
-    #                 attention_mask[i, -cur_len:] = True
-    #                 position_ids[i, -cur_len:] = torch.arange(0, cur_len, dtype=position_ids.dtype, device=position_ids.device)
-    #         else:
-    #             new_input_embeds_padded.append(torch.cat((cur_new_embed, torch.zeros((max_len - cur_len, cur_new_embed.shape[1]), dtype=cur_new_embed.dtype, device=cur_new_embed.device)), dim=0))
-    #             if cur_len > 0:
-    #                 new_labels_padded[i, :cur_len] = cur_new_labels
-    #                 attention_mask[i, :cur_len] = True
-    #                 position_ids[i, :cur_len] = torch.arange(0, cur_len, dtype=position_ids.dtype, device=position_ids.device)
-
-    #     new_input_embeds = torch.stack(new_input_embeds_padded, dim=0)
-    #     # rank0_print("tokenizer padding")
-
-    #     if _labels is None:
-    #         new_labels = None
-    #     else:
-    #         new_labels = new_labels_padded
-
-    #     if _attention_mask is None:
-    #         attention_mask = None
-    #     else:
-    #         attention_mask = attention_mask.to(dtype=_attention_mask.dtype)
-
-    #     if _position_ids is None:
-    #         position_ids = None
-    #     if getattr(self.config, "use_pos_skipping", False) and self.training:
-    #         position_ids = torch.arange(new_input_embeds.size(1), device=new_input_embeds.device).unsqueeze(0).to(new_input_embeds.device)
-    #         split_position = random.randint(0, new_input_embeds.size(1))
-    #         left_add = random.randint(0, self.config.pos_skipping_range)
-    #         right_add = random.randint(left_add, self.config.pos_skipping_range)
-    #         position_ids[:, :split_position] += left_add
-    #         position_ids[:, split_position:] += right_add
-    #     # import pdb; pdb.set_trace()
-    #     # rank0_print("Finish preparing")
-    #     return None, position_ids, attention_mask, past_key_values, new_input_embeds, new_labels
+    ## generation_type: default or None (default llava 1.6), recursion_remove_base, recursion_retain_base, base_only (no recursion, use_all_image_sizes)
 
     def prepare_inputs_labels_for_multimodal(self, input_ids, position_ids, attention_mask, past_key_values, 
-    labels, images, modalities=["image"], image_sizes=None, image_mask=None, generation_type=None):
-
+    labels, images, downsampled_images=None, modalities=["image"], image_sizes=None, image_mask=None, generation_type=None):        
+       
         vision_tower = self.get_vision_tower()
         # rank_print(modalities)
         if vision_tower is None or images is None or input_ids.shape[1] == 1:
@@ -585,8 +306,22 @@ class LlavaMetaForCausalLM(ABC):
             concat_images = torch.cat([image for image in images_list], dim=0)
             split_sizes = [image.shape[0] for image in images_list]
             encoded_image_features = self.encode_images(concat_images)
-            # image_features,all_faster_video_features = self.encode_multimodals(concat_images, video_idx_in_batch, split_sizes)
+            
+            ## get stages
+            stages = []
+            for stage in downsampled_images.keys():
+                if stage < 0:
+                    stages.append(stage)
+            stages.sort()
+            
+            ## encode downsampled images
+            encoded_downsampled_image_features = []
+            for stage in stages:
+                encoded_downsampled_image_features.append(
+                    self.encode_downsampled_images(idx, downsampled_images[stage].squeeze(0), stage)
+                )
 
+            # image_features,all_faster_video_features = self.encode_multimodals(concat_images, video_idx_in_batch, split_sizes)
             # This is a list, each element is [num_images, patch * patch, dim]
             # rank_print(f"Concat images : {concat_images.shape}")
             encoded_image_features = torch.split(encoded_image_features, split_sizes)
@@ -632,8 +367,6 @@ class LlavaMetaForCausalLM(ABC):
                                         concat_slow_fater_token.append(torch.cat((faster_video_feature[_], self.model.faster_token[None].to(image_feature.device)), dim=0))
                                 # import pdb; pdb.set_trace()
                                 image_feature = torch.cat(concat_slow_fater_token)
-
-                                # print("!!!!!!!!!!!!")
                         
                             new_image_features.append(image_feature)
                         elif mm_newline_position == "frame":
@@ -655,30 +388,105 @@ class LlavaMetaForCausalLM(ABC):
                             new_image_features.append(image_feature.flatten(0, 1))
                         else:
                             raise ValueError(f"Unexpected mm_newline_position: {mm_newline_position}")
+                        
+                    elif image_feature.shape[0] > 1 and generation_type is not None: # for aidas
+                        stage0_feature = image_feature[0]
+                        stage1_feature = image_feature[1:]                
+                        
+                        height = width = self.get_vision_tower().num_patches_per_side
+                        if "anyres_max" in image_aspect_ratio:
+                            matched_anyres_max_num_patches = re.match(r"anyres_max_(\d+)", image_aspect_ratio)
+                            if matched_anyres_max_num_patches:
+                                max_num_patches = int(matched_anyres_max_num_patches.group(1))
+
+                        if image_aspect_ratio == "anyres" or "anyres_max" in image_aspect_ratio:
+                            if hasattr(self.get_vision_tower(), "image_size"):
+                                vision_tower_image_size = self.get_vision_tower().image_size
+                            else:
+                                raise ValueError("vision_tower_image_size is not found in the vision tower.")
+                            try:
+                                num_patch_width, num_patch_height = get_anyres_image_grid_shape(image_sizes[image_idx], self.config.image_grid_pinpoints, vision_tower_image_size)
+                            except Exception as e:
+                                rank0_print(f"Error: {e}")
+                                num_patch_width, num_patch_height = 2, 2
+                            image_feature = image_feature.view(num_patch_height, num_patch_width, height, width, -1)
+                        else:
+                            image_feature = image_feature.view(2, 2, height, width, -1)
+
+                        if "maxpool2x2" in mm_patch_merge_type:
+                            image_feature = image_feature.permute(4, 0, 2, 1, 3).contiguous()
+                            image_feature = image_feature.flatten(1, 2).flatten(2, 3)
+                            image_feature = nn.functional.max_pool2d(image_feature, 2)
+                            image_feature = image_feature.flatten(1, 2).transpose(0, 1)
+                        elif "unpad" in mm_patch_merge_type and "anyres_max" in image_aspect_ratio and matched_anyres_max_num_patches:
+                            unit = image_feature.shape[2]
+                            image_feature = image_feature.permute(4, 0, 2, 1, 3).contiguous()
+                            image_feature = image_feature.flatten(1, 2).flatten(2, 3)
+                            image_feature = unpad_image(image_feature, image_sizes[image_idx])
+                            c, h, w = image_feature.shape
+                            times = math.sqrt(h * w / (max_num_patches * unit**2))
+                            if times > 1.1:
+                                image_feature = image_feature[None]
+                                image_feature = nn.functional.interpolate(image_feature, [int(h // times), int(w // times)], mode="bilinear")[0]
+                            image_feature = torch.cat((image_feature, self.model.image_newline[:, None, None].expand(*image_feature.shape[:-1], 1).to(image_feature.device)), dim=-1)
+                            image_feature = image_feature.flatten(1, 2).transpose(0, 1)
+                        elif "unpad" in mm_patch_merge_type:
+                            image_feature = image_feature.permute(4, 0, 2, 1, 3).contiguous()
+                            image_feature = image_feature.flatten(1, 2).flatten(2, 3)
+                            image_feature = unpad_image(image_feature, image_sizes[image_idx])
+                            image_feature = torch.cat((image_feature, self.model.image_newline[:, None, None].expand(*image_feature.shape[:-1], 1).to(image_feature.device)), dim=-1)
+                            image_feature = image_feature.flatten(1, 2).transpose(0, 1)
+                        
+                        ### Recursion part ###
+                        ### need check !!!!! ###
+                        
+                        # default generation (basic llava 1.6)
+                        if generation_type in ["default", None]:
+                            image_feature = torch.cat((stage0_feature, stage1_feature), dim=0)
+                        else:
+                            downsampled_features_list = []
+                            for encoded_downsampled_image_feature, stage in zip(encoded_downsampled_image_features, stages):
+                                mask = image_mask[stage]
+                                e_w, e_h, _ = encoded_downsampled_image_feature.shape
+                                _, m_w, m_h = mask.shape
+                                ### TODO ###
+                                # 1. interpolate mask to encoded size,
+                                # 2. elementwise multiplication,
+                                # 3. insert only non zero features to list.
+                            downsampled_features = torch.cat(downsampled_features_list, dim=0)
+                            image_feature = torch.cat((downsampled_features, stage0_feature, stage1_feature), dim=0)
+                                
+                        new_image_features.append(image_feature)
+                    
+                    ### old version recursion
                     elif image_feature.shape[0] > 1:  # multi patches and multi images operations
                         #print("divide into several patches")
                         # rank0_print("Single-images")
 
-                        ## retain or exclude base_image_feature
-                        if (image_mask == None) or (generation_type == "recursion_retain_base"):
-                            base_image_feature = image_feature[0]
-                        else:
-                            ## split the base with image mask
-                            base_image_feature = image_feature[0].view(24, 24, -1)
-                            base_list = []
-                            skip_list = []
-                            for row, col in image_mask:
-                                skip_list.append([row, col])
-                            # print(skip_list)
-                            for row in range(24):
-                                for col in range(24):
-                                    if [row, col] in skip_list:
-                                        continue
-                                    temp = base_image_feature[row, col, ...].unsqueeze(0)
-                                    base_list.append(temp)
-                            base_image_feature = torch.cat(base_list)
+                        ### need check!!!!! ###
+                        ## modify base tokens later
+                        base_image_feature = image_feature[0]
+                        image_feature = image_feature[1:]                                                                      
+
+                        # ## retain or exclude base_image_feature
+                        # if (image_mask == None) or (generation_type == "recursion_retain_base"):
+                        #     base_image_feature = image_feature[0]
+                        # else:
+                        #     ## split the base with image mask
+                        #     base_image_feature = image_feature[0].view(24, 24, -1)
+                        #     base_list = []
+                        #     skip_list = []
+                        #     for row, col in image_mask:
+                        #         skip_list.append([row, col])
+                        #     # print(skip_list)
+                        #     for row in range(24):
+                        #         for col in range(24):
+                        #             if [row, col] in skip_list:
+                        #                 continue
+                        #             temp = base_image_feature[row, col, ...].unsqueeze(0)
+                        #             base_list.append(temp)
+                        #     base_image_feature = torch.cat(base_list)                        
                         
-                        image_feature = image_feature[1:]
                         height = width = self.get_vision_tower().num_patches_per_side
                         #assert height * width == base_image_feature.shape[0]
 
@@ -700,9 +508,116 @@ class LlavaMetaForCausalLM(ABC):
                             image_feature = image_feature.view(num_patch_height, num_patch_width, height, width, -1)
                         else:
                             image_feature = image_feature.view(2, 2, height, width, -1)
-                        ###
-                        recursed_features = []
-                        ###
+
+                        if "maxpool2x2" in mm_patch_merge_type:
+                            image_feature = image_feature.permute(4, 0, 2, 1, 3).contiguous()
+                            image_feature = image_feature.flatten(1, 2).flatten(2, 3)
+                            image_feature = nn.functional.max_pool2d(image_feature, 2)
+                            image_feature = image_feature.flatten(1, 2).transpose(0, 1)
+                        elif "unpad" in mm_patch_merge_type and "anyres_max" in image_aspect_ratio and matched_anyres_max_num_patches:
+                            unit = image_feature.shape[2]
+                            image_feature = image_feature.permute(4, 0, 2, 1, 3).contiguous()
+                            image_feature = image_feature.flatten(1, 2).flatten(2, 3)
+                            image_feature = unpad_image(image_feature, image_sizes[image_idx])
+                            c, h, w = image_feature.shape
+                            times = math.sqrt(h * w / (max_num_patches * unit**2))
+                            if times > 1.1:
+                                image_feature = image_feature[None]
+                                image_feature = nn.functional.interpolate(image_feature, [int(h // times), int(w // times)], mode="bilinear")[0]
+                            image_feature = torch.cat((image_feature, self.model.image_newline[:, None, None].expand(*image_feature.shape[:-1], 1).to(image_feature.device)), dim=-1)
+                            image_feature = image_feature.flatten(1, 2).transpose(0, 1)
+                        elif "unpad" in mm_patch_merge_type:
+                            image_feature = image_feature.permute(4, 0, 2, 1, 3).contiguous()
+                            image_feature = image_feature.flatten(1, 2).flatten(2, 3)
+                            image_feature = unpad_image(image_feature, image_sizes[image_idx])
+                            image_feature = torch.cat((image_feature, self.model.image_newline[:, None, None].expand(*image_feature.shape[:-1], 1).to(image_feature.device)), dim=-1)
+                            image_feature = image_feature.flatten(1, 2).transpose(0, 1)
+                        
+                        ### Recursion part ###
+                        ### need check !!!!! ###
+                        
+                        # default generation (basic llava 1.6)
+                        if generation_type in ["default", None]:
+                            image_feature = torch.cat((base_image_feature, image_feature), dim=0)
+                        
+                        # use all image sizes in all_image_sizes (no recursion)
+                        elif generation_type is "base_only":
+                            if encoded_downsampled_image_features is not None:
+                                downsampled_image_features = [downsampled_feature[0] for downsampled_feature in encoded_downsampled_image_features] 
+                                base_image_features = torch.cat(downsampled_image_features, dim=0)
+                            else:
+                                base_image_features = base_image_feature
+                                
+                            image_feature = base_image_features
+                        
+                        elif "recursion" in generation_type:
+                            total_stages = len(recursed_image_sizes) + 1 ## assume stage starts from 1
+                            
+                            ## deal with downsampled features
+                            if encoded_downsampled_image_features is not None:
+                                all_image_features = [downsampled_feature[0] for downsampled_feature in encoded_downsampled_image_features] 
+
+                                if 336 in recursed_image_sizes:
+                                    image_feature = image_feature.permute(0, 2, 1, 3, 4).contiguous()
+                                    image_feature = image_feature.flatten(0, 3)
+                                    all_image_features.append(base_image_feature)
+                                    all_image_features.append(image_feature)
+                            else:
+                                assert recursed_image_sizes == [336, 672], "error in recursed_image_sizes"
+                                image_feature = image_feature.permute(0, 2, 1, 3, 4).contiguous()
+                                image_feature = image_feature.flatten(0, 3)
+                                all_image_features = [base_image_feature, image_feature]
+                            
+                            if current_stage == 1: 
+                                ## +1 for first stage input
+                                num_start_size = len(all_image_sizes) - len(recursed_image_sizes)
+                                base_image_features = all_image_features[:num_start_size]
+                                image_features = torch.cat(base_image_features, dim=0)
+                            
+                            else:     
+                                assert image_mask is not None, "no mask provided for recursion"                                                        
+
+                                default_size=14
+                                num_patches_side = [image_size/default_size for image_size in all_image_sizes]
+
+                                all_image_features_22 = [feature.view(n_patches, n_patches, -1) for n_patches, feature in zip(num_patches_side, all_image_features)]                                
+                                masked_image_features = [feature * mask.unsqueeze(-1) for feature, mask in zip(all_image_features_22, image_mask)]
+                                
+                                non_zero_tensors = []
+
+                                for feature in masked_image_features:                                    
+                                    non_zero_values = feature[feature != 0]                                     
+                                    non_zero_tensors.append(non_zero_values)
+                                
+                                image_features = torch.cat(non_zero_tensors, dim=0)
+                                    
+                        new_image_features.append(image_feature)
+                    elif image_feature.shape[0] > 1:  # multi patches and multi images operations
+                        # rank0_print("Single-images")
+                        base_image_feature = image_feature[0]
+                        image_feature = image_feature[1:]
+                        height = width = self.get_vision_tower().num_patches_per_side
+                        assert height * width == base_image_feature.shape[0]
+
+                        if "anyres_max" in image_aspect_ratio:
+                            matched_anyres_max_num_patches = re.match(r"anyres_max_(\d+)", image_aspect_ratio)
+                            if matched_anyres_max_num_patches:
+                                max_num_patches = int(matched_anyres_max_num_patches.group(1))
+
+                        if image_aspect_ratio == "anyres" or "anyres_max" in image_aspect_ratio:
+                            if hasattr(self.get_vision_tower(), "image_size"):
+                                vision_tower_image_size = self.get_vision_tower().image_size
+                            else:
+                                raise ValueError("vision_tower_image_size is not found in the vision tower.")
+                            try:
+                                num_patch_width, num_patch_height = get_anyres_image_grid_shape(image_sizes[image_idx], self.config.image_grid_pinpoints, vision_tower_image_size)
+                            except Exception as e:
+                                rank0_print(f"Error: {e}")
+                                num_patch_width, num_patch_height = 2, 2
+                            image_feature = image_feature.view(num_patch_height, num_patch_width, height, width, -1)
+                        else:
+                            image_feature = image_feature.view(2, 2, height, width, -1)
+
                         if "maxpool2x2" in mm_patch_merge_type:
                             image_feature = image_feature.permute(4, 0, 2, 1, 3).contiguous()
                             image_feature = image_feature.flatten(1, 2).flatten(2, 3)
@@ -727,46 +642,12 @@ class LlavaMetaForCausalLM(ABC):
                             image_feature = torch.cat((image_feature, self.model.image_newline[:, None, None].expand(*image_feature.shape[:-1], 1).to(image_feature.device)), dim=-1)
                             image_feature = image_feature.flatten(1, 2).transpose(0, 1)
                         else:
-                            ## for recursion
-                            if image_mask is not None:                                
-                                image_feature = image_feature.permute(0, 2, 1, 3, 4).contiguous()
-                                image_feature = image_feature.view(height * 2, width * 2, -1)
-
-                                for row, col in image_mask:                                    
-                                    temp = image_feature[row*2:row*2+2, col*2:col*2+2, ...]
-                                    temp = temp.flatten(0, 1)
-                                    recursed_features.append(temp)
-                            else:
-                                image_feature = image_feature.permute(0, 2, 1, 3, 4).contiguous()
-                                image_feature = image_feature.flatten(0, 3)
+                            image_feature = image_feature.permute(0, 2, 1, 3, 4).contiguous()
+                            image_feature = image_feature.flatten(0, 3)
                         if "nobase" in mm_patch_merge_type:
                             pass
                         else:
-                            ##  recursion second phase
-                            if image_mask is not None:
-                                if len(recursed_features) == 0:
-                                    #print("no recursed features")
-                                    image_feature = base_image_feature
-                                else:
-                                    #print("concat base and recursed")
-                                    recursed_features = torch.cat(recursed_features)
-                                    image_feature = torch.cat((base_image_feature, recursed_features), dim=0)
-                            ## recursion first phase
-                            elif "recursion" in generation_type:
-                                #print("use only base on first stage")
-                                image_feature = base_image_feature
-                            ## no recursion + use only base token
-                            elif generation_type == "base-only":
-                                #print("use only base")
-                                image_feature = base_image_feature
-                            ## no recursion + use only split token
-                            elif generation_type == "split-only":
-                                #print("use only split")
-                                image_feature = image_feature
-                            ## no recursion - default: concat base, split
-                            else:
-                                #print("no recursion - default")
-                                image_feature = torch.cat((base_image_feature, image_feature), dim=0)
+                            image_feature = torch.cat((base_image_feature, image_feature), dim=0)
                         new_image_features.append(image_feature)
                     else:  # single image operations
                         #print("single_image")
