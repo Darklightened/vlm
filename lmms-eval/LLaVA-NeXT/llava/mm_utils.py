@@ -18,9 +18,7 @@ import matplotlib.pyplot as plt
 from torchvision.transforms import ToPILImage
 from matplotlib import cm
 
-def init_downsampled_vision_towers(vision_tower, stages, positional_embedding_type):
-    print(vision_tower.vision_model)
-    exit()
+def init_downsampled_vision_towers(vision_tower, stages, positional_embedding_type, device):
     print(f"change positional embedding to {positional_embedding_type}")
     downsampled_vision_towers = dict()
     for stage in stages:
@@ -30,16 +28,18 @@ def init_downsampled_vision_towers(vision_tower, stages, positional_embedding_ty
 
     # Default configurations of model position embedding
     patch_size = 14
-    image_size = vision_tower.vision_model.image_size
+    image_size = vision_tower.vision_tower.vision_model.embeddings.image_size
 
     for stage in stages:
         if stage == 0:
             break
         downsampled_image_size = image_size * pow(2, stage)
         assert (downsampled_image_size // patch_size) == (downsampled_image_size / patch_size), f"unavailable stage: {stage}"
-        num_patches = (downsampled_image_size // patch_size) ** 2
+        
+        
+        num_patches = int((downsampled_image_size // patch_size) ** 2)
         num_positions = num_patches + 1
-        embed_dim = vision_tower.vision_model.embeddings.embed_dim
+        embed_dim = vision_tower.vision_tower.vision_model.embeddings.embed_dim
 
         downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.image_size = downsampled_image_size
         downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.num_patches = num_patches
@@ -48,9 +48,12 @@ def init_downsampled_vision_towers(vision_tower, stages, positional_embedding_ty
     
         # Modify positional embedding to match the resized image size
         if positional_embedding_type == "zero":       
-            downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions, embed_dim).to(dtype=torch.float16)
+            downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions, embed_dim).to(dtype=torch.float16, device=device)
             torch.nn.init.constant_(downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding.weight, 0)
+            downsampled_vision_towers[stage].vision_tower.vision_model.embeddings = \
+                downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.to(device)
         elif positional_embedding_type == "interpolation":
+            print("interpolate embedding type.")
             # Interpolate from the pretrained positional embedding
             original_embedding = downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding.weight.data
             original_num_positions = original_embedding.size(0)
@@ -60,14 +63,18 @@ def init_downsampled_vision_towers(vision_tower, stages, positional_embedding_ty
                 mode='linear', 
                 align_corners=False
             ).transpose(1, 2).squeeze(0)
-            downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions, embed_dim).to(dtype=torch.float16)
+            downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions, embed_dim).to(dtype=torch.float16, device=device)
             downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding.weight.data.copy_(new_embedding)
+            downsampled_vision_towers[stage].vision_tower.vision_model.embeddings = \
+                downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.to(device)
         elif positional_embedding_type == "reduced":
             print("Reduced embedding type.")
             # Reduce the pretrained embedding by truncating
             original_embedding = downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding.weight.data
-            downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions, embed_dim).to(dtype=torch.float16)
+            downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions, embed_dim).to(dtype=torch.float16, device=device)
             downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding.weight.data.copy_(original_embedding[:num_positions])
+            downsampled_vision_towers[stage].vision_tower.vision_model.embeddings = \
+                downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.to(device)
     return downsampled_vision_towers                                
 
 def resize_and_center_crop(image, shortest_edge_length):
@@ -547,7 +554,38 @@ def show_mask_on_image(img, mask):
     cam = cam / np.max(cam)
     return np.uint8(255 * cam), heatmap
 
-def get_heatmap(model, outputs, tokenizer, prompt, input_ids, num_current_patches, input_offset=0, image=None, save_path=None, llm_layer_weights=None, image_layer_weights=None):
+
+### Normalizing functions
+def norm_relu(ret_attn):
+    for i in range(len(ret_attn)):
+        temp = ret_attn[i] / ret_attn[i].max()
+        temp = torch.relu(temp)
+        ret_attn[i] = temp
+    return ret_attn
+
+def norm_min_max(ret_attn):
+    for i in range(len(ret_attn)):
+        temp = ret_attn[i]
+        temp += temp.min()
+        temp /= temp.max()
+        ret_attn[i] = temp
+    return ret_attn
+###
+
+
+def get_heatmap(
+    model,
+    outputs,
+    tokenizer,
+    prompt,
+    input_ids,
+    current_stage,
+    stages,
+    image_mask,
+    image=None,
+    save_path=None,
+    attn_norm=None):
+    
     # Constructing the LLM attention matrix
     aggregated_prompt_attention = []
     for i, layer in enumerate(outputs["attentions"][0]):
@@ -567,96 +605,159 @@ def get_heatmap(model, outputs, tokenizer, prompt, input_ids, num_current_patche
         + list(map(aggregate_llm_attention, outputs["attentions"]))
     )    
 
-    # Identify length or index of tokens
-    # input_token_len = model.get_vision_tower().num_patches + len(input_ids[0]) - 1  # -1 for the <image> token    
-    # vision_token_start = len(tokenizer(prompt.split("<image>")[0], return_tensors='pt')["input_ids"][0])
-    # vision_token_end = vision_token_start + model.get_vision_tower().num_patches
-    # output_token_len = len(outputs["sequences"][0])
+    input_token_len = 0
+    for stage in stages:
+        mask_patches_per_side, _ = image_mask[stage].shape
+        mask_grid = int(mask_patches_per_side * pow(2, stage - max(stages)))
+        mask = torch.nn.functional.interpolate(image_mask[stage].unsqueeze(0).unsqueeze(0), size=(mask_grid, mask_grid), mode='nearest')
+        patches_in_stage = mask.sum().item()
+        input_token_len += patches_in_stage
+    input_token_len += len(input_ids[0]) - 1 # -1 for the <image> token
+    input_token_len = int(input_token_len)
 
-    ########### check ############
-    ## input offset = token length if images that are not to be processed
-    ## num_current_patches = image tokens that are to be recursed (cutting target image)
-    input_token_len = num_current_patches + len(input_ids[0]) - 1 + input_offset  # -1 for the <image> token    
-    vision_token_start = len(tokenizer(prompt.split("<image>")[0], return_tensors='pt')["input_ids"][0]) + input_offset
-    vision_token_end = vision_token_start + num_current_patches
     output_token_len = len(outputs["sequences"][0])
-   
     output_token_start = input_token_len
     output_token_end = output_token_start + output_token_len
-    output_token_inds = list(range(output_token_start, output_token_end))    
-
-    # Connect with the vision encoder attention
-    image_attentions = []
-    for i, layer in enumerate(model.get_vision_tower().image_attentions):
-        layer = layer[0, ...].unsqueeze(0)
-        #print(f"Vision layer {i} shape after squeeze: {layer.shape}")
-        image_attentions.append(layer)
-
-    vis_attn_matrix = aggregate_vit_attention(
-        image_attentions,
-        select_layer=model.get_vision_tower().select_layer,
-        all_prev_layers=True
-    )
-    #print(f"Vision attention matrix shape: {vis_attn_matrix.shape}")
-
-    grid_size = model.get_vision_tower().num_patches_per_side
-    #print(f"Grid size: {grid_size}")
+    output_token_inds = list(range(output_token_start, output_token_end))
 
     # Initialize results
-    heat_torch_stack = []
-    ret_attn = []
-
-    # if image is not None:
-    #     image_pil = ToPILImage()(image.cpu().squeeze(0)) if isinstance(image, torch.Tensor) else image
-
-    # if save_path:
-    #     import os
-    #     os.makedirs(save_path, exist_ok=True)
-
-    # Output
-    for i in range(len(output_token_inds)):
-        target_token_ind = output_token_inds[i]        
-        attn_weights_over_vis_tokens = llm_attn_matrix[target_token_ind][vision_token_start:vision_token_end]        
-        attn_weights_over_vis_tokens = attn_weights_over_vis_tokens / attn_weights_over_vis_tokens.sum()
-
-        attn_over_image = []
-        for weight, vis_attn in zip(attn_weights_over_vis_tokens, vis_attn_matrix):
-            vis_attn = vis_attn.reshape(grid_size, grid_size)
+    ret_attn = [torch.zeros_like(image_mask[0]) for _ in output_token_inds]
+    
+    input_offset = 0
+    for stage in stages:
+        if stage < 0:
+            vision_tower = model.model.downsampled_vision_towers[stage]
+        else:
+            vision_tower = model.model.vision_tower
+        
+        num_patches = vision_tower.vision_tower.vision_model.embeddings.num_patches
+        grid_size = int(math.sqrt(num_patches))
+        if stage == 1:
+            num_patches *= 4
+            grid_size *= 2
             
-            attn_over_image.append(vis_attn * weight)
+        used_token_list = torch.nn.functional.interpolate(image_mask[stage].unsqueeze(0).unsqueeze(0), size=(grid_size, grid_size), mode='nearest').squeeze()
+        used_token_list = used_token_list.view(-1).tolist()
+        
+        if sum(used_token_list) == 0:
+            # every token in this stage is masked
+            continue
+        
+        vision_token_start = len(tokenizer(prompt.split("<image>")[0], return_tensors='pt')["input_ids"][0]) + input_offset
+        vision_token_end = vision_token_start + int(sum(used_token_list))
+        
+        input_offset += int(sum(used_token_list))
 
-        attn_over_image = torch.stack(attn_over_image).sum(dim=0)        
-        attn_over_image = attn_over_image / attn_over_image.max()
-        ret_attn.append(attn_over_image)
+        # Connect with the vision encoder attention
+        image_attentions = []
+        for i, layer in enumerate(vision_tower.image_attentions):
+            if stage == 1:
+                layer = layer[1:, :, 1:, 1:]
+                _, n, h, w = layer.shape
+                layer = layer.permute(1, 0, 2, 3).reshape(1, n, h * 2, w * 2)
+                cls_token = torch.zeros(1, n, 1, 1, device=layer.device)
+                layer = torch.cat((cls_token.expand(1, n, h * 2, 1), layer), dim=3)
+                layer = torch.cat((cls_token.expand(1, n, 1, w * 2 + 1), layer), dim=2)
+            else:
+                layer = layer[0, ...].unsqueeze(0)
+            image_attentions.append(layer)
 
-        # if image is not None:
-        #     # Resize the heatmap to match the original image size
-        #     resized_heatmap = F.interpolate(
-        #         attn_over_image.unsqueeze(0).unsqueeze(0),  # Add batch and channel dimensions
-        #         size=(image_pil.height, image_pil.width),  # Resize to match image dimensions
-        #         mode='bilinear',  # Use bilinear for smoother heatmap
-        #         align_corners=True
-        #     ).squeeze().numpy()
-
-        #     # Normalize the resized heatmap
-        #     resized_heatmap -= resized_heatmap.min()
-        #     resized_heatmap /= resized_heatmap.max()
-
-        #     np_img = np.array(image_pil)[:, :, ::-1]
-        #     heatmap = (cm.jet(resized_heatmap)[:, :, :3] * 255).astype(np.uint8)
-        #     blended = cv2.addWeighted(np_img, 0.5, heatmap, 0.5, 0)
-        #     img_with_attn = cv2.cvtColor(blended, cv2.COLOR_BGR2RGB)
-        #     # img_with_attn, heatmap = show_mask_on_image(np_img, resized_heatmap)
-        #     # img_with_attn = cv2.cvtColor(img_with_attn, cv2.COLOR_BGR2RGB)
+        vis_attn_matrix = aggregate_vit_attention(
+            image_attentions,
+            select_layer=vision_tower.select_layer,
+            all_prev_layers=True
+        )
+        if stage == 1:
+            vis_attn_matrix = F.interpolate(vis_attn_matrix.unsqueeze(0).unsqueeze(0), scale_factor=(2, 2), mode='bilinear', align_corners=True).squeeze()
             
-        #     # Save attention visualization for the current token and layer
-        #     if save_path:
-        #         plt.figure(figsize=(8, 8))
-        #         plt.imshow(img_with_attn )
-        #         plt.title(f"Token {target_token_ind}")
-        #         plt.axis("off")
-        #         plt.savefig(f"{save_path}/token_{target_token_ind}.png")
-        #         plt.close()
+        # Output
+        for i in range(len(output_token_inds)):
+            target_token_ind = output_token_inds[i]        
+            attn_weights_over_vis_tokens = llm_attn_matrix[target_token_ind][vision_token_start:vision_token_end]        
+            attn_weights_over_vis_tokens = attn_weights_over_vis_tokens / attn_weights_over_vis_tokens.sum()
+            
+            assert attn_weights_over_vis_tokens.shape[0] == sum(used_token_list), f"{stage},{attn_weights_over_vis_tokens.shape[0]},{sum(used_token_list)}"
+
+            attn_over_image = []
+            for idx in range(len(used_token_list)):
+                # append only used token * weight.
+                # len(attn_weights_over_vis_tokens) is same with sum(used_token_list).
+                if used_token_list[idx] == 1:
+                    weight = attn_weights_over_vis_tokens[len(attn_over_image)]
+                    vis_attn = vis_attn_matrix[idx]
+                    vis_attn = vis_attn.reshape(grid_size, grid_size)
+                    attn_over_image.append(vis_attn * weight)
+            ## old version
+            # for weight, vis_attn in zip(attn_weights_over_vis_tokens, vis_attn_matrix):
+            #     vis_attn = vis_attn.reshape(grid_size, grid_size)
+            #     attn_over_image.append(vis_attn * weight)
+
+            attn_over_image = torch.stack(attn_over_image).sum(dim=0)        
+            attn_over_image = attn_over_image / attn_over_image.max()
+            
+            h, w = ret_attn[i].shape
+            attn_over_image = attn_over_image.to(device=model.device)
+            attn_over_image = torch.nn.functional.interpolate(attn_over_image.unsqueeze(0).unsqueeze(0), size=(h, w), mode='nearest').squeeze()
+            attn_over_image = attn_over_image * image_mask[stage]
+
+            ret_attn[i] = ret_attn[i] + attn_over_image
+            
+        if stage == current_stage:
+            break
+
+    ##### norm ####
+    med = torch.stack(ret_attn, dim=0)
+    med = med.mean(dim=0)
+    for i in range(len(ret_attn)):
+        ret_attn[i] = ret_attn[i] - med
+        
+    if attn_norm is not None:
+        ret_attn = attn_norm(ret_attn)
+        
+    if image is not None and save_path is not None:
+        for i in range(len(output_token_inds)):
+            target_token_ind = output_token_inds[i] 
+            token_attn = ret_attn[i]
+            
+            # Resize the heatmap to match the original image size
+            resized_heatmap = F.interpolate(
+                token_attn.unsqueeze(0).unsqueeze(0),  # Add batch and channel dimensions
+                size=(image.height, image.width),  # Resize to match image dimensions
+                mode='bilinear',  # Use bilinear for smoother heatmap
+                align_corners=True
+            ).squeeze()
+            
+
+            # Normalize the resized heatmap
+            # resized_heatmap -= resized_heatmap.min()
+            resized_heatmap = torch.relu(resized_heatmap)
+            resized_heatmap /= resized_heatmap.max()
+            resized_heatmap = resized_heatmap.cpu().numpy()
+
+            np_img = np.array(image)[:, :, ::-1]
+            heatmap = (cm.jet(resized_heatmap)[:, :, :3] * 255).astype(np.uint8)
+            blended = cv2.addWeighted(np_img, 0.5, heatmap, 0.5, 0)
+            img_with_attn = blended
+            # img_with_attn = cv2.cvtColor(blended, cv2.COLOR_BGR2RGB)
+            # img_with_attn, heatmap = show_mask_on_image(np_img, resized_heatmap)
+            # img_with_attn = cv2.cvtColor(img_with_attn, cv2.COLOR_BGR2RGB)
+            
+            # Save attention visualization for the current token and layer
+            plt.figure(figsize=(8, 8))
+            plt.imshow(img_with_attn )
+            plt.title(f"Token {target_token_ind}")
+            plt.axis("off")
+            token_string = tokenizer.decode(outputs['sequences'][0][i])
+            if token_string == "<s>":
+                token_string = "sos"
+            elif token_string == "</s>":
+                token_string = "eos"
+            elif "." in token_string:
+                token_string.replace(".", "dot")
+            elif "/" in token_string:
+                token_string.replace("/", "slash")
+            plt.savefig(f"{save_path}/{str(i).zfill(4)}_{token_string}.png")
+            plt.close()
 
     return ret_attn
 
@@ -720,7 +821,7 @@ def get_heatmap_with_layer_visualization(
         select_layer=model.get_vision_tower().select_layer,
         all_prev_layers=True
     )
-    
+        
     grid_size = model.get_vision_tower().num_patches_per_side
 
     heat_torch_stack = []
@@ -778,9 +879,24 @@ def get_heatmap_with_layer_visualization(
     return layerwise_results
 
 
-def make_square(im, min_size=200, fill_color=(0, 0, 0)):
+def make_square(im, min_size, smallest_grid_size, fill_color=(0, 0, 0)):
     x, y = im.size
-    size = max(min_size, x, y)
+    size = int(max(min_size, x, y))
     new_im = Image.new('RGB', (size, size), fill_color)
-    new_im.paste(im, (int((size - x) / 2), int((size - y) / 2)))
-    return new_im
+    new_im.paste(im, (0, 0))
+    
+    step = size // smallest_grid_size
+    for x_idx, bounding_x in enumerate(range(0, size, step)):
+        if bounding_x >= x: break
+    for y_idx, bounding_y in enumerate(range(0, size, step)):
+        if bounding_y >= y: break
+
+    return new_im, x_idx, y_idx
+
+## old make_square
+# def make_square(im, min_size=200, fill_color=(0, 0, 0)):
+#     x, y = im.size
+#     size = max(min_size, x, y)
+#     new_im = Image.new('RGB', (size, size), fill_color)
+#     new_im.paste(im, (int((size - x) / 2), int((size - y) / 2)))
+#     return new_im

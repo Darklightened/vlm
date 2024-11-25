@@ -281,10 +281,24 @@ def parse_eval_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--positional_embedding_type",
+        type=str,
+        default="reduced",
+        help="[reduced, reduced_sin, interpolation, zero]. attention thresholding method for the layers",
+    )
+    
+    parser.add_argument(
         "--attention_thresholding_type",
         type=str,
         default="layer_mean",
-        help="[layer_mean]. attention thresholding method for the layers",
+        help="[layer_mean, layer_mean_topk, confidence_topk]. attention thresholding method for the layers",
+    )
+    
+    parser.add_argument(
+        "--attn_norm",
+        type=str,
+        default="norm_relu",
+        help="[None, norm_relu, norm_min_max]. Perform attention normalization - bool",
     )
 
     parser.add_argument(
@@ -341,6 +355,19 @@ def parse_eval_args() -> argparse.Namespace:
         type=str,
         default="default",
         help="target_token_selection_strategy - str",
+    )
+    parser.add_argument(
+        "--stages",
+        nargs="*",  # 0 or more values expected => creates a list
+        type=int,
+        default=[-1, 0, 1],  # default if nothing is provided
+        help="stages",
+    )
+    parser.add_argument(
+        "--visualize_heatmap",
+        type=bool,
+        default=False,
+        help="visualize_heatmap - bool",
     )
 
 

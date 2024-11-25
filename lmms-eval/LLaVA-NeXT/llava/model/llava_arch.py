@@ -214,7 +214,7 @@ class LlavaMetaForCausalLM(ABC):
         # stage -1: 168
         # stage  0: 336
         # stage  1: 672
-        image_features = self.get_model().get_downsampled_vision_towers(stage)(images)
+        image_features = self.get_model().get_downsampled_vision_towers(stage=stage)(images)
         # image_features = self.get_model().vision_resampler(image_features, images=images)
         image_features = self.get_model().mm_projector(image_features)
         return image_features
@@ -312,15 +312,15 @@ class LlavaMetaForCausalLM(ABC):
             for stage in downsampled_images.keys():
                 if stage < 0:
                     stages.append(stage)
-            stages.sort()
+            if len(stages) > 0:
+                stages.sort()
             
             ## encode downsampled images
             encoded_downsampled_image_features = []
             for stage in stages:
                 encoded_downsampled_image_features.append(
-                    self.encode_downsampled_images(idx, downsampled_images[stage].squeeze(0), stage)
+                    self.encode_downsampled_images(downsampled_images[stage].squeeze(0), stage)
                 )
-
             # image_features,all_faster_video_features = self.encode_multimodals(concat_images, video_idx_in_batch, split_sizes)
             # This is a list, each element is [num_images, patch * patch, dim]
             # rank_print(f"Concat images : {concat_images.shape}")
@@ -388,8 +388,15 @@ class LlavaMetaForCausalLM(ABC):
                             new_image_features.append(image_feature.flatten(0, 1))
                         else:
                             raise ValueError(f"Unexpected mm_newline_position: {mm_newline_position}")
+                    
+                    elif image_feature.shape[0] > 1 and generation_type is not None:
+                        '''
+                        AIDAS VLM
+                        (Migrating VLM Hallucination)
                         
-                    elif image_feature.shape[0] > 1 and generation_type is not None: # for aidas
+                        element-wise product each stage-n-features by n-image-mask.
+                        use only non-zero features.
+                        '''
                         stage0_feature = image_feature[0]
                         stage1_feature = image_feature[1:]                
                         
@@ -409,189 +416,108 @@ class LlavaMetaForCausalLM(ABC):
                             except Exception as e:
                                 rank0_print(f"Error: {e}")
                                 num_patch_width, num_patch_height = 2, 2
-                            image_feature = image_feature.view(num_patch_height, num_patch_width, height, width, -1)
+                            stage1_feature = stage1_feature.view(num_patch_height, num_patch_width, height, width, -1)
                         else:
-                            image_feature = image_feature.view(2, 2, height, width, -1)
+                            stage1_feature = stage1_feature.view(2, 2, height, width, -1)
 
                         if "maxpool2x2" in mm_patch_merge_type:
-                            image_feature = image_feature.permute(4, 0, 2, 1, 3).contiguous()
-                            image_feature = image_feature.flatten(1, 2).flatten(2, 3)
-                            image_feature = nn.functional.max_pool2d(image_feature, 2)
-                            image_feature = image_feature.flatten(1, 2).transpose(0, 1)
+                            stage1_feature = stage1_feature.permute(4, 0, 2, 1, 3).contiguous()
+                            stage1_feature = stage1_feature.flatten(1, 2).flatten(2, 3)
+                            stage1_feature = nn.functional.max_pool2d(stage1_feature, 2)
+                            stage1_feature = stage1_feature.flatten(1, 2).transpose(0, 1)
                         elif "unpad" in mm_patch_merge_type and "anyres_max" in image_aspect_ratio and matched_anyres_max_num_patches:
-                            unit = image_feature.shape[2]
-                            image_feature = image_feature.permute(4, 0, 2, 1, 3).contiguous()
-                            image_feature = image_feature.flatten(1, 2).flatten(2, 3)
-                            image_feature = unpad_image(image_feature, image_sizes[image_idx])
-                            c, h, w = image_feature.shape
+                            unit = stage1_feature.shape[2]
+                            stage1_feature = stage1_feature.permute(4, 0, 2, 1, 3).contiguous()
+                            stage1_feature = stage1_feature.flatten(1, 2).flatten(2, 3)
+                            stage1_feature = unpad_image(stage1_feature, image_sizes[image_idx])
+                            c, h, w = stage1_feature.shape
                             times = math.sqrt(h * w / (max_num_patches * unit**2))
                             if times > 1.1:
-                                image_feature = image_feature[None]
-                                image_feature = nn.functional.interpolate(image_feature, [int(h // times), int(w // times)], mode="bilinear")[0]
-                            image_feature = torch.cat((image_feature, self.model.image_newline[:, None, None].expand(*image_feature.shape[:-1], 1).to(image_feature.device)), dim=-1)
-                            image_feature = image_feature.flatten(1, 2).transpose(0, 1)
+                                stage1_feature = stage1_feature[None]
+                                stage1_feature = nn.functional.interpolate(stage1_feature, [int(h // times), int(w // times)], mode="bilinear")[0]
+                            stage1_feature = torch.cat((stage1_feature, self.model.image_newline[:, None, None].expand(*stage1_feature.shape[:-1], 1).to(stage1_feature.device)), dim=-1)
+                            stage1_feature = stage1_feature.flatten(1, 2).transpose(0, 1)
                         elif "unpad" in mm_patch_merge_type:
-                            image_feature = image_feature.permute(4, 0, 2, 1, 3).contiguous()
-                            image_feature = image_feature.flatten(1, 2).flatten(2, 3)
-                            image_feature = unpad_image(image_feature, image_sizes[image_idx])
-                            image_feature = torch.cat((image_feature, self.model.image_newline[:, None, None].expand(*image_feature.shape[:-1], 1).to(image_feature.device)), dim=-1)
-                            image_feature = image_feature.flatten(1, 2).transpose(0, 1)
+                            stage1_feature = stage1_feature.permute(4, 0, 2, 1, 3).contiguous()
+                            stage1_feature = stage1_feature.flatten(1, 2).flatten(2, 3)
+                            stage1_feature = unpad_image(stage1_feature, image_sizes[image_idx])
+                            stage1_feature = torch.cat((stage1_feature, self.model.image_newline[:, None, None].expand(*stage1_feature.shape[:-1], 1).to(stage1_feature.device)), dim=-1)
+                            stage1_feature = stage1_feature.flatten(1, 2).transpose(0, 1)
                         
                         ### Recursion part ###
                         ### need check !!!!! ###
                         
                         # default generation (basic llava 1.6)
-                        if generation_type in ["default", None]:
-                            image_feature = torch.cat((stage0_feature, stage1_feature), dim=0)
-                        else:
+                        # if "recursion" in generation_type:
+                        if True:
                             downsampled_features_list = []
-                            for encoded_downsampled_image_feature, stage in zip(encoded_downsampled_image_features, stages):
+                            stage0_features_list = []
+                            stage1_features_list = []
+
+                            ### STEP ###
+                            # 1. interpolate mask to encoded size,
+                            # 2. elementwise multiplication,
+                            # 3. insert only non-zero features to list.
+                            
+                            for downsampled_feature, stage in zip(encoded_downsampled_image_features, stages):
                                 mask = image_mask[stage]
-                                e_w, e_h, _ = encoded_downsampled_image_feature.shape
-                                _, m_w, m_h = mask.shape
-                                ### TODO ###
-                                # 1. interpolate mask to encoded size,
-                                # 2. elementwise multiplication,
-                                # 3. insert only non zero features to list.
-                            downsampled_features = torch.cat(downsampled_features_list, dim=0)
-                            image_feature = torch.cat((downsampled_features, stage0_feature, stage1_feature), dim=0)
+                                _, num_patches, _ = downsampled_feature.shape
+                                patch_per_side = int(math.sqrt(num_patches))
+
+                                resized_mask = torch.nn.functional.interpolate(mask.unsqueeze(0).unsqueeze(0), size=(patch_per_side, patch_per_side), mode='nearest')
+
+                                downsampled_feature = downsampled_feature.squeeze().view(patch_per_side, patch_per_side, -1)
+                                resized_mask = resized_mask.squeeze().unsqueeze(-1)
                                 
+                                downsampled_feature = downsampled_feature * resized_mask
+                                downsampled_feature = downsampled_feature.view(num_patches, -1)
+                                
+                                for f in downsampled_feature:
+                                    if f.min() == 0 and f.max() == 0: continue
+                                    downsampled_features_list.append(f.unsqueeze(0))
+                                
+                            
+                            patches_per_side = self.get_vision_tower().num_patches_per_side
+                            stage0_feature = stage0_feature.view(patches_per_side, patches_per_side, -1)
+                            mask = image_mask[0]
+                            resized_mask = torch.nn.functional.interpolate(mask.unsqueeze(0).unsqueeze(0), size=(patches_per_side, patches_per_side), mode='nearest')
+                            resized_mask = resized_mask.squeeze().unsqueeze(-1)
+                            stage0_feature = stage0_feature * resized_mask
+                            stage0_feature = stage0_feature.view(patches_per_side ** 2, -1)
+                            for f in stage0_feature:
+                                if f.min() == 0 and f.max() == 0: continue
+                                stage0_features_list.append(f.unsqueeze(0))
+                            
+                            patches_per_side = self.get_vision_tower().num_patches_per_side * 2
+                            stage1_feature = stage1_feature.view(patches_per_side, patches_per_side, -1)
+                            mask = image_mask[1]
+                            resized_mask = torch.nn.functional.interpolate(mask.unsqueeze(0).unsqueeze(0), size=(patches_per_side, patches_per_side), mode='nearest')
+                            resized_mask = resized_mask.squeeze().unsqueeze(-1)
+                            stage1_feature = stage1_feature * resized_mask
+                            stage1_feature = stage1_feature.view(patches_per_side ** 2, -1)
+                            for f in stage1_feature:
+                                if f.min() == 0 and f.max() == 0: continue
+                                stage1_features_list.append(f.unsqueeze(0))
+                            
+                            concat_list = []
+                            if len(downsampled_features_list) > 0:
+                                downsampled_features = torch.cat(downsampled_features_list, dim=0)
+                                concat_list.append(downsampled_features)
+                            if len(stage0_features_list) > 0:
+                                stage0_features = torch.cat(stage0_features_list, dim=0)
+                                concat_list.append(stage0_features)
+                            if len(stage1_features_list) > 0:
+                                stage1_features = torch.cat(stage1_features_list, dim=0)
+                                concat_list.append(stage1_features)
+
+                            image_feature = torch.cat(concat_list, dim=0)
+                            image_feature = image_feature.type(torch.float16)
+
                         new_image_features.append(image_feature)
                     
-                    ### old version recursion
-                    elif image_feature.shape[0] > 1:  # multi patches and multi images operations
-                        #print("divide into several patches")
-                        # rank0_print("Single-images")
-
-                        ### need check!!!!! ###
-                        ## modify base tokens later
-                        base_image_feature = image_feature[0]
-                        image_feature = image_feature[1:]                                                                      
-
-                        # ## retain or exclude base_image_feature
-                        # if (image_mask == None) or (generation_type == "recursion_retain_base"):
-                        #     base_image_feature = image_feature[0]
-                        # else:
-                        #     ## split the base with image mask
-                        #     base_image_feature = image_feature[0].view(24, 24, -1)
-                        #     base_list = []
-                        #     skip_list = []
-                        #     for row, col in image_mask:
-                        #         skip_list.append([row, col])
-                        #     # print(skip_list)
-                        #     for row in range(24):
-                        #         for col in range(24):
-                        #             if [row, col] in skip_list:
-                        #                 continue
-                        #             temp = base_image_feature[row, col, ...].unsqueeze(0)
-                        #             base_list.append(temp)
-                        #     base_image_feature = torch.cat(base_list)                        
-                        
-                        height = width = self.get_vision_tower().num_patches_per_side
-                        #assert height * width == base_image_feature.shape[0]
-
-                        if "anyres_max" in image_aspect_ratio:
-                            matched_anyres_max_num_patches = re.match(r"anyres_max_(\d+)", image_aspect_ratio)
-                            if matched_anyres_max_num_patches:
-                                max_num_patches = int(matched_anyres_max_num_patches.group(1))
-
-                        if image_aspect_ratio == "anyres" or "anyres_max" in image_aspect_ratio:
-                            if hasattr(self.get_vision_tower(), "image_size"):
-                                vision_tower_image_size = self.get_vision_tower().image_size
-                            else:
-                                raise ValueError("vision_tower_image_size is not found in the vision tower.")
-                            try:
-                                num_patch_width, num_patch_height = get_anyres_image_grid_shape(image_sizes[image_idx], self.config.image_grid_pinpoints, vision_tower_image_size)
-                            except Exception as e:
-                                rank0_print(f"Error: {e}")
-                                num_patch_width, num_patch_height = 2, 2
-                            image_feature = image_feature.view(num_patch_height, num_patch_width, height, width, -1)
-                        else:
-                            image_feature = image_feature.view(2, 2, height, width, -1)
-
-                        if "maxpool2x2" in mm_patch_merge_type:
-                            image_feature = image_feature.permute(4, 0, 2, 1, 3).contiguous()
-                            image_feature = image_feature.flatten(1, 2).flatten(2, 3)
-                            image_feature = nn.functional.max_pool2d(image_feature, 2)
-                            image_feature = image_feature.flatten(1, 2).transpose(0, 1)
-                        elif "unpad" in mm_patch_merge_type and "anyres_max" in image_aspect_ratio and matched_anyres_max_num_patches:
-                            unit = image_feature.shape[2]
-                            image_feature = image_feature.permute(4, 0, 2, 1, 3).contiguous()
-                            image_feature = image_feature.flatten(1, 2).flatten(2, 3)
-                            image_feature = unpad_image(image_feature, image_sizes[image_idx])
-                            c, h, w = image_feature.shape
-                            times = math.sqrt(h * w / (max_num_patches * unit**2))
-                            if times > 1.1:
-                                image_feature = image_feature[None]
-                                image_feature = nn.functional.interpolate(image_feature, [int(h // times), int(w // times)], mode="bilinear")[0]
-                            image_feature = torch.cat((image_feature, self.model.image_newline[:, None, None].expand(*image_feature.shape[:-1], 1).to(image_feature.device)), dim=-1)
-                            image_feature = image_feature.flatten(1, 2).transpose(0, 1)
-                        elif "unpad" in mm_patch_merge_type:
-                            image_feature = image_feature.permute(4, 0, 2, 1, 3).contiguous()
-                            image_feature = image_feature.flatten(1, 2).flatten(2, 3)
-                            image_feature = unpad_image(image_feature, image_sizes[image_idx])
-                            image_feature = torch.cat((image_feature, self.model.image_newline[:, None, None].expand(*image_feature.shape[:-1], 1).to(image_feature.device)), dim=-1)
-                            image_feature = image_feature.flatten(1, 2).transpose(0, 1)
-                        
-                        ### Recursion part ###
-                        ### need check !!!!! ###
-                        
-                        # default generation (basic llava 1.6)
-                        if generation_type in ["default", None]:
-                            image_feature = torch.cat((base_image_feature, image_feature), dim=0)
-                        
-                        # use all image sizes in all_image_sizes (no recursion)
-                        elif generation_type is "base_only":
-                            if encoded_downsampled_image_features is not None:
-                                downsampled_image_features = [downsampled_feature[0] for downsampled_feature in encoded_downsampled_image_features] 
-                                base_image_features = torch.cat(downsampled_image_features, dim=0)
-                            else:
-                                base_image_features = base_image_feature
-                                
-                            image_feature = base_image_features
-                        
-                        elif "recursion" in generation_type:
-                            total_stages = len(recursed_image_sizes) + 1 ## assume stage starts from 1
-                            
-                            ## deal with downsampled features
-                            if encoded_downsampled_image_features is not None:
-                                all_image_features = [downsampled_feature[0] for downsampled_feature in encoded_downsampled_image_features] 
-
-                                if 336 in recursed_image_sizes:
-                                    image_feature = image_feature.permute(0, 2, 1, 3, 4).contiguous()
-                                    image_feature = image_feature.flatten(0, 3)
-                                    all_image_features.append(base_image_feature)
-                                    all_image_features.append(image_feature)
-                            else:
-                                assert recursed_image_sizes == [336, 672], "error in recursed_image_sizes"
-                                image_feature = image_feature.permute(0, 2, 1, 3, 4).contiguous()
-                                image_feature = image_feature.flatten(0, 3)
-                                all_image_features = [base_image_feature, image_feature]
-                            
-                            if current_stage == 1: 
-                                ## +1 for first stage input
-                                num_start_size = len(all_image_sizes) - len(recursed_image_sizes)
-                                base_image_features = all_image_features[:num_start_size]
-                                image_features = torch.cat(base_image_features, dim=0)
-                            
-                            else:     
-                                assert image_mask is not None, "no mask provided for recursion"                                                        
-
-                                default_size=14
-                                num_patches_side = [image_size/default_size for image_size in all_image_sizes]
-
-                                all_image_features_22 = [feature.view(n_patches, n_patches, -1) for n_patches, feature in zip(num_patches_side, all_image_features)]                                
-                                masked_image_features = [feature * mask.unsqueeze(-1) for feature, mask in zip(all_image_features_22, image_mask)]
-                                
-                                non_zero_tensors = []
-
-                                for feature in masked_image_features:                                    
-                                    non_zero_values = feature[feature != 0]                                     
-                                    non_zero_tensors.append(non_zero_values)
-                                
-                                image_features = torch.cat(non_zero_tensors, dim=0)
-                                    
-                        new_image_features.append(image_feature)
+                    #################
+                    # original code #
+                    #################
                     elif image_feature.shape[0] > 1:  # multi patches and multi images operations
                         # rank0_print("Single-images")
                         base_image_feature = image_feature[0]

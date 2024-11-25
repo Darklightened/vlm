@@ -22,12 +22,16 @@ from lmms_eval.recursion_utils import (
     calculate_entropy_for_attn_threshold, 
     entropy_based_threshold, 
     confidence_based_threshold, 
-    calculate_entropy_and_all_confidences
+    calculate_entropy_and_all_confidences,
+    layer_mean_based_recursion,
+    layer_mean_topk_based_recursion,
+    confidence_topk_based_recursion,
 )
 
 import numpy as np
 import torch.nn.functional as F
 import csv
+import os
 from pathlib import Path
 
 warnings.filterwarnings("ignore")
@@ -41,12 +45,13 @@ try:
         get_model_name_from_path,
         process_images,
         tokenizer_image_token,
-        show_mask_on_image,
         get_heatmap,
         make_square,
-        process_anyres_image,
-        get_heatmap_with_layer_visualization,
-        init_downsampled_vision_towers
+        init_downsampled_vision_towers,
+    )
+    from llava.mm_utils import (
+        norm_relu,
+        norm_min_max,
     )
     from llava.model.builder import load_pretrained_model
 except Exception as e:
@@ -76,7 +81,7 @@ class Llava(lmms):
         batch_size: Optional[Union[int, str]] = 1,
         model_name=None,
         attn_implementation=best_fit_attn_implementation,
-        device_map="cuda:0",
+        device_map="aidas",
         conv_template="vicuna_v1",
         use_cache=True,
         tie_weights: bool = True,
@@ -84,8 +89,9 @@ class Llava(lmms):
         customized_config=None,  # ends in json        
         ## new args for recursive generation
         generation_type="default",
-        fix_grid="default",
+        fix_grid="2x2",
         attention_thresholding_type="layer_mean",
+        attn_norm = "norm_relu", 
         attention_threshold="0.1",
         remove_unpadding=False,    
         detection_strategy=None,
@@ -93,11 +99,9 @@ class Llava(lmms):
         save_output=True,
         output_csv_path = "generation_output.csv",
         target_token_selection_strategy="first",
-        stages=[0, 1],
-        positional_embedding_type="default",
-        save_heatmap_image=False,
-        save_heatmap_image_path="./image_heatmap",
-
+        stages=[-1, 0, 1],
+        positional_embedding_type="reduced",
+        visualize_heatmap=False,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -113,6 +117,9 @@ class Llava(lmms):
         elif accelerator.num_processes == 1 and device_map == "auto":
             self._device = torch.device(device)
             self.device_map = device_map
+        elif accelerator.num_processes == 1 and device_map == "aidas":
+            self._device = torch.device(device)
+            self.device_map = device
         else:
             self._device = torch.device(f"cuda:{accelerator.local_process_index}")
             self.device_map = f"cuda:{accelerator.local_process_index}"
@@ -149,6 +156,7 @@ class Llava(lmms):
         self.generation_type = generation_type        
         self.fix_grid = fix_grid
         self.attention_thresholding_type = attention_thresholding_type
+        self.attn_norm = attn_norm
         self.attention_threshold = attention_threshold        
         self.detection_strategy = detection_strategy
         self.detection_threshold = detection_threshold 
@@ -159,12 +167,13 @@ class Llava(lmms):
         assert sorted(stages) == stages, "stages must be sorted."
         self.stages = stages
         self.positional_embedding_type = positional_embedding_type
-        self.save_heatmap_image = save_heatmap_image
-        self.save_heatmap_image_path = save_heatmap_image_path
+        self.visualize_heatmap = visualize_heatmap
         
+        print(f"device: {device}")
         print(f"generation_type: {generation_type}")
         print(f"fix_grid: {fix_grid}")
         print(f"attention_thresholding_type: {attention_thresholding_type}")
+        print(f"attention_norm: {attn_norm}")
         print(f"attention_threshold: {attention_threshold}")
         print(f"detection_strategy: {detection_strategy}")        
         print(f"detection_threshold: {detection_threshold}")
@@ -173,8 +182,7 @@ class Llava(lmms):
         print(f"target_token_selection_strategy: {target_token_selection_strategy}")
         print(f"stages: {stages}")
         print(f"positional_embedding_type: {positional_embedding_type}")
-        print(f"save_heatmap_image: {save_heatmap_image}")
-        print(f"save_heatmap_image_path: {save_heatmap_image_path}")
+        print(f"visualize_heatmap: {visualize_heatmap}")
         
         ## default = "spatial_unpad" for llava1.6
         ## To remove unpadding, set remove_unpadding=True -> mm.path_merge_type will be 'spatial'
@@ -188,32 +196,45 @@ class Llava(lmms):
 
             self.output_csv_path = Path(self.output_csv_path)
 
-        if not self.output_csv_path.exists():
-            with open(self.output_csv_path, mode="w", newline="") as file:
-                writer = csv.writer(file)
-                headers = ["Doc ID", "Stage", "Text Output"]   
-                headers += [f"Cumulative Confidence {i+1}" for i in range(10)]
-                writer.writerow(headers)
+            if not self.output_csv_path.exists():
+                with open(self.output_csv_path, mode="w", newline="") as file:
+                    writer = csv.writer(file)
+                    headers = ["Doc ID", "Stage", "Text Output"]   
+                    headers += [f"Cumulative Confidence {i+1}" for i in range(10)]
+                    writer.writerow(headers)
+                    
+        if attn_norm == "None":
+            self.attn_norm = None
+        elif attn_norm == "norm_relu":
+            self.attn_norm = norm_relu
+        elif attn_norm == "norm_min_max":
+            self.attn_norm = norm_min_max
+        else:
+            eval_logger.info(f"Unsupported norm type. Using norm_relu.")
+            self.attn_norm = norm_relu
 
+        ##################################################################################
         ## init downsampled vision towers
-        # stage -2:  84
-        # stage -1: 168
-        # stage  0: 336
-        # stage  1: 672
+        ## stage -2:  84
+        ## stage -1: 168
+        ## stage  0: 336
+        ## stage  1: 672
         if self.stages[0] < 0:
-            self.model.downsampled_vision_towers = init_downsampled_vision_towers(
+            self.model.model.downsampled_vision_towers = init_downsampled_vision_towers(
                 self.model.model.vision_tower,
                 self.stages,
-                self.positional_embedding_type
+                self.positional_embedding_type,
+                device,
             )
-        self.model.to(device)
+        self.model.model = self.model.model.to(device)
         
         self.patch_size = 14
-        self.image_size = self.model.model.vision_tower.vision_model.image_size
-        largest_grid_size = self.image_size * pow(2, stages[-1]) // self.patch_size
-        self.image_mask = dict()
-        for stage in self.stages:
-            self.image_mask[stage] = torch.zeros(largest_grid_size, largest_grid_size)
+        self.image_size = self.model.model.vision_tower.vision_tower.vision_model.embeddings.image_size
+        self.smallest_grid_size = int(self.image_size * pow(2, stages[0]) // self.patch_size)
+        self.largest_grid_size = int(self.image_size * pow(2, stages[-1]) // self.patch_size)
+        self.reset_image_mask()
+        ## downsampled vision tower end
+        ##################################################################################
 
         # assert self.batch_size_per_gpu == 1, "Llava currently does not support batched generation. See https://github.com/haotian-liu/LLaVA/issues/754. HF Llava also has this issue."
         if accelerator.num_processes > 1:
@@ -228,7 +249,6 @@ class Llava(lmms):
                 }
                 AcceleratorState().deepspeed_plugin.deepspeed_config_process(must_match=True, **kwargs)
                 eval_logger.info("Detected that you are using DistributedType.DEEPSPEED. Make sure you run `accelerate config` and set zero stage to 0")
-
             if accelerator.distributed_type == DistributedType.FSDP or accelerator.distributed_type == DistributedType.DEEPSPEED:
                 self._model = accelerator.prepare(self.model)
             else:
@@ -245,6 +265,12 @@ class Llava(lmms):
         else:
             eval_logger.info(f"Using single device: {self._device}")
             self.model.to(self._device)
+            self.model.model.vision_tower.to(self._device)
+            if self.stages[0] < 0:
+                for stage in self.stages:
+                    if stage == 0:
+                        break
+                    self.model.model.downsampled_vision_towers[stage].to(self._device)
             self._rank = 0
             self._world_size = 1
     
@@ -417,7 +443,11 @@ class Llava(lmms):
         chunks = re_ords.get_batched(n=self.batch_size, batch_fn=None)
         num_iters = len(requests) // self.batch_size if len(requests) % self.batch_size == 0 else len(requests) // self.batch_size + 1
         pbar = tqdm(total=num_iters, disable=(self.rank != 0), desc="Model Responding")
-        for chunk in chunks:
+        for idx_chunk, chunk in enumerate(chunks):
+            
+            ## reset image mask and pad mask
+            self.reset_image_mask()
+            
             contexts, all_gen_kwargs, doc_to_visual, doc_id, task, split = zip(*chunk)
             task = task[0]
             split = split[0]
@@ -428,7 +458,18 @@ class Llava(lmms):
             ## for recursive implementation, we only use 2x2 grid (might be updated in future)
             ## Set grid to 2x2 for recursive generation, else default
             if self.fix_grid == "2x2":
-                flattened_visuals = [make_square(visual, min_size=336) for visual in flattened_visuals]
+                temp_list = []
+                for idx, visual in enumerate(flattened_visuals):
+                    if idx == 0:
+                        squared_img, bounding_x, bounding_y = make_square(visual, min_size=360, smallest_grid_size=self.smallest_grid_size)
+                        # squared_img.save("./test.png")
+                        # exit()
+                        temp_list.append(squared_img)
+                        self.set_pad_mask(bounding_x, bounding_y)
+                    else:
+                        squared_img, _, _ = make_square(visual, min_size=360, smallest_grid_size=self.smallest_grid_size)
+                        temp_list.append(squared_img)
+                flattened_visuals = temp_list
             else:
                 pass
 
@@ -462,8 +503,8 @@ class Llava(lmms):
                     for stage in self.stages:
                         if stage == 0:
                             break
-                        temp_image_size = self.image_size * pow(2, stage)
-                        downsampled_image_tensor = F.interpolate(image_tensor[0], size=(temp_image_size, temp_image_size), mode='bilinear', align_corners=False)
+                        temp_image_size = int(self.image_size * pow(2, stage))
+                        downsampled_image_tensor = F.interpolate(image_tensor[0][0].unsqueeze(0), size=(temp_image_size, temp_image_size), mode='bilinear', align_corners=False)
                         downsampled_image_tensor = downsampled_image_tensor.unsqueeze(0)
                         downsampled_image_tensor = downsampled_image_tensor.to(dtype=torch.float16, device=self.device)
                         downsampled_image_tensors[stage] = downsampled_image_tensor
@@ -517,14 +558,22 @@ class Llava(lmms):
             # TODO: attention to this major generation step...
             
             ## main generation part
-            try:
-                for idx, stage in enumerate(self.stages):
-                    # make all-activated image mask for the first stage
-                    if idx == 0:
-                        self.image_mask[stage] = torch.ones_like(self.image_mask[stage])
+            # try:
+            if "recursion" in self.generation_type:
+                for idx_stage, stage in enumerate(self.stages):
                     
-                    last_stage = (stage == self.stages[-1])    
+                    ## for debugging with visualization
+                    if self.visualize_heatmap:
+                        save_path = f"./heatmap_vis/{str(doc_id).zfill(6)}/{str(idx_stage).zfill(2)}_stage_{stage}/"
+                        os.makedirs(save_path, exist_ok=True)
+                    else:
+                        save_path = None
                     
+                    ## Necessary for unpad
+                    self.combine_image_and_pad_mask()
+                    
+                    last_stage = (stage == self.stages[-1])
+
                     cont = self.model.generate(
                         input_ids,
                         attention_mask=attention_masks,
@@ -539,41 +588,112 @@ class Llava(lmms):
                         use_cache=self.use_cache,
                         generation_type=self.generation_type,
                         return_dict_in_generate=True,
-                        output_attentions=last_stage,
+                        output_attentions=True,
                         output_scores=True,
                         downsampled_images = downsampled_image_tensors,
                         image_mask = self.image_mask
                     )
                     
-                    text_outputs = self.tokenizer.batch_decode(cont, skip_special_tokens=True)
+                    text_outputs = self.tokenizer.batch_decode(cont['sequences'], skip_special_tokens=True)
                     scores = cont.scores
+                    sequences = cont["sequences"][0]
+                    
+                    # Save confidence for analysis
+                    if self.save_output:                            
+                        P_T_given_I_Q_full, entropy_sum, cumulative_confidences = calculate_entropy_and_all_confidences(
+                            sequences, scores = scores
+                        )  
+                        self.save_stage_to_csv(f"Stage {idx_stage}", doc_id, text_outputs, cumulative_confidences)
+                        
+                    ret_attn = get_heatmap(
+                                    self.model,
+                                    cont,
+                                    self.tokenizer,
+                                    question_input[0],
+                                    input_ids,
+                                    stage,
+                                    self.stages,
+                                    self.image_mask,
+                                    flattened_visuals[0],
+                                    save_path=save_path,
+                                    attn_norm=self.attn_norm,
+                                )
+                    
+                    # For confidence-based topk attention threshold.
+                    
+                    del cont
                     
                     if last_stage: break
                     
-                    ### TODO ###
-                    # 1. get heatmap
-                    # 2. update self.image_mask
+                    ### Threshold-based Recursion ######################################################
+                    if self.attention_thresholding_type == "layer_mean":
+                        self.image_mask[stage+1] = layer_mean_based_recursion(attn = ret_attn[0], # select token index
+                                                   attn_threshold = self.attention_threshold, 
+                                                   image_mask = self.image_mask[stage+1])
+                        
+                    elif self.attention_thresholding_type == "layer_mean_topk":
+                        self.image_mask[stage+1] = layer_mean_topk_based_recursion(attn = ret_attn[0], # select token index
+                                                   top_k = self.attention_threshold, 
+                                                   image_mask = self.image_mask[stage+1])
                     
-            except Exception as e:
+                    elif self.attention_thresholding_type == "confidence_topk": 
+                        self.image_mask[stage+1] = confidence_topk_based_recursion(attn = ret_attn[0], # select token index
+                                                   top_k = self.attention_threshold, 
+                                                   sequences = sequences,
+                                                   scores = scores, 
+                                                   image_mask = self.image_mask[stage+1])
+                            
+                    else: 
+                        self.activate_image_mask(self.stages[idx_stage + 1])
+
+                    
+            elif self.generation_type == "total":
+                self.activate_every_image_masks()
+                self.combine_image_and_pad_mask()
+
                 cont = self.model.generate(
-                        input_ids,
-                        attention_mask=attention_masks,
-                        pad_token_id=pad_token_ids,
-                        images=image_tensor,
-                        image_sizes=gen_kwargs["image_sizes"],
-                        do_sample=True if gen_kwargs["temperature"] > 0 else False,
-                        temperature=gen_kwargs["temperature"],
-                        top_p=gen_kwargs["top_p"],
-                        num_beams=gen_kwargs["num_beams"],
-                        max_new_tokens=gen_kwargs["max_new_tokens"],
-                        use_cache=self.use_cache,
-                        generation_type="default",                       
-                    )
-                text_outputs = self.tokenizer.batch_decode(cont, skip_special_tokens=True)
-                #raise e
-                eval_logger.error(f"Error {e} in generating, generate with default")
-                # cont = ""
-                # text_outputs = [""]
+                    input_ids,
+                    attention_mask=attention_masks,
+                    pad_token_id=pad_token_ids,
+                    images=image_tensor,
+                    image_sizes=gen_kwargs["image_sizes"],
+                    do_sample=True if gen_kwargs["temperature"] > 0 else False,
+                    temperature=gen_kwargs["temperature"],
+                    top_p=gen_kwargs["top_p"],
+                    num_beams=gen_kwargs["num_beams"],
+                    max_new_tokens=gen_kwargs["max_new_tokens"],
+                    use_cache=self.use_cache,
+                    generation_type=self.generation_type,
+                    return_dict_in_generate=True,
+                    # output_attentions=last_stage,
+                    # output_scores=True,
+                    downsampled_images = downsampled_image_tensors,
+                    image_mask = self.image_mask
+                )
+                
+                text_outputs = self.tokenizer.batch_decode(cont['sequences'], skip_special_tokens=True)
+                # scores = cont.scores
+                    
+            # except Exception as e:
+            #     cont = self.model.generate(
+            #             input_ids,
+            #             attention_mask=attention_masks,
+            #             pad_token_id=pad_token_ids,
+            #             images=image_tensor,
+            #             image_sizes=gen_kwargs["image_sizes"],
+            #             do_sample=True if gen_kwargs["temperature"] > 0 else False,
+            #             temperature=gen_kwargs["temperature"],
+            #             top_p=gen_kwargs["top_p"],
+            #             num_beams=gen_kwargs["num_beams"],
+            #             max_new_tokens=gen_kwargs["max_new_tokens"],
+            #             use_cache=self.use_cache,
+            #             generation_type="default",                       
+            #         )
+            #     text_outputs = self.tokenizer.batch_decode(cont, skip_special_tokens=True)
+            #     #raise e
+            #     eval_logger.error(f"Error {e} in generating, generate with default")
+            #     # cont = ""
+            #     # text_outputs = [""]
                 
 
             # cont_toks_list = cont.tolist()
@@ -596,3 +716,36 @@ class Llava(lmms):
 
         pbar.close()
         return res
+    
+    def generate_until_multi_round(self, requests) -> List[str]:
+        raise NotImplementedError("TODO: Implement multi-round generation for LLaVAHF")
+    
+    def reset_image_mask(self):
+        self.image_mask = dict()
+        for idx, stage in enumerate(self.stages):
+            if idx == 0:
+                # activate every token of the first stage
+                self.image_mask[stage] = torch.ones(self.largest_grid_size, self.largest_grid_size, device=self.device)        
+            else:
+                self.image_mask[stage] = torch.zeros(self.largest_grid_size, self.largest_grid_size, device=self.device)
+        self.pad_mask = torch.ones(self.largest_grid_size, self.largest_grid_size, device=self.device)
+    
+    def set_pad_mask(self, bounding_x, bounding_y):
+        temp_tensor = torch.zeros(self.smallest_grid_size, self.smallest_grid_size, device=self.device)
+        temp_tensor[:bounding_y, :bounding_x] = 1
+        temp_tensor = F.interpolate(temp_tensor.unsqueeze(0).unsqueeze(0), size=(self.largest_grid_size, self.largest_grid_size), mode='nearest').squeeze()
+        self.pad_mask = self.pad_mask * temp_tensor
+    
+    def combine_image_and_pad_mask(self):
+        for stage in self.stages:
+            self.image_mask[stage] = self.image_mask[stage] * self.pad_mask
+    
+    def activate_every_image_masks(self):
+        self.image_mask = dict()
+        for stage in self.stages:
+            self.image_mask[stage] = torch.ones(self.largest_grid_size, self.largest_grid_size, device=self.device)        
+    
+    def activate_image_mask(self, stage):
+        self.image_mask[stage] = torch.ones(self.largest_grid_size, self.largest_grid_size, device=self.device)        
+
+        

@@ -111,3 +111,39 @@ def calculate_entropy_and_all_confidences(sequence, scores):
     # print("Per-token cumulative confidences:", cumulative_confidences)
 
     return P_T_given_I_Q_full, entropy_sum, cumulative_confidences
+
+#### Recursion Methods ####
+
+def layer_mean_based_recursion(attn = None, attn_threshold = 0.1 , image_mask = None):
+    for row in range(attn.shape[0]):
+        for col in range(attn.shape[1]):
+            if attn[row, col] > attn_threshold:
+                image_mask[row][col] = 1
+    
+    return image_mask
+
+def layer_mean_topk_based_recursion(attn = None, top_k = 0.1 , image_mask = None):
+    flattened_attn = attn.view(-1) 
+    flattened_attn = flattened_attn.float()
+    threshold_index = int(len(flattened_attn) * (top_k)) 
+    threshold_value = torch.topk(flattened_attn, threshold_index).values[-1]
+    for row in range(attn.shape[0]):
+        for col in range(attn.shape[1]):
+            if attn[row, col] > threshold_value:
+                image_mask[row][col] = 1
+    return image_mask
+
+def confidence_topk_based_recursion(attn = None, top_k = 0.1 ,sequences = None, scores= None, image_mask = None): 
+    _, _, cumulative_confidences = calculate_entropy_and_all_confidences(sequence = sequences , scores = scores)
+                                                                         
+    calculated_threshold = confidence_based_threshold(cumulative_confidences= cumulative_confidences, base_threshold=top_k)
+    flattened_attn = attn.view(-1).float()
+    threshold_index = int(len(flattened_attn) * (calculated_threshold))
+    threshold_value = torch.topk(flattened_attn, threshold_index).values[-1]
+
+    for row in range(attn.shape[0]):
+        for col in range(attn.shape[1]):
+            if attn[row, col] > threshold_value:
+                image_mask[row][col] = 1
+    
+    return image_mask
