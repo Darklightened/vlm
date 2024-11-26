@@ -12,6 +12,7 @@ from accelerate import Accelerator, DistributedType, InitProcessGroupKwargs
 from accelerate.state import AcceleratorState
 from packaging import version
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 from lmms_eval import utils
 from lmms_eval.api.instance import Instance
@@ -570,7 +571,7 @@ class Llava(lmms):
                         save_path = None
                     
                     ## Necessary for unpad
-                    self.combine_image_and_pad_mask()
+                    # self.combine_image_and_pad_mask()
                     
                     last_stage = (stage == self.stages[-1])
 
@@ -594,10 +595,33 @@ class Llava(lmms):
                         image_mask = self.image_mask
                     )
                     
+                    ## delete sos
+                    if cont["sequences"][0][0] == 1:
+                        cont["sequences"] = cont["sequences"][0][1:].unsqueeze(0)
+                        
                     text_outputs = self.tokenizer.batch_decode(cont['sequences'], skip_special_tokens=True)
                     scores = cont.scores
                     sequences = cont["sequences"][0]
                     
+                    if self.visualize_heatmap:
+                        mask_image = self.image_mask[stage].cpu().numpy() * 255
+                        target_token_ind = cont["sequences"][0][0] 
+                        plt.figure(figsize=(8, 8))
+                        plt.imshow(mask_image)
+                        plt.title(f"Token {target_token_ind}")
+                        plt.axis("off")
+                        token_string = self.tokenizer.decode(cont['sequences'][0][0])
+                        if token_string == "<s>":
+                            token_string = "sos"
+                        elif token_string == "</s>":
+                            token_string = "eos"
+                        elif "." in token_string:
+                            token_string.replace(".", "dot")
+                        elif "/" in token_string:
+                            token_string.replace("/", "slash")
+                        plt.savefig(f"{save_path}/mask.png")
+                        plt.close()           
+                                 
                     # Save confidence for analysis
                     if self.save_output:                            
                         P_T_given_I_Q_full, entropy_sum, cumulative_confidences = calculate_entropy_and_all_confidences(
@@ -620,24 +644,21 @@ class Llava(lmms):
                                 )
                     
                     # For confidence-based topk attention threshold.
-                    
-                    del cont
-                    
                     if last_stage: break
                     
                     ### Threshold-based Recursion ######################################################
                     if self.attention_thresholding_type == "layer_mean":
-                        self.image_mask[stage+1] = layer_mean_based_recursion(attn = ret_attn[0], # select token index
+                        self.image_mask[stage+1] = layer_mean_based_recursion(attn = sum(ret_attn[:-1]), # select token index
                                                    attn_threshold = self.attention_threshold, 
                                                    image_mask = self.image_mask[stage+1])
                         
                     elif self.attention_thresholding_type == "layer_mean_topk":
-                        self.image_mask[stage+1] = layer_mean_topk_based_recursion(attn = ret_attn[0], # select token index
+                        self.image_mask[stage+1] = layer_mean_topk_based_recursion(attn = sum(ret_attn[:-1]), # select token index
                                                    top_k = self.attention_threshold, 
                                                    image_mask = self.image_mask[stage+1])
                     
                     elif self.attention_thresholding_type == "confidence_topk": 
-                        self.image_mask[stage+1] = confidence_topk_based_recursion(attn = ret_attn[0], # select token index
+                        self.image_mask[stage+1] = confidence_topk_based_recursion(attn = sum(ret_attn[:-1]), # select token index
                                                    top_k = self.attention_threshold, 
                                                    sequences = sequences,
                                                    scores = scores, 
@@ -645,6 +666,9 @@ class Llava(lmms):
                             
                     else: 
                         self.activate_image_mask(self.stages[idx_stage + 1])
+                        
+                    del cont
+                    
 
                     
             elif self.generation_type == "total":

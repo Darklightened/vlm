@@ -717,7 +717,7 @@ def get_heatmap(
     if image is not None and save_path is not None:
         for i in range(len(output_token_inds)):
             target_token_ind = output_token_inds[i] 
-            token_attn = ret_attn[i]
+            token_attn = sum(ret_attn[:-1])
             
             # Resize the heatmap to match the original image size
             resized_heatmap = F.interpolate(

@@ -15,7 +15,7 @@ python3 -m accelerate.commands.launch \
     --device cuda:0 \
     --model llava \
     --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
-    --tasks mmstar \
+    --tasks vqav2_val_lite \
     --batch_size 1 \
     --log_samples \
     --log_samples_suffix llava_v1.6_pope \
@@ -23,9 +23,10 @@ python3 -m accelerate.commands.launch \
     --generation_type recursion \
     --fix_grid 2x2 \
     --attention_thresholding_type layer_mean \
-    --attention_threshold 0.1 \
+    --attention_threshold 0.3 \
     --remove_unpadding True \
-    --stages "-1" "0" "1" \
+    --attn_norm norm_relu \
+    --stages "-2" "-1" "0" "1" \
     --visualize_heatmap True \
     --verbosity DEBUG \
     # --wandb_args "project=llava1.6_recursive_eval_woohye0n,entity=VLM_Hallucination_Woohyeon,name=168-336-672-pad-total"
