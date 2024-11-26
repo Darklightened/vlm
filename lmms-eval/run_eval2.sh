@@ -12,10 +12,10 @@
 python3 -m accelerate.commands.launch \
     --num_processes=1 \
     -m lmms_eval \
-    --device cuda:3 \
+    --device cuda:0 \
     --model llava \
     --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
-    --tasks pope,mme,mmstar \
+    --tasks pope \
     --batch_size 1 \
     --log_samples \
     --log_samples_suffix llava_v1.6_pope \
@@ -23,13 +23,13 @@ python3 -m accelerate.commands.launch \
     --generation_type recursion \
     --fix_grid 2x2 \
     --attention_thresholding_type layer_mean_topk \
-    --attention_threshold 0.2 \
+    --attention_threshold 0.3 \
     --remove_unpadding True \
     --attn_norm True \
-    --stages "-1" "0" "1" \
+    --stages "-2" "-1" "0" "1" \
     --verbosity DEBUG \
-    --wandb_args "project=llava1.6_recursive_eval_woohye0n,entity=VLM_Hallucination_Woohyeon,name=168-336-672-topk-20"
-    # --visualize_heatmap True \
-    # --save_output True \
-    # --output_csv_path "./generation_output_pope_168-336-672-topk-20.csv" \
+    --visualize_heatmap True \
+    --save_output True \
+    --output_csv_path "./generation_output_pope_Recursive_84-168-336-672-topk-30.csv" \
+    --wandb_args "project=llava1.6_recursive_eval,entity=VLM_Hallucination_Woohyeon,name=Recursive_168-336-672-topk20"
 

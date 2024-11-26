@@ -89,6 +89,7 @@ dependencies:
   - wheel=0.44.0
   - xz=5.4.6
   - zlib=1.2.13
+  - torch==2.1.2+cu121
   - pip:
       - accelerate==0.21.0
       - aiofiles==23.2.1
@@ -108,7 +109,7 @@ dependencies:
       - fastapi==0.115.0
       - ffmpy==0.4.0
       - filelock==3.16.1
-      - flash-attn==2.5.2
+      - flash-attn==2.5.2      
       - fonttools==4.54.1
       - gitdb==4.0.11
       - gitpython==3.1.43
@@ -200,4 +201,6 @@ dependencies:
       - wavedrom==2.0.3.post3
       - wcwidth==0.2.13
       - websockets==11.0.3
-prefix: /home/aidas_intern_1/anaconda3/envs/vlm
+prefix: /opt/miniconda/envs/vlm
+#prefix: /home/aidas_intern_1/anaconda3/envs/vlm
+
