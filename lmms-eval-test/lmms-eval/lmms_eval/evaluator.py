@@ -170,38 +170,14 @@ def simple_evaluate(
 
     task_dict = get_task_dict(tasks, task_manager)
 
-    if model == "llava":
-        print("initialize llava model with modification")
-
-        ModelClass = get_model(model)
-        lm = ModelClass.create_from_arg_string(
-            model_args,
-            {
-                "batch_size": batch_size,
-                "device": device,
-                "generation_type": cli_args.generation_type,
-                "fix_grid": cli_args.fix_grid,
-                "attention_thresholding_type": cli_args.attention_thresholding_type,
-                "attention_threshold": cli_args.attention_threshold,
-                "remove_unpadding": cli_args.remove_unpadding,
-                "regenerate_condition": cli_args.regenerate_condition,
-                "detection_threshold": cli_args.detection_threshold,
-                "detection": cli_args.detection,
-                "save_output": cli_args.save_output,
-                "output_csv_path": cli_args.output_csv_path,
-                "target_token_selection_strategy": cli_args.target_token_selection_strategy,
-            },
-        )
-
-    else:
-        ModelClass = get_model(model)
-        lm = ModelClass.create_from_arg_string(
-            model_args,
-            {
-                "batch_size": batch_size,
-                "device": device,
-            },
-        )
+    ModelClass = get_model(model)
+    lm = ModelClass.create_from_arg_string(
+        model_args,
+        {
+            "batch_size": batch_size,
+            "device": device,
+        },
+    )
 
     # helper function to recursively apply config overrides to leaf subtasks, skipping their constituent groups.
     # (setting of num_fewshot ; bypassing metric calculation ; setting fewshot seed)

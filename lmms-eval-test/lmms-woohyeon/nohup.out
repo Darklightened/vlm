@@ -1,129 +1,0 @@
-The following values were not passed to `accelerate launch` and had defaults used instead:
-	`--num_machines` was set to a value of `1`
-	`--mixed_precision` was set to a value of `'no'`
-	`--dynamo_backend` was set to a value of `'no'`
-To avoid this warning pass in values for each of the problematic parameters or run `accelerate config`.
-wandb: Currently logged in as: rlawodlr (VLM_Hallucination_Woohyeon). Use `wandb login --relogin` to force relogin
-wandb: wandb version 0.18.7 is available!  To upgrade, please run:
-wandb:  $ pip install wandb --upgrade
-wandb: Tracking run with wandb version 0.16.5
-wandb: Run data is saved locally in /home/aidas_intern_1/woohyeon/lmms-woohyeon/wandb/run-20241121_162956-wx2eiw5o
-wandb: Run `wandb offline` to turn off syncing.
-wandb: Syncing run llava-v1.6-7b-168-336-topk0.1
-wandb: ⭐️ View project at https://wandb.ai/VLM_Hallucination_Woohyeon/llava1.6_recursive_eval_woohye0n
-wandb: 🚀 View run at https://wandb.ai/VLM_Hallucination_Woohyeon/llava1.6_recursive_eval_woohye0n/runs/wx2eiw5o/workspace
-[32m2024-11-21 16:30:00.762[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate[0m:[36m346[0m - [1mVerbosity set to DEBUG[0m
-Detected kernel version 5.4.0, which is below the recommended minimum of 5.5.0; this can cause the process to hang. It is recommended to upgrade the kernel to the minimum version or higher.
-[32m2024-11-21 16:30:02.598[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.tasks[0m:[36m_get_task_and_group[0m:[36m452[0m - [34m[1m`group` and `group_alias` keys in tasks' configs will no longer be used in the next release of lmms-eval. `tag` will be used to allow to call a collection of tasks just like `group`. `group` will be removed in order to not cause confusion with the new ConfigurableGroup which will be the offical way to create groups with addition of group-wide configuations.[0m
-[32m2024-11-21 16:30:03.787[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m429[0m - [1mEvaluation tracker args: {'output_path': './logs/'}[0m
-[32m2024-11-21 16:30:03.788[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m518[0m - [1mSelected Tasks: ['vqav2'][0m
-[32m2024-11-21 16:30:03.808[0m | [1mINFO    [0m | [36mlmms_eval.evaluator[0m:[36msimple_evaluate[0m:[36m155[0m - [1mSetting random seed to 0 | Setting numpy seed to 1234 | Setting torch manual seed to 1234[0m
-Resolving data files:   0%|          | 0/68 [00:00<?, ?it/s]Resolving data files:   1%|▏         | 1/68 [00:00<00:11,  5.71it/s]Resolving data files:  63%|██████▎   | 43/68 [00:00<00:00, 144.48it/s]Resolving data files:  85%|████████▌ | 58/68 [00:00<00:00, 65.62it/s] Resolving data files: 100%|██████████| 68/68 [00:00<00:00, 82.35it/s]
-Resolving data files:   0%|          | 0/36 [00:00<?, ?it/s]Resolving data files: 100%|██████████| 36/36 [00:00<00:00, 165202.35it/s]
-Resolving data files:   0%|          | 0/143 [00:00<?, ?it/s]Resolving data files: 100%|██████████| 143/143 [00:00<00:00, 298104.11it/s]
-Resolving data files:   0%|          | 0/68 [00:00<?, ?it/s]Resolving data files: 100%|██████████| 68/68 [00:00<00:00, 223171.10it/s]
-Resolving data files:   0%|          | 0/36 [00:00<?, ?it/s]Resolving data files: 100%|██████████| 36/36 [00:00<00:00, 201326.59it/s]
-Resolving data files:   0%|          | 0/143 [00:00<?, ?it/s]Resolving data files: 100%|██████████| 143/143 [00:00<00:00, 314682.83it/s]
-Resolving data files:   0%|          | 0/68 [00:00<?, ?it/s]Resolving data files: 100%|██████████| 68/68 [00:00<00:00, 247365.72it/s]
-Resolving data files:   0%|          | 0/36 [00:00<?, ?it/s]Resolving data files: 100%|██████████| 36/36 [00:00<00:00, 175984.78it/s]
-Resolving data files:   0%|          | 0/143 [00:00<?, ?it/s]Resolving data files: 100%|██████████| 143/143 [00:00<00:00, 304305.16it/s]
-Resolving data files:   0%|          | 0/68 [00:00<?, ?it/s]Resolving data files: 100%|██████████| 68/68 [00:00<00:00, 252848.11it/s]
-Resolving data files:   0%|          | 0/36 [00:00<?, ?it/s]Resolving data files: 100%|██████████| 36/36 [00:00<00:00, 185497.47it/s]
-Resolving data files:   0%|          | 0/143 [00:00<?, ?it/s]Resolving data files: 100%|██████████| 143/143 [00:00<00:00, 268721.09it/s]
-initialize llava model with modofication
-OpenCLIP not installed
-[32m2024-11-21 16:30:16.965[0m | [1mINFO    [0m | [36mlmms_eval.models.llava[0m:[36m__init__[0m:[36m130[0m - [1mResize target: 168[0m
-Detected kernel version 5.4.0, which is below the recommended minimum of 5.5.0; this can cause the process to hang. It is recommended to upgrade the kernel to the minimum version or higher.
-You are using a model of type llava to instantiate a model of type llava_llama. This is not supported for all configurations of models and can yield errors.
-Loaded LLaVA model: liuhaotian/llava-v1.6-vicuna-7b
-loding from here
-Loading vision tower: openai/clip-vit-large-patch14-336
-Loading checkpoint shards:   0%|          | 0/3 [00:00<?, ?it/s]Loading checkpoint shards:  33%|███▎      | 1/3 [00:46<01:32, 46.19s/it]Loading checkpoint shards:  67%|██████▋   | 2/3 [01:32<00:46, 46.15s/it]Loading checkpoint shards: 100%|██████████| 3/3 [02:11<00:00, 43.10s/it]Loading checkpoint shards: 100%|██████████| 3/3 [02:11<00:00, 43.93s/it]
-Model Class: LlavaLlamaForCausalLM
-generation_type: recursion
-fix_grid: 2x2
-attention_thresholding_type: layer_mean_with_top_k
-attention_threshold: 0.1
-regenerate_condition: all
-remove unpadding=True, change to 'spatial'
-[32m2024-11-21 16:32:31.381[0m | [1mINFO    [0m | [36mlmms_eval.models.llava[0m:[36m__init__[0m:[36m236[0m - [1mUsing single device: cuda:0[0m
-change positional embedding to reduced
-Reduced embedding type.
-[32m2024-11-21 16:32:31.436[0m | [1mINFO    [0m | [36mlmms_eval.evaluator_utils[0m:[36mfrom_taskdict[0m:[36m91[0m - [1mNo metadata found in task config for vqav2_val, using default n_shot=0[0m
-[32m2024-11-21 16:32:31.436[0m | [1mINFO    [0m | [36mlmms_eval.evaluator_utils[0m:[36mfrom_taskdict[0m:[36m91[0m - [1mNo metadata found in task config for vqav2_test, using default n_shot=0[0m
-[32m2024-11-21 16:32:31.437[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.caching.cache[0m:[36mload_from_cache[0m:[36m33[0m - [34m[1mrequests-vqav2_val-0shot-rank0-world_size1-tokenizer is not cached, generating...[0m
-[32m2024-11-21 16:32:31.437[0m | [1mINFO    [0m | [36mlmms_eval.api.task[0m:[36mbuild_all_requests[0m:[36m425[0m - [1mBuilding contexts for vqav2_val on rank 0...[0m
-  0%|          | 0/214354 [00:00<?, ?it/s]  5%|▍         | 9783/214354 [00:00<00:02, 97821.23it/s]  9%|▉         | 19566/214354 [00:00<00:08, 22822.24it/s] 11%|█▏        | 24468/214354 [00:01<00:15, 12456.36it/s] 13%|█▎        | 27406/214354 [00:02<00:18, 10007.08it/s] 14%|█▎        | 29407/214354 [00:02<00:21, 8800.67it/s]  14%|█▍        | 30883/214354 [00:02<00:22, 7986.31it/s] 15%|█▍        | 32034/214354 [00:02<00:25, 7270.73it/s] 15%|█▌        | 32963/214354 [00:03<00:26, 6764.86it/s] 16%|█▌        | 33747/214354 [00:03<00:28, 6283.77it/s] 16%|█▌        | 34425/214354 [00:03<00:30, 5917.24it/s] 16%|█▋        | 35031/214354 [00:03<00:31, 5690.57it/s] 18%|█▊        | 38257/214354 [00:03<00:16, 10435.67it/s] 22%|██▏       | 46208/214354 [00:03<00:06, 24476.40it/s] 23%|██▎       | 49576/214354 [00:10<01:36, 1707.34it/s]  28%|██▊       | 59039/214354 [00:10<00:43, 3589.64it/s] 32%|███▏      | 69200/214354 [00:10<00:22, 6346.37it/s] 37%|███▋      | 79309/214354 [00:10<00:13, 10005.10it/s] 42%|████▏     | 89491/214354 [00:10<00:08, 14806.03it/s] 47%|████▋     | 99720/214354 [00:10<00:05, 20886.75it/s] 51%|█████▏    | 110018/214354 [00:11<00:03, 28301.71it/s] 56%|█████▌    | 120259/214354 [00:11<00:02, 36770.96it/s] 61%|██████    | 130467/214354 [00:11<00:01, 45936.74it/s] 66%|██████▌   | 140679/214354 [00:11<00:01, 55319.67it/s] 70%|███████   | 150879/214354 [00:11<00:00, 64310.75it/s] 75%|███████▌  | 160862/214354 [00:12<00:03, 17391.95it/s] 80%|███████▉  | 170991/214354 [00:13<00:01, 23208.38it/s] 84%|████████▍ | 181025/214354 [00:13<00:01, 30158.99it/s] 89%|████████▉ | 191031/214354 [00:13<00:00, 38130.93it/s] 94%|█████████▍| 201100/214354 [00:13<00:00, 46895.44it/s] 99%|█████████▊| 211182/214354 [00:13<00:00, 55887.30it/s]100%|██████████| 214354/214354 [00:13<00:00, 15881.11it/s]
-[32m2024-11-21 16:46:38.032[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.evaluator[0m:[36mevaluate[0m:[36m445[0m - [34m[1mTask: vqav2_val; number of requests on this rank: 214354[0m
-[32m2024-11-21 16:46:38.580[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.caching.cache[0m:[36mload_from_cache[0m:[36m33[0m - [34m[1mrequests-vqav2_test-0shot-rank0-world_size1-tokenizer is not cached, generating...[0m
-[32m2024-11-21 16:46:38.581[0m | [1mINFO    [0m | [36mlmms_eval.api.task[0m:[36mbuild_all_requests[0m:[36m425[0m - [1mBuilding contexts for vqav2_test on rank 0...[0m
-Traceback (most recent call last):
-  File "/home/aidas_intern_1/anaconda3/envs/vlm_woohyeon/lib/python3.10/runpy.py", line 196, in _run_module_as_main
-    return _run_code(code, main_globals, None,
-  File "/home/aidas_intern_1/anaconda3/envs/vlm_woohyeon/lib/python3.10/runpy.py", line 86, in _run_code
-    exec(code, run_globals)
-  File "/home/aidas_intern_1/.local/lib/python3.10/site-packages/accelerate/commands/launch.py", line 1178, in <module>
-    main()
-  File "/home/aidas_intern_1/.local/lib/python3.10/site-packages/accelerate/commands/launch.py", line 1174, in main
-    launch_command(args)
-  File "/home/aidas_intern_1/.local/lib/python3.10/site-packages/accelerate/commands/launch.py", line 1168, in launch_command
-    simple_launcher(args)
-  File "/home/aidas_intern_1/.local/lib/python3.10/site-packages/accelerate/commands/launch.py", line 763, in simple_launcher
-    raise subprocess.CalledProcessError(returncode=process.returncode, cmd=cmd)
-subprocess.CalledProcessError: Command '['/home/aidas_intern_1/anaconda3/envs/vlm_woohyeon/bin/python3', '-m', 'lmms_eval', '--model', 'llava', '--model_args', 'pretrained=liuhaotian/llava-v1.6-vicuna-7b', '--tasks', 'vqav2', '--batch_size', '1', '--log_samples', '--log_samples_suffix', 'llava_v1.6_pope', '--output_path', './logs/', '--generation_type', 'recursion', '--fix_grid', '2x2', '--attention_thresholding_type', 'layer_mean_with_top_k', '--attention_threshold', '0.1', '--remove_unpadding', 'True', '--regenerate_condition', 'all', '--verbosity', 'DEBUG', '--positional_embedding_type', 'reduced', '--wandb_args', 'project=llava1.6_recursive_eval_woohye0n,entity=VLM_Hallucination_Woohyeon,name=llava-v1.6-7b-168-336-topk0.1']' died with <Signals.SIGKILL: 9>.
-./run_eval2.sh: line 48: hon3: command not found
-The following values were not passed to `accelerate launch` and had defaults used instead:
-	`--num_machines` was set to a value of `1`
-	`--mixed_precision` was set to a value of `'no'`
-	`--dynamo_backend` was set to a value of `'no'`
-To avoid this warning pass in values for each of the problematic parameters or run `accelerate config`.
-wandb: Currently logged in as: rlawodlr (VLM_Hallucination_Woohyeon). Use `wandb login --relogin` to force relogin
-wandb: wandb version 0.18.7 is available!  To upgrade, please run:
-wandb:  $ pip install wandb --upgrade
-wandb: Tracking run with wandb version 0.16.5
-wandb: Run data is saved locally in /home/aidas_intern_1/woohyeon/lmms-woohyeon/wandb/run-20241121_164937-cdlaobui
-wandb: Run `wandb offline` to turn off syncing.
-wandb: Syncing run llava-v1.6-7b-168-336-topk0.3
-wandb: ⭐️ View project at https://wandb.ai/VLM_Hallucination_Woohyeon/llava1.6_recursive_eval_woohye0n
-wandb: 🚀 View run at https://wandb.ai/VLM_Hallucination_Woohyeon/llava1.6_recursive_eval_woohye0n/runs/cdlaobui/workspace
-[32m2024-11-21 16:49:42.295[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate[0m:[36m346[0m - [1mVerbosity set to DEBUG[0m
-Detected kernel version 5.4.0, which is below the recommended minimum of 5.5.0; this can cause the process to hang. It is recommended to upgrade the kernel to the minimum version or higher.
-[32m2024-11-21 16:49:44.509[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.tasks[0m:[36m_get_task_and_group[0m:[36m452[0m - [34m[1m`group` and `group_alias` keys in tasks' configs will no longer be used in the next release of lmms-eval. `tag` will be used to allow to call a collection of tasks just like `group`. `group` will be removed in order to not cause confusion with the new ConfigurableGroup which will be the offical way to create groups with addition of group-wide configuations.[0m
-[32m2024-11-21 16:49:45.623[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m429[0m - [1mEvaluation tracker args: {'output_path': './logs/'}[0m
-[32m2024-11-21 16:49:45.624[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m518[0m - [1mSelected Tasks: ['vqav2'][0m
-[32m2024-11-21 16:49:45.644[0m | [1mINFO    [0m | [36mlmms_eval.evaluator[0m:[36msimple_evaluate[0m:[36m155[0m - [1mSetting random seed to 0 | Setting numpy seed to 1234 | Setting torch manual seed to 1234[0m
-Resolving data files:   0%|          | 0/68 [00:00<?, ?it/s]Resolving data files:   1%|▏         | 1/68 [00:00<00:10,  6.69it/s]Resolving data files:  68%|██████▊   | 46/68 [00:00<00:00, 210.99it/s]Resolving data files: 100%|██████████| 68/68 [00:00<00:00, 222.99it/s]
-Resolving data files:   0%|          | 0/36 [00:00<?, ?it/s]Resolving data files: 100%|██████████| 36/36 [00:00<00:00, 168333.27it/s]
-Resolving data files:   0%|          | 0/143 [00:00<?, ?it/s]Resolving data files: 100%|██████████| 143/143 [00:00<00:00, 296044.16it/s]
-Resolving data files:   0%|          | 0/68 [00:00<?, ?it/s]Resolving data files: 100%|██████████| 68/68 [00:00<00:00, 266803.25it/s]
-Resolving data files:   0%|          | 0/36 [00:00<?, ?it/s]Resolving data files: 100%|██████████| 36/36 [00:00<00:00, 165383.29it/s]
-Resolving data files:   0%|          | 0/143 [00:00<?, ?it/s]Resolving data files: 100%|██████████| 143/143 [00:00<00:00, 313859.48it/s]
-Resolving data files:   0%|          | 0/68 [00:00<?, ?it/s]Resolving data files: 100%|██████████| 68/68 [00:00<00:00, 234549.89it/s]
-Resolving data files:   0%|          | 0/36 [00:00<?, ?it/s]Resolving data files: 100%|██████████| 36/36 [00:00<00:00, 202135.13it/s]
-Resolving data files:   0%|          | 0/143 [00:00<?, ?it/s]Resolving data files: 100%|██████████| 143/143 [00:00<00:00, 335450.49it/s]
-Resolving data files:   0%|          | 0/68 [00:00<?, ?it/s]Resolving data files: 100%|██████████| 68/68 [00:00<00:00, 254427.00it/s]
-Resolving data files:   0%|          | 0/36 [00:00<?, ?it/s]Resolving data files: 100%|██████████| 36/36 [00:00<00:00, 213873.86it/s]
-Resolving data files:   0%|          | 0/143 [00:00<?, ?it/s]Resolving data files: 100%|██████████| 143/143 [00:00<00:00, 283720.66it/s]
-initialize llava model with modofication
-OpenCLIP not installed
-[32m2024-11-21 16:49:57.953[0m | [1mINFO    [0m | [36mlmms_eval.models.llava[0m:[36m__init__[0m:[36m130[0m - [1mResize target: 168[0m
-Detected kernel version 5.4.0, which is below the recommended minimum of 5.5.0; this can cause the process to hang. It is recommended to upgrade the kernel to the minimum version or higher.
-You are using a model of type llava to instantiate a model of type llava_llama. This is not supported for all configurations of models and can yield errors.
-Loaded LLaVA model: liuhaotian/llava-v1.6-vicuna-7b
-loding from here
-Loading vision tower: openai/clip-vit-large-patch14-336
-Loading checkpoint shards:   0%|          | 0/3 [00:00<?, ?it/s]Loading checkpoint shards:  33%|███▎      | 1/3 [00:47<01:35, 47.88s/it]Loading checkpoint shards:  67%|██████▋   | 2/3 [01:32<00:46, 46.11s/it]Loading checkpoint shards: 100%|██████████| 3/3 [02:13<00:00, 43.62s/it]Loading checkpoint shards: 100%|██████████| 3/3 [02:13<00:00, 44.47s/it]
-Model Class: LlavaLlamaForCausalLM
-generation_type: recursion
-fix_grid: 2x2
-attention_thresholding_type: layer_mean_with_top_k
-attention_threshold: 0.3
-regenerate_condition: all
-remove unpadding=True, change to 'spatial'
-[32m2024-11-21 16:52:13.852[0m | [1mINFO    [0m | [36mlmms_eval.models.llava[0m:[36m__init__[0m:[36m236[0m - [1mUsing single device: cuda:0[0m
-change positional embedding to reduced
-Reduced embedding type.
-[32m2024-11-21 16:52:13.906[0m | [1mINFO    [0m | [36mlmms_eval.evaluator_utils[0m:[36mfrom_taskdict[0m:[36m91[0m - [1mNo metadata found in task config for vqav2_val, using default n_shot=0[0m
-[32m2024-11-21 16:52:13.906[0m | [1mINFO    [0m | [36mlmms_eval.evaluator_utils[0m:[36mfrom_taskdict[0m:[36m91[0m - [1mNo metadata found in task config for vqav2_test, using default n_shot=0[0m
-[32m2024-11-21 16:52:13.907[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.caching.cache[0m:[36mload_from_cache[0m:[36m33[0m - [34m[1mrequests-vqav2_val-0shot-rank0-world_size1-tokenizer is not cached, generating...[0m
-[32m2024-11-21 16:52:13.907[0m | [1mINFO    [0m | [36mlmms_eval.api.task[0m:[36mbuild_all_requests[0m:[36m425[0m - [1mBuilding contexts for vqav2_val on rank 0...[0m

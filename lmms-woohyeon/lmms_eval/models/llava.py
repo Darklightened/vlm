@@ -669,7 +669,8 @@ class Llava(lmms):
                         else:
                             image_mask = torch.cat(image_mask_list)
                     elif self.attention_thresholding_type == "layer_mean_with_top_k":  
-                        attn = ret_attn[0]
+                        attn = sum(ret_attn[:-1])
+                        # attn = ret_attn[0]
 
                         top_k_percent = self.attention_threshold
                         ## Setting Threshold (Top 20%)

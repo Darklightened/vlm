@@ -73,6 +73,8 @@ class LlavaMistralForCausalLM(MistralForCausalLM, LlavaMetaForCausalLM):
         images: Optional[torch.FloatTensor] = None,
         image_sizes: Optional[List[List[int]]] = None,
         return_dict: Optional[bool] = None,
+        modalities: Optional[List[str]] = ["image"],
+        dpo_forward: Optional[bool] = None,
         cache_position=None,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
 
@@ -98,15 +100,21 @@ class LlavaMistralForCausalLM(MistralForCausalLM, LlavaMetaForCausalLM):
         inputs: Optional[torch.Tensor] = None,
         images: Optional[torch.Tensor] = None,
         image_sizes: Optional[torch.Tensor] = None,
+        modalities: Optional[List[str]] = ["image"],
         **kwargs,
     ) -> Union[GenerateOutput, torch.LongTensor]:
+        modalities = kwargs.pop("modalities", None) if "modalities" in kwargs and modalities is None else modalities
         position_ids = kwargs.pop("position_ids", None)
         attention_mask = kwargs.pop("attention_mask", None)
+        image_mask = kwargs.pop("image_mask", None)
+        generation_type = kwargs.pop("generation_type", None)    
+        downsampled_images = kwargs.pop("downsampled_images", None) 
         if "inputs_embeds" in kwargs:
             raise NotImplementedError("`inputs_embeds` is not supported")
 
-        if images is not None:
-            (inputs, position_ids, attention_mask, _, inputs_embeds, _) = self.prepare_inputs_labels_for_multimodal(inputs, position_ids, attention_mask, None, None, images, image_sizes=image_sizes)
+        if images is not None:            
+            (inputs, position_ids, attention_mask, _, inputs_embeds, _) = self.prepare_inputs_labels_for_multimodal(inputs, position_ids, attention_mask, None, None,
+            images, downsampled_images=downsampled_images, modalities=modalities, image_sizes=image_sizes, image_mask=image_mask, generation_type=generation_type)
         else:
             inputs_embeds = self.get_model().embed_tokens(inputs)
 

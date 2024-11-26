@@ -19,11 +19,6 @@ from lmms_eval.api.model import lmms
 from lmms_eval.api.registry import register_model
 from lmms_eval.utils import stop_sequences_criteria
 
-import numpy as np
-import torch.nn.functional as F
-import csv
-from pathlib import Path
-
 warnings.filterwarnings("ignore")
 
 from loguru import logger as eval_logger
@@ -35,12 +30,6 @@ try:
         get_model_name_from_path,
         process_images,
         tokenizer_image_token,
-        show_mask_on_image,
-        get_heatmap,
-        make_square,
-        process_anyres_image,
-        get_heatmap_with_layer_visualization,
-        get_heatmap_layers
     )
     from llava.model.builder import load_pretrained_model
 except Exception as e:
@@ -55,63 +44,6 @@ if version.parse(torch.__version__) >= version.parse("2.1.2"):
 else:
     best_fit_attn_implementation = "eager"
 
-def calculate_entropy_for_attn_threshold(attn_map):
-    flattened_attn = attn_map.view(-1)
-    flattened_attn = flattened_attn / flattened_attn.sum()
-    
-    log_probs = torch.log(flattened_attn + 1e-8)
-    
-    # Calculate Entropy
-    entropy = -torch.sum(flattened_attn * log_probs)
-    return entropy.item()
-
-def entropy_based_threshold(attn_map, base_threshold=0.2, scaling_factor=0.5, max_entropy=5.0):
-    # Calculate Entropy
-    entropy = calculate_entropy(attn_map)
-    print(f'Calculated Entropy: {entropy}')
-    
-    # Normalize entropy to [0, 1] range, assuming max_entropy is an upper bound for entropy
-    normalized_entropy = min(entropy / max_entropy, 1.0)
-    
-    # High Entropy -> Low threshold
-    threshold = base_threshold * (1 - scaling_factor * normalized_entropy)
-    threshold = min(max(threshold, 0.1), 0.9)  # threshold range 0.1~0.9
-    return threshold
-
-def calculate_entropy_and_all_confidences(sequence, scores):
-    """
-    Calculate entropy, full sequence confidence, and per-token cumulative confidences.
-    Args:
-        sequence (torch.Tensor): Generated sequence of token IDs.
-        scores (list of torch.Tensor): List of logit tensors, one for each token in the sequence.
-
-    Returns:
-        tuple: Full sequence confidence, entropy, and a list of per-token cumulative confidences.
-    """
-    log_prob_sum_full = 0.0  # Log-probability sum for calculating full sequence confidence
-    entropy_sum = 0.0  # Sum of entropies
-    cumulative_confidences = []  # List to store cumulative confidence up to each token
-
-    for idx, token_id in enumerate(sequence):
-        probs = F.softmax(scores[idx], dim=-1)  # Softmax to get probabilities for the current token
-        token_prob = probs[0, token_id].item()  # Probability of the actual token
-
-        # Update cumulative log probability for the full sequence up to this token
-        log_prob_sum_full += np.log(token_prob + 1e-10)
-        # Calculate and store cumulative confidence for this subsequence
-        cumulative_confidences.append(np.exp(log_prob_sum_full))
-        
-        # Entropy calculation for the token
-        entropy_sum -= token_prob * np.log(token_prob + 1e-10)
-
-    # Full sequence confidence (cumulative up to the last token)
-    P_T_given_I_Q_full = cumulative_confidences[-1] if cumulative_confidences else np.exp(log_prob_sum_full)
-
-    # print(f"Overall confidence P(T | I, Q): {P_T_given_I_Q_full}")
-    # print(f"Entropy H(T | I, Q): {entropy_sum}")
-    # print("Per-token cumulative confidences:", cumulative_confidences)
-
-    return P_T_given_I_Q_full, entropy_sum, cumulative_confidences
 
 @register_model("llava")
 class Llava(lmms):
@@ -132,20 +64,7 @@ class Llava(lmms):
         use_cache=True,
         tie_weights: bool = True,
         truncate_context=False,  # whether to truncate the context in generation, set it False for LLaVA-1.6
-        customized_config=None,  # ends in json        
-        ## new args for recursive generation
-        generation_type="default",
-        fix_grid="default",
-        attention_thresholding_type="layer_mean",
-        attention_threshold="0.1",
-        remove_unpadding=False,
-        regenerate_condition="all",
-        detection=True,
-        detection_threshold=0.8,
-        save_output=True,
-        output_csv_path = "generation_output.csv",
-        target_token_selection_strategy="first",
-
+        customized_config=None,  # ends in json
         **kwargs,
     ) -> None:
         super().__init__()
@@ -192,50 +111,6 @@ class Llava(lmms):
         self.conv_template = conv_template
         self.use_cache = use_cache
         self.truncate_context = truncate_context
-
-        # additional parameters for recursion
-        self.generation_type = generation_type        
-        self.fix_grid = fix_grid
-        self.attention_thresholding_type = attention_thresholding_type
-        self.attention_threshold = attention_threshold
-        self.regenerate_condition = regenerate_condition
-        self.detection = detection
-        self.detection_threshold = detection_threshold 
-        self.save_output = save_output
-        self.output_csv_path = output_csv_path
-        self.target_token_selection_strategy = target_token_selection_strategy
-        
-        print(f"generation_type: {generation_type}")
-        print(f"fix_grid: {fix_grid}")
-        print(f"attention_thresholding_type: {attention_thresholding_type}")
-        print(f"attention_threshold: {attention_threshold}")
-        print(f"regenerate_condition: {regenerate_condition}")
-        print(f"detection_threshold: {detection_threshold}")
-        
-        ## default = "spatial_unpad" for llava1.6
-        ## To remove unpadding, set remove_unpadding=True -> mm.path_merge_type will be 'spatial'
-        if remove_unpadding == True:
-            print("remove unpadding=True, change to 'spatial'")
-            self._model.config.mm_patch_merge_type = "spatial"      
-        
-        if self.save_output:
-            assert self.output_csv_path is not None, "Output CSV path is not provided."
-
-            self.output_csv_path = Path(self.output_csv_path)
-
-            if not self.output_csv_path.exists():
-                with open(self.output_csv_path, mode="w", newline="") as file:
-                    writer = csv.writer(file)
-                    
-                    # Basic headers
-                    headers = ["Stage", "Doc ID", "Text Output"]
-                    
-                    # Add headers for cumulative confidences dynamically
-                    headers += [f"Cumulative Confidence {i+1}" for i in range(10)]
-                    
-                    # Write header row
-                    writer.writerow(headers)
-
         # assert self.batch_size_per_gpu == 1, "Llava currently does not support batched generation. See https://github.com/haotian-liu/LLaVA/issues/754. HF Llava also has this issue."
         if accelerator.num_processes > 1:
             assert accelerator.distributed_type in [DistributedType.FSDP, DistributedType.MULTI_GPU, DistributedType.DEEPSPEED], "Unsupported distributed type provided. Only DDP and FSDP are supported."
@@ -268,15 +143,6 @@ class Llava(lmms):
             self.model.to(self._device)
             self._rank = 0
             self._world_size = 1
-    
-    # Method to log each stage's results
-    def save_stage_to_csv(self, doc_id, stage, text_output, cumulative_confidences):
-        with open(self.output_csv_path, mode="a", newline="") as file:
-            writer = csv.writer(file)
-
-            # Prepare the row with doc_id, stage, and text_output, followed by each cumulative confidence as separate columns
-            row = [doc_id, stage, text_output] + cumulative_confidences
-            writer.writerow(row)
 
     @property
     def config(self):
@@ -443,16 +309,7 @@ class Llava(lmms):
             task = task[0]
             split = split[0]
             batched_visuals = [doc_to_visual[0](self.task_dict[task][split][ids]) for ids in doc_id]  # [B, N]
-            flattened_visuals = self.flatten(batched_visuals)  # [B*N]      
-
-            ## original model accepts several diffrent grids (e.g. 1x2, 1x3, 2x2)
-            ## for recursive implementation, we only use 2x2 grid (might be updated in future)
-            ## Set grid to 2x2 for recursive generation, else default
-            if self.fix_grid == "2x2":
-                flattened_visuals = [make_square(visual, min_size=336) for visual in flattened_visuals]
-            else:
-                pass
-
+            flattened_visuals = self.flatten(batched_visuals)  # [B*N]
             # we assume all gen kwargs in the batch are the same
             # this is safe to assume because the `grouper` object ensures it.
             gen_kwargs = all_gen_kwargs[0]
@@ -527,10 +384,7 @@ class Llava(lmms):
             attention_masks = input_ids.ne(pad_token_ids).to(self.device)
             # These steps are not in LLaVA's original code, but are necessary for generation to work
             # TODO: attention to this major generation step...
-            
-            ## main generation part
-            #try:   
-            if "recursion" in self.generation_type:
+            try:
                 cont = self.model.generate(
                     input_ids,
                     attention_mask=attention_masks,
@@ -543,217 +397,13 @@ class Llava(lmms):
                     num_beams=gen_kwargs["num_beams"],
                     max_new_tokens=gen_kwargs["max_new_tokens"],
                     use_cache=self.use_cache,
-                    generation_type=self.generation_type,
-                    return_dict_in_generate=True,
-                    output_attentions=True,
-                    output_scores=True,
-                )                
-                #print("recursive 1st stage")
-                # if cont["sequences"][0][0] == 1:
-                #     cont["sequences"] = cont["sequences"][0][1:].unsqueeze(0)
-                print(cont['sequences'][0])
-                text_outputs = self.tokenizer.batch_decode(cont['sequences'], skip_special_tokens=True)
-                scores = cont.scores                                   
-
-                # Calculate entropy and all cumulative confidences
-                P_T_given_I_Q_full, entropy_sum, cumulative_confidences = calculate_entropy_and_all_confidences(
-                    cont["sequences"][0], scores = scores
-                )                                  
-                
-                # Save first stage results to CSV
-                self.save_stage_to_csv("Stage 1", doc_id, text_outputs, cumulative_confidences)
-
-                #print("regenerating with attention threshold") 
-                # image = flattened_visuals[0]  
-                # img_save_path = f"./results/{doc_id}"        
-
-                ## returns attention over image tokens
-                ret_attn = get_heatmap(self.model, cont, self.tokenizer, question_input[0], input_ids)  
-                # layer_attn = get_heatmap_layers(self.model, cont, self.tokenizer, question_input[0], input_ids, [16])
-                # ret_attn = layer_attn[0]['heatmaps']
-                
-                #get_heatmap_with_layer_visualization(self.model, cont, self.tokenizer, question_input[0], input_ids, image, img_save_path)              
-                #del text_outputs
-                target_output_indices = []
-
-                ## target token selection strategy
-                if self.target_token_selection_strategy == "first":
-                    target_output_indices.append(0)
-
-                elif self.target_token_selection_strategy == "all":
-                    target_output_indices = [i for i, _ in enumerate(text_outputs)]
-
-                elif self.target_token_selection_strategy == "min_confidence":
-                    # Find the index of the token with the minimum confidence score
-                    min_conf_index = scores.index(min(scores))
-                    target_output_indices.append(min_conf_index)
-                elif self.target_token_selection_strategy == "classifier_based":
-                    pass
-                elif self.target_token_selection_strategy == "max_attn_variance":
-                    pass
-                elif self.target_token_selection_strategy == "prompt_attn":
-                    pass
-
-                else:
-                    # Default or fallback behavior if strategy is unspecified
-                    target_output_indices = [0]  
-
-                ## averages attention over the layers to determine threshold
-                if self.attention_thresholding_type == "layer_mean":
-                    med = torch.stack(ret_attn, dim=0)
-                    med = med.mean(dim=0)
-                    # [0] indicates the first token generated (change to [1] if output includes <s>)
-                    attn = ret_attn[0] - med
-                    attn = torch.relu(attn)
-                    attn = attn / attn.max()
-
-                    image_mask_list = []
-                    for row in range(attn.shape[0]):
-                        for col in range(attn.shape[1]):
-                            #print(f"attention value: {attn[row,col]}")
-                            if attn[row, col] > self.attention_threshold:
-                                #print(f"attention value: {attn[row,col]}")
-                                image_mask_list.append(torch.LongTensor([[row, col]]))
-                    #print(image_mask_list)
-                    image_mask = torch.cat(image_mask_list)
-                    #print(f"num_divided: {len(image_mask_list)}")
-                elif self.attention_thresholding_type == "layer_mean_with_top_k":  
-                    attn = ret_attn[0]
-                    #print(self.attention_threshold)
-
-                    top_k_percent = self.attention_threshold
-                    ## Setting Threshold (Top 20%)
-                    flattened_attn = attn.view(-1) 
-                    flattened_attn = flattened_attn.float()
-                    threshold_index = int(len(flattened_attn) * (1 - top_k_percent)) 
-                    threshold_value = torch.topk(flattened_attn, threshold_index).values[-1]
-
-                    image_mask_list = []
-                    for row in range(attn.shape[0]):
-                        for col in range(attn.shape[1]):
-                            if attn[row, col] > threshold_value:
-                                image_mask_list.append(torch.LongTensor([[row, col]]))
-                    image_mask = torch.cat(image_mask_list)
-                    
-                elif self.attention_thresholding_type == "entropy_based_topk":  
-                    print(f"Entropy-based Top-K threshold (Base topk={self.attention_threshold}).")
-                    attn = ret_attn[0]
-                    calculated_threshold = entropy_based_threshold(attn, base_threshold=0.2, scaling_factor=0.5)
-                    print(f"Calculated Threshold: {calculated_threshold}")
-                    flattened_attn = attn.view(-1).float()
-                    threshold_index = int(len(flattened_attn) * (1 - calculated_threshold))
-                    threshold_value = torch.topk(flattened_attn, threshold_index).values[-1]
-
-                    image_mask_list = []
-                    for row in range(attn.shape[0]):
-                        for col in range(attn.shape[1]):
-                            if attn[row, col] > threshold_value:
-                                image_mask_list.append(torch.LongTensor([[row, col]]))
-                    image_mask = torch.cat(image_mask_list)
-                    
-                else:
-                    image_mask = None
-                
-                if self.detection and cumulative_confidences[0] > self.detection_threshold:
-                    print("score over threshold, do not recurse")
-                    text_outputs = self.tokenizer.batch_decode(cont['sequences'], skip_special_tokens=True)
-                    # Save second stage result as None to CSV
-                    self.save_stage_to_csv("Stage 2", doc_id, ["No recurse"], cumulative_confidences)
-                else:   
-                    ## regenerate with image mask
-                    ## remove output_attentions for efficient generation
-                    cont = self.model.generate(
-                        input_ids,
-                        attention_mask=attention_masks,
-                        pad_token_id=pad_token_ids,
-                        images=image_tensor,
-                        image_sizes=gen_kwargs["image_sizes"],
-                        do_sample=True if gen_kwargs["temperature"] > 0 else False,
-                        temperature=gen_kwargs["temperature"],
-                        top_p=gen_kwargs["top_p"],
-                        num_beams=gen_kwargs["num_beams"],
-                        max_new_tokens=gen_kwargs["max_new_tokens"],
-                        use_cache=self.use_cache,
-                        generation_type=self.generation_type,
-                        return_dict_in_generate=True,
-                        # output_attentions=True,
-                        image_mask = image_mask,
-                        output_scores=True,
-                    )
-                    #print("recursive 2nd stage")
-                    text_outputs = self.tokenizer.batch_decode(cont['sequences'], skip_special_tokens=True)
-                    #print(text_outputs)    
-                    
-                    P_T_given_I_Q_full_2, entropy_sum_2, cumulative_confidences_2 = calculate_entropy_and_all_confidences(
-                        cont["sequences"][0], scores = cont.scores
-                    )
-
-                    # print(f"P_T_given_I_Q_full: {P_T_given_I_Q_full}")
-                    # print(f"P_T_given_I_Q_full_2: {P_T_given_I_Q_full_2}")
-                    
-                    # if P_T_given_I_Q_full > P_T_given_I_Q_full_2 : 
-                    #     print("Using 1st Round Result")
-                    #     text_outputs = text_outputs
-                    # else: 
-                    #     print("Using 2nd Round Result")
-                    #     text_outputs = text_outputs_2
-                    
-                    # Save second stage results to CSV
-                    self.save_stage_to_csv("Stage 2", doc_id, text_outputs, cumulative_confidences_2)                        
-
-            ## no recursion: remove output_attentions, return_dict params since passing them requires additional memory
-            else:
-                #print("no recursion")
-                cont = self.model.generate(
-                    input_ids,
-                    attention_mask=attention_masks,
-                    pad_token_id=pad_token_ids,
-                    images=image_tensor,
-                    image_sizes=gen_kwargs["image_sizes"],
-                    do_sample=True if gen_kwargs["temperature"] > 0 else False,
-                    temperature=gen_kwargs["temperature"],
-                    top_p=gen_kwargs["top_p"],
-                    num_beams=gen_kwargs["num_beams"],
-                    max_new_tokens=gen_kwargs["max_new_tokens"],
-                    use_cache=self.use_cache,
-                    generation_type=self.generation_type,
-                    return_dict_in_generate=True,
-                    # output_attentions=True,
-                    output_scores=True
                 )
-                text_outputs = self.tokenizer.batch_decode(cont['sequences'], skip_special_tokens=True)
-                #print(text_outputs)                     
-                
-                # Calculate entropy and all cumulative confidences
-                P_T_given_I_Q_full, entropy_sum, cumulative_confidences = calculate_entropy_and_all_confidences(
-                    cont["sequences"][0], cont.scores
-                )
-                # Save non-recursive results to CSV
-                self.save_stage_to_csv("Non-recursive", doc_id, text_outputs, cumulative_confidences)
-
-            # except Exception as e:
-            #     cont = self.model.generate(
-            #             input_ids,
-            #             attention_mask=attention_masks,
-            #             pad_token_id=pad_token_ids,
-            #             images=image_tensor,
-            #             image_sizes=gen_kwargs["image_sizes"],
-            #             do_sample=True if gen_kwargs["temperature"] > 0 else False,
-            #             temperature=gen_kwargs["temperature"],
-            #             top_p=gen_kwargs["top_p"],
-            #             num_beams=gen_kwargs["num_beams"],
-            #             max_new_tokens=gen_kwargs["max_new_tokens"],
-            #             use_cache=self.use_cache,
-            #             generation_type="default",
-            #             # return_dict_in_generate=True,
-            #             # output_attentions=True,
-            #         )
-            #     text_outputs = self.tokenizer.batch_decode(cont, skip_special_tokens=True)
-            #     #raise e
-            #     eval_logger.error(f"Error {e} in generating, generate with default")
-            #     # cont = ""
-            #     # text_outputs = [""]
-                
+                text_outputs = self.tokenizer.batch_decode(cont, skip_special_tokens=True)
+            except Exception as e:
+                raise e
+                eval_logger.error(f"Error {e} in generating")
+                cont = ""
+                text_outputs = [""]
 
             # cont_toks_list = cont.tolist()
             # for cont_toks, context in zip(cont_toks_list, contexts):
