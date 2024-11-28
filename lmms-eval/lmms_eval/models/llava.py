@@ -1,4 +1,5 @@
 import torch
+import sys
 
 torch.backends.cuda.matmul.allow_tf32 = True
 
@@ -19,24 +20,38 @@ from lmms_eval.api.instance import Instance
 from lmms_eval.api.model import lmms
 from lmms_eval.api.registry import register_model
 from lmms_eval.utils import stop_sequences_criteria
-from lmms_eval.recursion_utils import (
-    calculate_entropy_for_attn_threshold, 
-    entropy_based_threshold, 
-    confidence_based_threshold, 
-    calculate_entropy_and_all_confidences,
-    layer_mean_based_recursion,
-    layer_mean_topk_based_recursion,
-    confidence_topk_based_recursion,
-)
-
+from lmms_eval.recursion_utils import *
 import numpy as np
 import torch.nn.functional as F
 import csv
 import os
+import ast
 from pathlib import Path
 
 warnings.filterwarnings("ignore")
 
+def string_to_list(input_string):
+    """
+    Converts a string representation of a list into an actual Python list.
+    
+    Args:
+        input_string (str): The input string, e.g., '[1, 2, 3]' or "['a', 'b', 'c']"
+        
+    Returns:
+        list: The converted Python list.
+        
+    Raises:
+        ValueError: If the string cannot be converted into a list.
+    """
+    try:
+        # Use ast.literal_eval for safe evaluation of string as Python literal
+        if input_string.startswith('['):
+            return ast.literal_eval(input_string)
+        else:
+            raise ValueError("The input string does not start with '['")
+    except (ValueError, SyntaxError) as e:
+        raise ValueError(f"Failed to convert string to list: {e}")
+    
 from loguru import logger as eval_logger
 
 try:
@@ -55,6 +70,7 @@ try:
         norm_min_max,
     )
     from llava.model.builder import load_pretrained_model
+    
 except Exception as e:
     eval_logger.debug("LLaVA is not installed. Please install LLaVA to use this model.\nError: %s" % e)
 
@@ -96,6 +112,7 @@ class Llava(lmms):
         attention_threshold=[0.1],
         remove_unpadding=False,    
         detection_strategy=None,
+        merging=None,
         detection_threshold=0.8,
         save_output=True,
         output_csv_path = "generation_output.csv",
@@ -128,6 +145,16 @@ class Llava(lmms):
         llava_model_args = {
             "multimodal": True,
         }
+        
+        # Prepare model merging
+        self.merging=merging  
+        # If merging==None, then single model evaluation.
+        if merging == "None":
+            self.merging = None
+        elif isinstance(merging, str):
+            self.merging = merging
+        print(f'self.merging= {self.merging}')
+        
         if customized_config is not None:
             llava_model_args["customized_config"] = customized_config
         if attn_implementation is not None:
@@ -135,9 +162,13 @@ class Llava(lmms):
         if "use_flash_attention_2" in kwargs:
             llava_model_args["use_flash_attention_2"] = kwargs["use_flash_attention_2"]
         model_name = model_name if model_name is not None else get_model_name_from_path(pretrained)
+        
         try:
             # Try to load the model with the multimodal argument
-            self._tokenizer, self._model, self._image_processor, self._max_length = load_pretrained_model(pretrained, None, model_name, device_map=self.device_map, **llava_model_args)
+            self._tokenizer, self._model, self._image_processor, self._max_length = load_pretrained_model(pretrained, None, model_name, 
+                                                                                                          device_map=self.device_map, 
+                                                                                                          merging=self.merging, 
+                                                                                                          **llava_model_args)
         except TypeError:
             # for older versions of LLaVA that don't have multimodal argument
             llava_model_args.pop("multimodal", None)
@@ -158,7 +189,7 @@ class Llava(lmms):
         self.fix_grid = fix_grid
         self.attention_thresholding_type = attention_thresholding_type
         self.attn_norm = attn_norm
-        self.attention_threshold = attention_threshold        
+        self.attention_threshold = attention_threshold      
         self.detection_strategy = detection_strategy
         self.detection_threshold = detection_threshold 
         self.save_output = save_output
@@ -213,7 +244,14 @@ class Llava(lmms):
         else:
             eval_logger.info(f"Unsupported norm type. Using norm_relu.")
             self.attn_norm = norm_relu
-
+            
+        if attention_threshold[0] == '[' :
+            self.attention_threshold = string_to_list(attention_threshold)
+            # print(self.attention_threshold)
+        else:
+            self.attention_threshold = [float(attention_threshold) for i in range(len(self.stages)-1)]
+            # print(self.attention_threshold)
+        
         ##################################################################################
         ## init downsampled vision towers
         ## stage -2:  84
@@ -624,7 +662,7 @@ class Llava(lmms):
                                  
                     # Save confidence for analysis
                     if self.save_output:                            
-                        P_T_given_I_Q_full, entropy_sum, cumulative_confidences = calculate_entropy_and_all_confidences(
+                        _, _, cumulative_confidences = calculate_entropy_and_all_confidences(
                             sequences, scores = scores
                         )  
                         self.save_stage_to_csv(f"Stage {idx_stage}", doc_id, text_outputs, cumulative_confidences)
@@ -654,17 +692,17 @@ class Llava(lmms):
                     
                     if self.attention_thresholding_type == "layer_mean":
                         self.image_mask[stage+1] = layer_mean_based_recursion(attn = sum(ret_attn[:-1]), # select token index
-                                                   attn_threshold = attn_threshold_stage, 
+                                                   attn_threshold = self.attention_threshold[idx_stage], 
                                                    image_mask = self.image_mask[stage+1])
                         
                     elif self.attention_thresholding_type == "layer_mean_topk":
                         self.image_mask[stage+1] = layer_mean_topk_based_recursion(attn = sum(ret_attn[:-1]), # select token index
-                                                   top_k = attn_threshold_stage, 
+                                                   top_k = self.attention_threshold[idx_stage], 
                                                    image_mask = self.image_mask[stage+1])
                     
                     elif self.attention_thresholding_type == "confidence_topk": 
                         self.image_mask[stage+1] = confidence_topk_based_recursion(attn = sum(ret_attn[:-1]), # select token index
-                                                   top_k = attn_threshold_stage, 
+                                                   top_k = self.attention_threshold[idx_stage], 
                                                    sequences = sequences,
                                                    scores = scores, 
                                                    image_mask = self.image_mask[stage+1])

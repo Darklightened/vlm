@@ -67,6 +67,7 @@ def init_downsampled_vision_towers(vision_tower, stages, positional_embedding_ty
             downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding.weight.data.copy_(new_embedding)
             downsampled_vision_towers[stage].vision_tower.vision_model.embeddings = \
                 downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.to(device)
+        
         elif positional_embedding_type == "reduced":
             print("Reduced embedding type.")
             # Reduce the pretrained embedding by truncating
@@ -75,6 +76,30 @@ def init_downsampled_vision_towers(vision_tower, stages, positional_embedding_ty
             downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding.weight.data.copy_(original_embedding[:num_positions])
             downsampled_vision_towers[stage].vision_tower.vision_model.embeddings = \
                 downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.to(device)
+                
+        elif positional_embedding_type == "bilinear_interpolation":
+            # Interpolate from the pretrained positional embedding
+            print("Bilienar interpolation embedding type.")
+            original_embedding = downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding.weight.data
+            cls_token = original_embedding[:1, :]
+            original_embedding = original_embedding[1:, :]  # Skip CLS
+            # (1, 1024, 24, 24)
+            new_height = int(len(original_embedding) ** (1/2) / (2 ** -stage))
+            original_embedding = original_embedding.view(int(len(original_embedding)**(1/2)), int(len(original_embedding)**(1/2)), -1).permute(2, 0, 1).unsqueeze(0)
+            
+            resized_positional_embeddings = torch.nn.functional.interpolate(
+                                            original_embedding,
+                                            size=(new_height, new_height),  # r
+                                            mode='bilinear',
+                                            align_corners=False
+                                        )  
+            resized_positional_embeddings = resized_positional_embeddings.squeeze(0).permute(1, 2, 0).reshape(-1, 1024)
+            new_embedding = torch.cat([cls_token, resized_positional_embeddings], dim=0)  
+            downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(len(new_embedding), embed_dim).to(dtype=torch.float16, device=device)
+            downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding.weight.data.copy_(new_embedding)
+            downsampled_vision_towers[stage].vision_tower.vision_model.embeddings = \
+                downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.to(device)
+            
     return downsampled_vision_towers                                
 
 def resize_and_center_crop(image, shortest_edge_length):
@@ -878,25 +903,28 @@ def get_heatmap_with_layer_visualization(
 
     return layerwise_results
 
+## one-side padding
+# def make_square(im, min_size, smallest_grid_size, fill_color=(0, 0, 0)):
+#     x, y = im.size
+#     size = int(max(min_size, x, y))
+#     new_im = Image.new('RGB', (size, size), fill_color)
+#     new_im.paste(im, (0, 0))
+    
+#     step = size // smallest_grid_size
+#     for x_idx, bounding_x in enumerate(range(0, size, step)):
+#         if bounding_x >= x: break
+#     for y_idx, bounding_y in enumerate(range(0, size, step)):
+#         if bounding_y >= y: break
 
+#     return new_im, x_idx, y_idx
+
+# old make_square
 def make_square(im, min_size, smallest_grid_size, fill_color=(0, 0, 0)):
     x, y = im.size
-    size = int(max(min_size, x, y))
+    size = (max(min_size, x, y))
+    size = max(min_size, x, y)
     new_im = Image.new('RGB', (size, size), fill_color)
-    new_im.paste(im, (0, 0))
-    
-    step = size // smallest_grid_size
-    for x_idx, bounding_x in enumerate(range(0, size, step)):
-        if bounding_x >= x: break
-    for y_idx, bounding_y in enumerate(range(0, size, step)):
-        if bounding_y >= y: break
-
-    return new_im, x_idx, y_idx
-
-## old make_square
-# def make_square(im, min_size=200, fill_color=(0, 0, 0)):
-#     x, y = im.size
-#     size = max(min_size, x, y)
-#     new_im = Image.new('RGB', (size, size), fill_color)
-#     new_im.paste(im, (int((size - x) / 2), int((size - y) / 2)))
-#     return new_im
+    new_im.paste(im, (int((size - x) / 2), int((size - y) / 2)))
+    return new_im, 0, 0 
+    new_im.paste(im, (int((size - x) / 2), int((size - y) / 2)))
+    return new_im, 0, 0

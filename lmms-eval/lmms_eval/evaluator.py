@@ -182,6 +182,7 @@ def simple_evaluate(
                 "generation_type": cli_args.generation_type,
                 "fix_grid": cli_args.fix_grid,
                 "attention_thresholding_type": cli_args.attention_thresholding_type,
+                "merging": cli_args.merging,
                 "attn_norm": cli_args.attn_norm,
                 "positional_embedding_type": cli_args.positional_embedding_type,
                 "attention_threshold": cli_args.attention_threshold,

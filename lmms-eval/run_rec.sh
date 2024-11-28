@@ -15,69 +15,93 @@ python3 -m accelerate.commands.launch \
     --device cuda:0 \
     --model llava \
     --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
-    --tasks vqav2_val_lite \
+    --tasks pope \
     --batch_size 1 \
     --log_samples \
     --log_samples_suffix llava_v1.6_pope \
     --output_path ./logs/ \
     --generation_type recursion \
     --fix_grid 2x2 \
-    --attention_thresholding_type layer_mean \
-    --attention_threshold 0.0 \
+    --attention_threshold "[0.9,0.6,0.3]" \
+    --attention_thresholding_type layermean_topk \
     --remove_unpadding True \
     --attn_norm norm_min_max \
-    --stages "-1" "0" "1" \
+    --stages "-2" "-1" "0" "1" \
     --verbosity DEBUG \
-    --wandb_args "project=llava1.6_recursive_eval_1126,entity=VLM_Hallucination_Woohyeon,name=168-336-672-pad-rec-00" \
+    --wandb_args "project=llava1.6_recursive_eval_1127_jake,entity=VLM_Hallucination_Woohyeon,name=84-168-336-672-top9-6-3" \
+    # --merging "liuhaotian/llava-v1.6-mistral-7b"\
     # --save_output True \
     # --output_csv_path "./generation_output_pope_168-336-672-pad-rec-00.csv" \
     # --visualize_heatmap True \
 
-python3 -m accelerate.commands.launch \
-    --num_processes=1 \
-    -m lmms_eval \
-    --device cuda:0 \
-    --model llava \
-    --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
-    --tasks vqav2_val_lite \
-    --batch_size 1 \
-    --log_samples \
-    --log_samples_suffix llava_v1.6_pope \
-    --output_path ./logs/ \
-    --generation_type recursion \
-    --fix_grid 2x2 \
-    --attention_thresholding_type layer_mean \
-    --attention_threshold 0.1 \
-    --remove_unpadding True \
-    --attn_norm norm_min_max \
-    --stages "-1" "0" "1" \
-    --verbosity DEBUG \
-    --wandb_args "project=llava1.6_recursive_eval_1126,entity=VLM_Hallucination_Woohyeon,name=168-336-672-pad-rec-10" \
-    # --save_output True \
-    # --output_csv_path "./generation_output_pope_168-336-672-pad-rec-10.csv" \
-    # --visualize_heatmap True \
+# python3 -m accelerate.commands.launch \
+#     --num_processes=1 \
+#     -m lmms_eval \
+#     --device cuda:0 \
+#     --model llava \
+#     --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
+#     --tasks pope \
+#     --batch_size 1 \
+#     --log_samples \
+#     --log_samples_suffix llava_v1.6_pope \
+#     --output_path ./logs/ \
+#     --generation_type recursion \
+#     --fix_grid 2x2 \
+#     --attention_thresholding_type layer_mean_topk \
+#     --attention_threshold 0.5 \
+#     --remove_unpadding True \
+#     --attn_norm norm_min_max \
+#     --stages "-1" "0" "1" \
+#     --verbosity DEBUG \
+#     --wandb_args "project=llava1.6_recursive_eval_1127_jake,entity=VLM_Hallucination_Woohyeon,name=168-336-672-top50" \
+#     # --save_output True \
+#     # --output_csv_path "./generation_output_pope_168-336-672-pad-rec-10.csv" \
+#     # --visualize_heatmap True \
 
-python3 -m accelerate.commands.launch \
-    --num_processes=1 \
-    -m lmms_eval \
-    --device cuda:0 \
-    --model llava \
-    --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
-    --tasks vqav2_val_lite \
-    --batch_size 1 \
-    --log_samples \
-    --log_samples_suffix llava_v1.6_pope \
-    --output_path ./logs/ \
-    --generation_type recursion \
-    --fix_grid 2x2 \
-    --attention_thresholding_type layer_mean \
-    --attention_threshold 0.2 \
-    --remove_unpadding True \
-    --attn_norm norm_min_max \
-    --stages "-1" "0" "1" \
-    --verbosity DEBUG \
-    --wandb_args "project=llava1.6_recursive_eval_1126,entity=VLM_Hallucination_Woohyeon,name=168-336-672-pad-rec-20" \
-    # --save_output True \
-    # --output_csv_path "./generation_output_pope_168-336-672-pad-rec-30.csv" \
-    # --visualize_heatmap True \
+# python3 -m accelerate.commands.launch \
+#     --num_processes=1 \
+#     -m lmms_eval \
+#     --device cuda:0 \
+#     --model llava \
+#     --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
+#     --tasks pope \
+#     --batch_size 1 \
+#     --log_samples \
+#     --log_samples_suffix llava_v1.6_pope \
+#     --output_path ./logs/ \
+#     --generation_type recursion \
+#     --fix_grid 2x2 \
+#     --attention_thresholding_type layer_mean_topk \
+#     --attention_threshold 0.7 \
+#     --remove_unpadding True \
+#     --attn_norm norm_min_max \
+#     --stages "-1" "0" "1" \
+#     --verbosity DEBUG \
+#     --wandb_args "project=llava1.6_recursive_eval_1127_jake,entity=VLM_Hallucination_Woohyeon,name=168-336-672-top70" \
+#     # --save_output True \
+#     # --output_csv_path "./generation_output_pope_168-336-672-pad-rec-30.csv" \
+#     # --visualize_heatmap True \
 
+# python3 -m accelerate.commands.launch \
+#     --num_processes=1 \
+#     -m lmms_eval \
+#     --device cuda:0 \
+#     --model llava \
+#     --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
+#     --tasks pope \
+#     --batch_size 1 \
+#     --log_samples \
+#     --log_samples_suffix llava_v1.6_pope \
+#     --output_path ./logs/ \
+#     --generation_type recursion \
+#     --fix_grid 2x2 \
+#     --attention_thresholding_type layer_mean_topk \
+#     --attention_threshold 0.9 \
+#     --remove_unpadding True \
+#     --attn_norm norm_min_max \
+#     --stages "-1" "0" "1" \
+#     --verbosity DEBUG \
+#     --wandb_args "project=llava1.6_recursive_eval_1127_jake,entity=VLM_Hallucination_Woohyeon,name=168-336-672-top90" \
+#     # --save_output True \
+#     # --output_csv_path "./generation_output_pope_168-336-672-pad-rec-30.csv" \
+#     # --visualize_heatmap True \
