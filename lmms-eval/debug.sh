@@ -8,13 +8,15 @@
 ## attention_thresholding_type: [layer_mean, layer_mean_with_top_k]
 ## remove_unpadding: set True to remove unpadding and set mm_patch_merge_type='spatial' else 'spatial_unpad'
 ## regenerate_condition: currently "all": always regenerate when type is "recursion"
+## --model_args pretrained="[liuhaotian/llava-v1.6-vicuna-7b, liuhaotian/llava-v1.6-mistral-7b]"\
+## --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b"\
 
 python3 -m accelerate.commands.launch \
     --num_processes=1 \
     -m lmms_eval \
     --device cuda:0 \
     --model llava \
-    --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
+    --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b"\
     --tasks vqav2_val_lite \
     --batch_size 1 \
     --log_samples \
@@ -23,11 +25,12 @@ python3 -m accelerate.commands.launch \
     --generation_type recursion \
     --fix_grid 2x2 \
     --attention_thresholding_type layer_mean \
-    --attention_threshold 0.3 \
+    --attention_threshold "0.3" \
     --remove_unpadding True \
     --attn_norm norm_relu \
     --stages "-2" "-1" "0" "1" \
     --visualize_heatmap True \
     --verbosity DEBUG \
+    --positional_embedding_type bilinear_interpolation
     # --wandb_args "project=llava1.6_recursive_eval_woohye0n,entity=VLM_Hallucination_Woohyeon,name=168-336-672-pad-total"
 

@@ -12,7 +12,7 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
-
+import sys
 import os
 import warnings
 import shutil
@@ -23,8 +23,52 @@ from llava.model import *
 from llava.constants import DEFAULT_IMAGE_PATCH_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN
 from llava.utils import rank0_print
 
+# For model merging
+from collections import OrderedDict
+import copy
 
-def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, load_4bit=False, device_map="auto", torch_dtype="float16",attn_implementation="flash_attention_2", customized_config=None, overwrite_config=None, **kwargs):
+def print_gpu_memory():
+    if torch.cuda.is_available():
+        print(f"Current Device: {torch.cuda.current_device()}")
+        print(f"Device Name: {torch.cuda.get_device_name()}")
+        print(f"Allocated Memory: {torch.cuda.memory_allocated() / 1e9:.2f} GB")
+        print(f"Cached Memory: {torch.cuda.memory_reserved() / 1e9:.2f} GB")
+        print(f"Free Memory: {(torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_reserved()) / 1e9:.2f} GB")
+    else:
+        print("No GPU available.")
+        
+## Model conversion utils
+def state_dict_to_vector(state_dict, remove_keys=[]):
+    shared_state_dict = copy.deepcopy(state_dict)
+    for key in remove_keys:
+        if key in shared_state_dict:
+            del shared_state_dict[key]
+    sorted_shared_state_dict = OrderedDict(sorted(shared_state_dict.items()))
+    return torch.nn.utils.parameters_to_vector(
+        [value.reshape(-1) for key, value in sorted_shared_state_dict.items()]
+    )
+
+
+def vector_to_state_dict(vector, state_dict, remove_keys=[]):
+    # create a reference dict to define the order of the vector
+    reference_dict = copy.deepcopy(state_dict)
+    for key in remove_keys:
+        if key in reference_dict:
+            del reference_dict[key]
+    sorted_reference_dict = OrderedDict(sorted(reference_dict.items()))
+
+    # create a shared state dict using the refence dict
+    torch.nn.utils.vector_to_parameters(vector, sorted_reference_dict.values())
+
+    # add back the encoder and decoder embedding weights.
+    if "transformer.shared.weight" in sorted_reference_dict:
+        for key in remove_keys:
+            sorted_reference_dict[key] = sorted_reference_dict[
+                "transformer.shared.weight"
+            ]
+    return sorted_reference_dict
+
+def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, load_4bit=False, device_map="auto", torch_dtype="float16",attn_implementation="flash_attention_2", customized_config=None, overwrite_config=None, merging=None, **kwargs):
     kwargs["device_map"] = device_map
 
     if load_8bit:
@@ -49,6 +93,8 @@ def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, l
     else:
         is_multimodal = False
 
+    print(f"model_name: {model_name}")
+    
     if "llava" in model_name.lower() or is_multimodal:
         # Load LLaVA model
         if "lora" in model_name.lower() and model_base is None:
@@ -137,7 +183,6 @@ def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, l
                 or "llava-v1.5" in model_name.lower()
             ):
                 from llava.model.language_model.llava_llama import LlavaConfig
-
                 tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False)
                 if customized_config is None:
                     llava_cfg = LlavaConfig.from_pretrained(model_path)
@@ -177,6 +222,7 @@ def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, l
             elif "mistral" in model_name.lower() or "zephyr" in model_name.lower():
                 tokenizer = AutoTokenizer.from_pretrained(model_path)
                 model = LlavaMistralForCausalLM.from_pretrained(model_path, low_cpu_mem_usage=True, attn_implementation=attn_implementation, **kwargs)
+            
             elif (
                 "wizardlm-2" in model_name.lower()
                 and "vicuna" in model_name.lower()
@@ -278,6 +324,45 @@ def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, l
     rank0_print(f"Model Class: {model.__class__.__name__}")
     image_processor = None
 
+    ##### Merging Starts!! ####################################################################################
+    
+    # Prepare mistral model to be merged.
+    if merging == None : 
+        pass
+    
+    elif "mistral" in merging.lower():
+        print(f"Perform Model Merging with {merging}")
+        merged_tokenizer = AutoTokenizer.from_pretrained(merging)
+        merged_model = LlavaMistralForCausalLM.from_pretrained(merging, low_cpu_mem_usage=True,
+                                                               attn_implementation=attn_implementation,
+                                                               **kwargs)
+        remove_keys = []
+        # Flattening checkpoints
+        def count_parameters(vector):
+            return vector.numel()
+        
+        flat_merged_model = state_dict_to_vector(merged_model.state_dict(), remove_keys)
+        flat_model = state_dict_to_vector(model.state_dict(), remove_keys)
+        
+        print(merged_model)
+        print(model)
+        
+        del merged_model
+        torch.cuda.empty_cache()  # Clear GPU memory
+    
+        # merging flattened vectors
+        flat_model = (flat_merged_model + flat_merged_model) / 2
+        
+        del flat_merged_model
+        torch.cuda.empty_cache()  # Clear GPU memory
+            
+        # reconstruct
+        model.load_state_dict(vector_to_state_dict(flat_model, model.state_dict()))
+        
+        del flat_model, merged_tokenizer
+        torch.cuda.empty_cache()  # Clear GPU memory
+    ###########################################################################################################
+    
     if "llava" in model_name.lower() or is_multimodal:
         mm_use_im_start_end = getattr(model.config, "mm_use_im_start_end", False)
         mm_use_im_patch_token = getattr(model.config, "mm_use_im_patch_token", True)

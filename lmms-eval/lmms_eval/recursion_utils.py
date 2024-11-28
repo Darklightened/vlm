@@ -5,39 +5,6 @@ import torch.nn.functional as F
 import csv
 from pathlib import Path
 
-def detect_hallucination_distribution(final_cumulative_confidence):
-    """
-    Detect hallucination based on the final cumulative confidence distribution.
-    
-    Args:
-        final_cumulative_confidence (float): The final cumulative confidence for the sequence.
-        
-    Returns:
-        bool: True if hallucination is likely, False otherwise.
-    """
-    hallucination_dist = [0.167, 0.179, 0.129, 0.206, 0.32]  # Hallucination O 분포
-    non_hallucination_dist = [0.028, 0.036, 0.056, 0.09, 0.791]  # Hallucination X 분포
-
-    # 최종 cumulative confidence가 속하는 구간 계산
-    if final_cumulative_confidence < 0.6:
-        confidence_bin = 0
-    elif final_cumulative_confidence < 0.7:
-        confidence_bin = 1
-    elif final_cumulative_confidence < 0.8:
-        confidence_bin = 2
-    elif final_cumulative_confidence < 0.9:
-        confidence_bin = 3
-    else:
-        confidence_bin = 4
-
-    current_dist = [0, 0, 0, 0, 0]
-    current_dist[confidence_bin] = 1  
-    # Cosine similarity
-    hallucination_score = 1 - cosine(current_dist, hallucination_dist)
-    non_hallucination_score = 1 - cosine(current_dist, non_hallucination_dist)
-
-    return hallucination_score > non_hallucination_score
-
 def calculate_entropy_for_attn_threshold(attn_map):
     flattened_attn = attn_map.view(-1)
     flattened_attn = flattened_attn / flattened_attn.sum()
@@ -122,7 +89,7 @@ def layer_mean_based_recursion(attn = None, attn_threshold = 0.1 , image_mask = 
     
     return image_mask
 
-def layer_mean_topk_based_recursion(attn = None, top_k = 0.1 , image_mask = None):
+def layer_mean_topk_based_recursion(attn = None, top_k = 0.1, image_mask = None):
     flattened_attn = attn.view(-1) 
     flattened_attn = flattened_attn.float()
     threshold_index = int(len(flattened_attn) * (top_k)) 
@@ -133,7 +100,7 @@ def layer_mean_topk_based_recursion(attn = None, top_k = 0.1 , image_mask = None
                 image_mask[row][col] = 1
     return image_mask
 
-def confidence_topk_based_recursion(attn = None, top_k = 0.1 ,sequences = None, scores= None, image_mask = None): 
+def confidence_topk_based_recursion(attn = None, top_k = 0.1, sequences = None, scores= None, image_mask = None): 
     _, _, cumulative_confidences = calculate_entropy_and_all_confidences(sequence = sequences , scores = scores)
                                                                          
     calculated_threshold = confidence_based_threshold(cumulative_confidences= cumulative_confidences, base_threshold=top_k)
