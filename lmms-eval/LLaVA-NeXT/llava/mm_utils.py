@@ -903,10 +903,28 @@ def get_heatmap_with_layer_visualization(
 
     return layerwise_results
 
+## one-side padding
+# def make_square(im, min_size, smallest_grid_size, fill_color=(0, 0, 0)):
+#     x, y = im.size
+#     size = int(max(min_size, x, y))
+#     new_im = Image.new('RGB', (size, size), fill_color)
+#     new_im.paste(im, (0, 0))
+    
+#     step = size // smallest_grid_size
+#     for x_idx, bounding_x in enumerate(range(0, size, step)):
+#         if bounding_x >= x: break
+#     for y_idx, bounding_y in enumerate(range(0, size, step)):
+#         if bounding_y >= y: break
 
+#     return new_im, x_idx, y_idx
+
+# old make_square
 def make_square(im, min_size, smallest_grid_size, fill_color=(0, 0, 0)):
     x, y = im.size
     size = (max(min_size, x, y))
+    size = max(min_size, x, y)
     new_im = Image.new('RGB', (size, size), fill_color)
     new_im.paste(im, (int((size - x) / 2), int((size - y) / 2)))
     return new_im, 0, 0 
+    new_im.paste(im, (int((size - x) / 2), int((size - y) / 2)))
+    return new_im, 0, 0
