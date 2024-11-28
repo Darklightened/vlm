@@ -5,19 +5,19 @@ from collections import defaultdict
 
 from loguru import logger as eval_logger
 
-def vqa_rad_doc_to_visual(doc):
+def pathvqa_doc_to_visual(doc):
     return [doc["image"].convert("RGB")]
 
-def vqa_rad_doc_to_text(doc):
+def pathvqa_doc_to_text(doc):
     # Assuming the 'doc' dictionary has a key 'question' with the question text
     question = doc["question"].strip()
     return f"{question}\nAnswer the question using a single word or phrase."
 
-def vqa_rad_process_results(doc, results):
+def pathvqa_process_results(doc, results):
     pred = results[0].lower().strip()
     gt_ans = doc["answer"].lower().strip()   
-    category = "vqa_rad_closed_accuracy" if gt_ans in ["yes", "no"] else "vqa_rad_open_accuracy"
-    if category == "vqa_rad_closed_accuracy":        
+    category = "pathvqa_closed_accuracy" if gt_ans in ["yes", "no"] else "pathvqa_open_accuracy"
+    if category == "pathvqa_closed_accuracy":        
         score = 1.0 if pred == gt_ans else 0.0
     else:
         score = 1.0 if gt_ans in pred else 0.0
@@ -25,7 +25,7 @@ def vqa_rad_process_results(doc, results):
         category: {"category": category, "score": score, "prediction": pred, "ground_truth": gt_ans},        
     }
 
-def vqa_rad_aggregate_results(results):
+def pathvqa_aggregate_results(results):
     category_scores = defaultdict(list)
     for result in results:
         score = result["score"]

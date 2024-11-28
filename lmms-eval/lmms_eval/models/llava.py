@@ -93,7 +93,7 @@ class Llava(lmms):
         fix_grid="2x2",
         attention_thresholding_type="layer_mean",
         attn_norm = "norm_relu", 
-        attention_threshold="0.1",
+        attention_threshold=[0.1],
         remove_unpadding=False,    
         detection_strategy=None,
         detection_threshold=0.8,
@@ -647,19 +647,24 @@ class Llava(lmms):
                     if last_stage: break
                     
                     ### Threshold-based Recursion ######################################################
+                    if len(self.attention_threshold) <= idx_stage:
+                        attn_threshold_stage = self.attention_threshold[0]
+                    else:
+                        attn_threshold_stage = self.attention_threshold[idx_stage]                    
+                    
                     if self.attention_thresholding_type == "layer_mean":
                         self.image_mask[stage+1] = layer_mean_based_recursion(attn = sum(ret_attn[:-1]), # select token index
-                                                   attn_threshold = self.attention_threshold, 
+                                                   attn_threshold = attn_threshold_stage, 
                                                    image_mask = self.image_mask[stage+1])
                         
                     elif self.attention_thresholding_type == "layer_mean_topk":
                         self.image_mask[stage+1] = layer_mean_topk_based_recursion(attn = sum(ret_attn[:-1]), # select token index
-                                                   top_k = self.attention_threshold, 
+                                                   top_k = attn_threshold_stage, 
                                                    image_mask = self.image_mask[stage+1])
                     
                     elif self.attention_thresholding_type == "confidence_topk": 
                         self.image_mask[stage+1] = confidence_topk_based_recursion(attn = sum(ret_attn[:-1]), # select token index
-                                                   top_k = self.attention_threshold, 
+                                                   top_k = attn_threshold_stage, 
                                                    sequences = sequences,
                                                    scores = scores, 
                                                    image_mask = self.image_mask[stage+1])

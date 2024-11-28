@@ -301,11 +301,19 @@ def parse_eval_args() -> argparse.Namespace:
         help="[None, norm_relu, norm_min_max]. Perform attention normalization - bool",
     )
 
+    # parser.add_argument(
+    #     "--attention_threshold",
+    #     type=float,
+    #     default=0.1,
+    #     help="attention threshold - float",
+    # )
+    
     parser.add_argument(
         "--attention_threshold",
+        nargs="*",  # 0 or more values expected => creates a list
         type=float,
-        default=0.1,
-        help="attention threshold - float",
+        default=[0.1],  # default if nothing is provided
+        help="attention_threshold for stages",
     )
 
     parser.add_argument(
