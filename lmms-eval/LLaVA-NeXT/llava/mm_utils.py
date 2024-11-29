@@ -652,7 +652,7 @@ def get_heatmap(
     input_offset = 0
     for stage in stages:
         if stage < 0:
-            vision_tower = model.model.downsampled_vision_towers[stage]
+            vision_tower = model.model.downsampled_vision_towers[str(stage)]
         else:
             vision_tower = model.model.vision_tower
         

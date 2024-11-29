@@ -84,7 +84,7 @@ def calculate_entropy_and_all_confidences(sequence, scores):
 def layer_mean_based_recursion(attn = None, attn_threshold = 0.1 , image_mask = None):
     for row in range(attn.shape[0]):
         for col in range(attn.shape[1]):
-            if attn[row, col] > attn_threshold:
+            if attn[row, col] >= attn_threshold:
                 image_mask[row][col] = 1
     
     return image_mask
