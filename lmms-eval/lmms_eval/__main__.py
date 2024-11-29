@@ -301,19 +301,18 @@ def parse_eval_args() -> argparse.Namespace:
         help="[None, norm_relu, norm_min_max]. Perform attention normalization - bool",
     )
 
+    parser.add_argument(
+        "--attention_threshold",
+        type=str,
+        default="0.1",
+        help="attention threshold - float",
+    )
     # parser.add_argument(
     #     "--attention_threshold",
     #     type=float,
     #     default=0.1,
     #     help="attention threshold - float",
     # )
-    
-    parser.add_argument(
-        "--attention_threshold",
-        type=str,
-        default=0.1,
-        help="attention threshold - float",
-    )
     
     parser.add_argument(
         "--merging",
@@ -382,6 +381,12 @@ def parse_eval_args() -> argparse.Namespace:
         type=bool,
         default=False,
         help="visualize_heatmap - bool",
+    )
+    parser.add_argument(
+        "--square",
+        type=int,
+        default=1,
+        help="square - int",
     )
 
 

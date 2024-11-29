@@ -39,7 +39,7 @@ class LlavaMetaModel:
         if hasattr(config, "mm_vision_tower"):
             delay_load = getattr(config, "delay_load", False)
             self.vision_tower = build_vision_tower(config, delay_load=delay_load)
-            self.downsampled_vision_towers = dict()
+            self.downsampled_vision_towers = nn.ModuleDict()
             self.vision_resampler = build_vision_resampler(config, vision_tower=self.vision_tower)
             self.mm_projector = build_vision_projector(config, vision_cfg=self.vision_tower.config)
 
@@ -54,8 +54,8 @@ class LlavaMetaModel:
     
     def get_downsampled_vision_towers(self, stage=-1):
         downsampled_vision_towers = getattr(self, "downsampled_vision_towers", None)
-        assert type(downsampled_vision_towers) is dict, "Must be dict"
-        downsampled_vision_tower = downsampled_vision_towers[stage]
+        assert type(downsampled_vision_towers) is nn.ModuleDict, "Must be dict"
+        downsampled_vision_tower = downsampled_vision_towers[str(stage)]
         return downsampled_vision_tower
 
     def initialize_vision_modules(self, model_args, fsdp=None):

@@ -189,6 +189,7 @@ def simple_evaluate(
                 "remove_unpadding": cli_args.remove_unpadding,
                 "stages": cli_args.stages,
                 "visualize_heatmap": cli_args.visualize_heatmap,
+                "square": cli_args.square,
                 # "regenerate_condition": cli_args.regenerate_condition,
                 # "detection_threshold": cli_args.detection_threshold,
                 # "detection": cli_args.detection,

@@ -94,10 +94,12 @@ def layer_mean_topk_based_recursion(attn = None, top_k = 0.1, image_mask = None)
     flattened_attn = flattened_attn.float()
     threshold_index = int(len(flattened_attn) * (top_k)) 
     threshold_value = torch.topk(flattened_attn, threshold_index).values[-1]
+
     for row in range(attn.shape[0]):
         for col in range(attn.shape[1]):
-            if attn[row, col] > threshold_value:
+            if attn[row, col] >= threshold_value:
                 image_mask[row][col] = 1
+
     return image_mask
 
 def confidence_topk_based_recursion(attn = None, top_k = 0.1, sequences = None, scores= None, image_mask = None): 
@@ -110,7 +112,7 @@ def confidence_topk_based_recursion(attn = None, top_k = 0.1, sequences = None, 
 
     for row in range(attn.shape[0]):
         for col in range(attn.shape[1]):
-            if attn[row, col] > threshold_value:
+            if attn[row, col] >= threshold_value:
                 image_mask[row][col] = 1
     
     return image_mask

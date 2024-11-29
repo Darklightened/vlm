@@ -22,6 +22,7 @@ from lmms_eval.api.registry import register_model
 from lmms_eval.utils import stop_sequences_criteria
 from lmms_eval.recursion_utils import *
 import numpy as np
+import cv2
 import torch.nn.functional as F
 import csv
 import os
@@ -62,7 +63,8 @@ try:
         process_images,
         tokenizer_image_token,
         get_heatmap,
-        make_square,
+        make_square1,
+        make_square2,
         init_downsampled_vision_towers,
     )
     from llava.mm_utils import (
@@ -120,6 +122,7 @@ class Llava(lmms):
         stages=[-1, 0, 1],
         positional_embedding_type="reduced",
         visualize_heatmap=False,
+        square=1,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -200,6 +203,7 @@ class Llava(lmms):
         self.stages = stages
         self.positional_embedding_type = positional_embedding_type
         self.visualize_heatmap = visualize_heatmap
+        self.square = square
         
         print(f"device: {device}")
         print(f"generation_type: {generation_type}")
@@ -215,6 +219,7 @@ class Llava(lmms):
         print(f"stages: {stages}")
         print(f"positional_embedding_type: {positional_embedding_type}")
         print(f"visualize_heatmap: {visualize_heatmap}")
+        print(f"square: {square}")
         
         ## default = "spatial_unpad" for llava1.6
         ## To remove unpadding, set remove_unpadding=True -> mm.path_merge_type will be 'spatial'
@@ -251,6 +256,11 @@ class Llava(lmms):
         else:
             self.attention_threshold = [float(attention_threshold) for i in range(len(self.stages)-1)]
             # print(self.attention_threshold)
+            
+        if self.square == 1:
+            self.make_square = make_square1
+        elif self.square == 2:
+            self.make_square = make_square2
         
         ##################################################################################
         ## init downsampled vision towers
@@ -265,7 +275,6 @@ class Llava(lmms):
                 self.positional_embedding_type,
                 device,
             )
-        self.model.model = self.model.model.to(device)
         
         self.patch_size = 14
         self.image_size = self.model.model.vision_tower.vision_tower.vision_model.embeddings.image_size
@@ -304,12 +313,12 @@ class Llava(lmms):
         else:
             eval_logger.info(f"Using single device: {self._device}")
             self.model.to(self._device)
-            self.model.model.vision_tower.to(self._device)
-            if self.stages[0] < 0:
-                for stage in self.stages:
-                    if stage == 0:
-                        break
-                    self.model.model.downsampled_vision_towers[stage].to(self._device)
+            # self.model.model.vision_tower.to(self._device)
+            # if self.stages[0] < 0:
+            #     for stage in self.stages:
+            #         if stage == 0:
+            #             break
+            #         self.model.model.downsampled_vision_towers[str(stage)].to(self._device)
             self._rank = 0
             self._world_size = 1
     
@@ -491,7 +500,11 @@ class Llava(lmms):
             task = task[0]
             split = split[0]
             batched_visuals = [doc_to_visual[0](self.task_dict[task][split][ids]) for ids in doc_id]  # [B, N]
-            flattened_visuals = self.flatten(batched_visuals)  # [B*N]      
+            flattened_visuals = self.flatten(batched_visuals)  # [B*N]
+            # if len(flattened_visuals) != 1:
+            #     res.extend(["skipped"])
+            #     pbar.update(1)
+            #     continue
 
             ## original model accepts several diffrent grids (e.g. 1x2, 1x3, 2x2)
             ## for recursive implementation, we only use 2x2 grid (might be updated in future)
@@ -500,13 +513,13 @@ class Llava(lmms):
                 temp_list = []
                 for idx, visual in enumerate(flattened_visuals):
                     if idx == 0:
-                        squared_img, bounding_x, bounding_y = make_square(visual, min_size=360, smallest_grid_size=self.smallest_grid_size)
+                        squared_img, bounding_x, bounding_y = self.make_square(visual, min_size=360, smallest_grid_size=self.smallest_grid_size)
                         # squared_img.save("./test.png")
                         # exit()
                         temp_list.append(squared_img)
                         self.set_pad_mask(bounding_x, bounding_y)
                     else:
-                        squared_img, _, _ = make_square(visual, min_size=360, smallest_grid_size=self.smallest_grid_size)
+                        squared_img, _, _ = self.make_square(visual, min_size=360, smallest_grid_size=self.smallest_grid_size)
                         temp_list.append(squared_img)
                 flattened_visuals = temp_list
             else:
@@ -644,10 +657,10 @@ class Llava(lmms):
                     if self.visualize_heatmap:
                         mask_image = self.image_mask[stage].cpu().numpy() * 255
                         target_token_ind = cont["sequences"][0][0] 
-                        plt.figure(figsize=(8, 8))
-                        plt.imshow(mask_image)
-                        plt.title(f"Token {target_token_ind}")
-                        plt.axis("off")
+                        # plt.figure(figsize=(8, 8))
+                        # plt.imshow(mask_image)
+                        # plt.title(f"Token {target_token_ind}")
+                        # plt.axis("off")
                         token_string = self.tokenizer.decode(cont['sequences'][0][0])
                         if token_string == "<s>":
                             token_string = "sos"
@@ -657,8 +670,9 @@ class Llava(lmms):
                             token_string.replace(".", "dot")
                         elif "/" in token_string:
                             token_string.replace("/", "slash")
-                        plt.savefig(f"{save_path}/mask.png")
-                        plt.close()           
+                        # plt.savefig(f"{save_path}/mask.png")
+                        # plt.close()           
+                        cv2.imwrite(f"{save_path}/mask.png", mask_image)
                                  
                     # Save confidence for analysis
                     if self.save_output:                            
@@ -676,14 +690,15 @@ class Llava(lmms):
                                     stage,
                                     self.stages,
                                     self.image_mask,
-                                    flattened_visuals[0],
+                                    select_token=None,
+                                    image=flattened_visuals[0],
                                     save_path=save_path,
                                     attn_norm=self.attn_norm,
                                 )
                     
                     # For confidence-based topk attention threshold.
                     if last_stage: break
-                    
+
                     ### Threshold-based Recursion ######################################################
                     if len(self.attention_threshold) <= idx_stage:
                         attn_threshold_stage = self.attention_threshold[0]
@@ -691,17 +706,17 @@ class Llava(lmms):
                         attn_threshold_stage = self.attention_threshold[idx_stage]                    
                     
                     if self.attention_thresholding_type == "layer_mean":
-                        self.image_mask[stage+1] = layer_mean_based_recursion(attn = sum(ret_attn[:-1]), # select token index
+                        self.image_mask[stage+1] = layer_mean_based_recursion(attn = ret_attn, # select token index
                                                    attn_threshold = self.attention_threshold[idx_stage], 
                                                    image_mask = self.image_mask[stage+1])
                         
                     elif self.attention_thresholding_type == "layer_mean_topk":
-                        self.image_mask[stage+1] = layer_mean_topk_based_recursion(attn = sum(ret_attn[:-1]), # select token index
+                        self.image_mask[stage+1] = layer_mean_topk_based_recursion(attn = ret_attn, # select token index
                                                    top_k = self.attention_threshold[idx_stage], 
                                                    image_mask = self.image_mask[stage+1])
                     
                     elif self.attention_thresholding_type == "confidence_topk": 
-                        self.image_mask[stage+1] = confidence_topk_based_recursion(attn = sum(ret_attn[:-1]), # select token index
+                        self.image_mask[stage+1] = confidence_topk_based_recursion(attn = ret_attn, # select token index
                                                    top_k = self.attention_threshold[idx_stage], 
                                                    sequences = sequences,
                                                    scores = scores, 

@@ -20,11 +20,11 @@ from matplotlib import cm
 
 def init_downsampled_vision_towers(vision_tower, stages, positional_embedding_type, device):
     print(f"change positional embedding to {positional_embedding_type}")
-    downsampled_vision_towers = dict()
+    downsampled_vision_towers = torch.nn.ModuleDict()
     for stage in stages:
         if stage == 0:
             break
-        downsampled_vision_towers[stage] = copy.deepcopy(vision_tower)
+        downsampled_vision_towers[str(stage)] = copy.deepcopy(vision_tower)
 
     # Default configurations of model position embedding
     patch_size = 14
@@ -41,21 +41,21 @@ def init_downsampled_vision_towers(vision_tower, stages, positional_embedding_ty
         num_positions = num_patches + 1
         embed_dim = vision_tower.vision_tower.vision_model.embeddings.embed_dim
 
-        downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.image_size = downsampled_image_size
-        downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.num_patches = num_patches
-        downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.num_positions = num_positions
-        downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.register_buffer("position_ids", torch.arange(num_positions).expand((1, -1)), persistent=False)
+        downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.image_size = downsampled_image_size
+        downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.num_patches = num_patches
+        downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.num_positions = num_positions
+        downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.register_buffer("position_ids", torch.arange(num_positions).expand((1, -1)), persistent=False)
     
         # Modify positional embedding to match the resized image size
         if positional_embedding_type == "zero":       
-            downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions, embed_dim).to(dtype=torch.float16, device=device)
-            torch.nn.init.constant_(downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding.weight, 0)
-            downsampled_vision_towers[stage].vision_tower.vision_model.embeddings = \
-                downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.to(device)
+            downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions, embed_dim).to(dtype=torch.float16, device=device)
+            torch.nn.init.constant_(downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding.weight, 0)
+            downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings = \
+                downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.to(device)
         elif positional_embedding_type == "interpolation":
             print("interpolate embedding type.")
             # Interpolate from the pretrained positional embedding
-            original_embedding = downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding.weight.data
+            original_embedding = downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding.weight.data
             original_num_positions = original_embedding.size(0)
             new_embedding = torch.nn.functional.interpolate(
                 original_embedding.unsqueeze(0).transpose(1, 2), 
@@ -63,24 +63,24 @@ def init_downsampled_vision_towers(vision_tower, stages, positional_embedding_ty
                 mode='linear', 
                 align_corners=False
             ).transpose(1, 2).squeeze(0)
-            downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions, embed_dim).to(dtype=torch.float16, device=device)
-            downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding.weight.data.copy_(new_embedding)
-            downsampled_vision_towers[stage].vision_tower.vision_model.embeddings = \
-                downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.to(device)
+            downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions, embed_dim).to(dtype=torch.float16, device=device)
+            downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding.weight.data.copy_(new_embedding)
+            downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings = \
+                downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.to(device)
         
         elif positional_embedding_type == "reduced":
             print("Reduced embedding type.")
             # Reduce the pretrained embedding by truncating
-            original_embedding = downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding.weight.data
-            downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions, embed_dim).to(dtype=torch.float16, device=device)
-            downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding.weight.data.copy_(original_embedding[:num_positions])
-            downsampled_vision_towers[stage].vision_tower.vision_model.embeddings = \
-                downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.to(device)
+            original_embedding = downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding.weight.data
+            downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions, embed_dim).to(dtype=torch.float16, device=device)
+            downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding.weight.data.copy_(original_embedding[:num_positions])
+            downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings = \
+                downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.to(device)
                 
         elif positional_embedding_type == "bilinear_interpolation":
             # Interpolate from the pretrained positional embedding
             print("Bilienar interpolation embedding type.")
-            original_embedding = downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding.weight.data
+            original_embedding = downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding.weight.data
             cls_token = original_embedding[:1, :]
             original_embedding = original_embedding[1:, :]  # Skip CLS
             # (1, 1024, 24, 24)
@@ -95,10 +95,10 @@ def init_downsampled_vision_towers(vision_tower, stages, positional_embedding_ty
                                         )  
             resized_positional_embeddings = resized_positional_embeddings.squeeze(0).permute(1, 2, 0).reshape(-1, 1024)
             new_embedding = torch.cat([cls_token, resized_positional_embeddings], dim=0)  
-            downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(len(new_embedding), embed_dim).to(dtype=torch.float16, device=device)
-            downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.position_embedding.weight.data.copy_(new_embedding)
-            downsampled_vision_towers[stage].vision_tower.vision_model.embeddings = \
-                downsampled_vision_towers[stage].vision_tower.vision_model.embeddings.to(device)
+            downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(len(new_embedding), embed_dim).to(dtype=torch.float16, device=device)
+            downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding.weight.data.copy_(new_embedding)
+            downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings = \
+                downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.to(device)
             
     return downsampled_vision_towers                                
 
@@ -607,6 +607,7 @@ def get_heatmap(
     current_stage,
     stages,
     image_mask,
+    select_token=None,
     image=None,
     save_path=None,
     attn_norm=None):
@@ -730,19 +731,41 @@ def get_heatmap(
         if stage == current_stage:
             break
 
-    ##### norm ####
     med = torch.stack(ret_attn, dim=0)
     med = med.mean(dim=0)
     for i in range(len(ret_attn)):
         ret_attn[i] = ret_attn[i] - med
         
+    overall_attn_weights_over_vis_tokens = []
+    for i, (row, token) in enumerate(
+        zip(
+            llm_attn_matrix[input_token_len:], 
+            outputs["sequences"][0].tolist()
+        )
+    ):
+        overall_attn_weights_over_vis_tokens.append(
+            row[vision_token_start:vision_token_end].sum().item()
+        )
+    
+    if select_token is not None:
+        ret_attn = ret_attn[select_token]
+    else:
+        temp = []
+        attn_use_threshold = sum(overall_attn_weights_over_vis_tokens) / len(overall_attn_weights_over_vis_tokens)
+        for attn, w in zip(ret_attn, overall_attn_weights_over_vis_tokens):
+            if w >= attn_use_threshold:
+                temp.append(attn)
+        ret_attn = sum(temp)
+        
+    ##### norm ####
     if attn_norm is not None:
         ret_attn = attn_norm(ret_attn)
-        
+    
     if image is not None and save_path is not None:
         for i in range(len(output_token_inds)):
             target_token_ind = output_token_inds[i] 
-            token_attn = sum(ret_attn[:-1])
+            # token_attn = sum(ret_attn[:-1])
+            token_attn = ret_attn[i]
             
             # Resize the heatmap to match the original image size
             resized_heatmap = F.interpolate(
@@ -752,10 +775,9 @@ def get_heatmap(
                 align_corners=True
             ).squeeze()
             
-
             # Normalize the resized heatmap
-            # resized_heatmap -= resized_heatmap.min()
-            resized_heatmap = torch.relu(resized_heatmap)
+            resized_heatmap -= resized_heatmap.min()
+            # resized_heatmap = torch.relu(resized_heatmap)
             resized_heatmap /= resized_heatmap.max()
             resized_heatmap = resized_heatmap.cpu().numpy()
 
@@ -783,6 +805,17 @@ def get_heatmap(
                 token_string.replace("/", "slash")
             plt.savefig(f"{save_path}/{str(i).zfill(4)}_{token_string}.png")
             plt.close()
+            
+        # plot the trend of attention weights over the vision tokens
+        fig, ax = plt.subplots(figsize=(20, 5))
+        ax.plot(overall_attn_weights_over_vis_tokens)
+        ax.set_xticks(range(len(overall_attn_weights_over_vis_tokens)))
+        ax.set_xticklabels(
+            [tokenizer.decode(token, add_special_tokens=False).strip() for token in outputs["sequences"][0].tolist()],
+            rotation=75
+        )
+        ax.set_title("at each token, the sum of attention weights over all the vision tokens")
+        plt.savefig(f"{save_path}/by_token_{token_string}.png")
 
     return ret_attn
 
@@ -903,28 +936,28 @@ def get_heatmap_with_layer_visualization(
 
     return layerwise_results
 
-## one-side padding
-# def make_square(im, min_size, smallest_grid_size, fill_color=(0, 0, 0)):
-#     x, y = im.size
-#     size = int(max(min_size, x, y))
-#     new_im = Image.new('RGB', (size, size), fill_color)
-#     new_im.paste(im, (0, 0))
-    
-#     step = size // smallest_grid_size
-#     for x_idx, bounding_x in enumerate(range(0, size, step)):
-#         if bounding_x >= x: break
-#     for y_idx, bounding_y in enumerate(range(0, size, step)):
-#         if bounding_y >= y: break
-
-#     return new_im, x_idx, y_idx
-
 # old make_square
-def make_square(im, min_size, smallest_grid_size, fill_color=(0, 0, 0)):
+def make_square1(im, min_size, smallest_grid_size, fill_color=(0, 0, 0)):
     x, y = im.size
     size = (max(min_size, x, y))
     size = max(min_size, x, y)
     new_im = Image.new('RGB', (size, size), fill_color)
     new_im.paste(im, (int((size - x) / 2), int((size - y) / 2)))
     return new_im, 0, 0 
-    new_im.paste(im, (int((size - x) / 2), int((size - y) / 2)))
-    return new_im, 0, 0
+
+# one-side padding
+def make_square2(im, min_size, smallest_grid_size, fill_color=(0, 0, 0)):
+    x, y = im.size
+    size = int(max(min_size, x, y))
+    new_im = Image.new('RGB', (size, size), fill_color)
+    new_im.paste(im, (0, 0))
+    
+    step = size // smallest_grid_size
+    for x_idx, bounding_x in enumerate(range(0, size, step)):
+        if bounding_x >= x: break
+    for y_idx, bounding_y in enumerate(range(0, size, step)):
+        if bounding_y >= y: break
+
+    return new_im, x_idx, y_idx
+
+

@@ -13,29 +13,6 @@ from lmms_eval.api.instance import Instance
 
 T = TypeVar("T", bound="lmms")
 
-def parse_string_to_list(input_string):
-    """
-    Converts a string like '[liuhaotian/llava-v1.6-vicuna-7b, liuhaotian/llava-v1.6-mistral-7b]'
-    into a Python list. If the input is not a list-like string, returns the input string as-is.
-
-    Args:
-        input_string (str): The input string containing a list-like structure.
-
-    Returns:
-        list or str: A list of strings extracted from the input if it is a list-like string,
-                     otherwise the input string itself.
-    """
-    # Check if the input string starts with "[" and ends with "]"
-    if input_string.strip().startswith("[") and input_string.strip().endswith("]"):
-        # Remove the square brackets and strip leading/trailing whitespace
-        cleaned_string = input_string.strip("[]").strip()
-        
-        # Split by commas and remove extra whitespace around each element
-        parsed_list = [item.strip() for item in cleaned_string.split(",")]
-        return parsed_list
-    
-    # If not a list-like string, return the input string as-is
-    return input_string
 
 class lmms(abc.ABC):
     def __init__(self) -> None:
@@ -128,13 +105,7 @@ class lmms(abc.ABC):
         - Instance of the LMM class.
         """
         additional_config = {} if additional_config is None else additional_config
-        
-        # For model merging, make it list.
-        args_string = parse_string_to_list(arg_string)
-
-        # For model merging, if it is a list, then extract model names.
-            
-        args = utils.simple_parse_args_string(args_string)
+        args = utils.simple_parse_args_string(arg_string)
         args2 = {k: v for k, v in additional_config.items() if v is not None}
         return cls(**args, **args2)
 
