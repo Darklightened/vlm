@@ -647,7 +647,7 @@ def get_heatmap(
     output_token_inds = list(range(output_token_start, output_token_end))
 
     # Initialize results
-    ret_attn = [torch.zeros_like(image_mask[0]) for _ in output_token_inds]
+    ret_attn_list = [torch.zeros_like(image_mask[0]) for _ in output_token_inds]
     
     input_offset = 0
     for stage in stages:
@@ -721,20 +721,20 @@ def get_heatmap(
             attn_over_image = torch.stack(attn_over_image).sum(dim=0)        
             attn_over_image = attn_over_image / attn_over_image.max()
             
-            h, w = ret_attn[i].shape
+            h, w = ret_attn_list[i].shape
             attn_over_image = attn_over_image.to(device=model.device)
             attn_over_image = torch.nn.functional.interpolate(attn_over_image.unsqueeze(0).unsqueeze(0), size=(h, w), mode='nearest').squeeze()
             attn_over_image = attn_over_image * image_mask[stage]
 
-            ret_attn[i] = ret_attn[i] + attn_over_image
+            ret_attn_list[i] = ret_attn_list[i] + attn_over_image
             
         if stage == current_stage:
             break
 
-    med = torch.stack(ret_attn, dim=0)
+    med = torch.stack(ret_attn_list, dim=0)
     med = med.mean(dim=0)
-    for i in range(len(ret_attn)):
-        ret_attn[i] = ret_attn[i] - med
+    for i in range(len(ret_attn_list)):
+        ret_attn_list[i] = ret_attn_list[i] - med
         
     overall_attn_weights_over_vis_tokens = []
     for i, (row, token) in enumerate(
@@ -748,11 +748,11 @@ def get_heatmap(
         )
     
     if select_token is not None:
-        ret_attn = ret_attn[select_token]
+        ret_attn = ret_attn_list[select_token]
     else:
         temp = []
         attn_use_threshold = sum(overall_attn_weights_over_vis_tokens) / len(overall_attn_weights_over_vis_tokens)
-        for attn, w in zip(ret_attn, overall_attn_weights_over_vis_tokens):
+        for attn, w in zip(ret_attn_list, overall_attn_weights_over_vis_tokens):
             if w >= attn_use_threshold:
                 temp.append(attn)
         ret_attn = sum(temp)
@@ -764,8 +764,8 @@ def get_heatmap(
     if image is not None and save_path is not None:
         for i in range(len(output_token_inds)):
             target_token_ind = output_token_inds[i] 
-            # token_attn = sum(ret_attn[:-1])
-            token_attn = ret_attn[i]
+            # token_attn = sum(ret_attn_list[:-1])
+            token_attn = ret_attn_list[i]
             
             # Resize the heatmap to match the original image size
             resized_heatmap = F.interpolate(
