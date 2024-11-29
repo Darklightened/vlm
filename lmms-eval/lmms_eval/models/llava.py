@@ -63,8 +63,8 @@ try:
         process_images,
         tokenizer_image_token,
         get_heatmap,
-        make_square1,
-        make_square2,
+        make_square_center,
+        make_square_oneside,
         init_downsampled_vision_towers,
     )
     from llava.mm_utils import (
@@ -258,9 +258,9 @@ class Llava(lmms):
             # print(self.attention_threshold)
             
         if self.square == 1:
-            self.make_square = make_square1
+            self.make_square = make_square_center
         elif self.square == 2:
-            self.make_square = make_square2
+            self.make_square = make_square_oneside
         
         ##################################################################################
         ## init downsampled vision towers

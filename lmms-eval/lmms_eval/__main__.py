@@ -386,7 +386,7 @@ def parse_eval_args() -> argparse.Namespace:
         "--square",
         type=int,
         default=1,
-        help="square - int",
+        help="square - int, 1: center, 2: oneside",
     )
 
 

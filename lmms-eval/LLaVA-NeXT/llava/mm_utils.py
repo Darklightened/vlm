@@ -937,7 +937,7 @@ def get_heatmap_with_layer_visualization(
     return layerwise_results
 
 # old make_square
-def make_square1(im, min_size, smallest_grid_size, fill_color=(0, 0, 0)):
+def make_square_center(im, min_size, smallest_grid_size, fill_color=(0, 0, 0)):
     x, y = im.size
     size = (max(min_size, x, y))
     size = max(min_size, x, y)
@@ -946,7 +946,7 @@ def make_square1(im, min_size, smallest_grid_size, fill_color=(0, 0, 0)):
     return new_im, 0, 0 
 
 # one-side padding
-def make_square2(im, min_size, smallest_grid_size, fill_color=(0, 0, 0)):
+def make_square_oneside(im, min_size, smallest_grid_size, fill_color=(0, 0, 0)):
     x, y = im.size
     size = int(max(min_size, x, y))
     new_im = Image.new('RGB', (size, size), fill_color)
