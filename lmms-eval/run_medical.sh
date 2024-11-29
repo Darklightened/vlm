@@ -36,7 +36,7 @@
 python3 -m accelerate.commands.launch \
     --num_processes=1 \
     -m lmms_eval \
-    --device cuda:0 \
+    --device cuda:1 \
     --model llava \
     --model_args pretrained="microsoft/llava-med-v1.5-mistral-7b" \
     --tasks vqa-rad \
@@ -44,9 +44,9 @@ python3 -m accelerate.commands.launch \
     --log_samples \
     --log_samples_suffix llava_v1.6_vqa-rad \
     --output_path ./logs/ \
-    --generation_type total \
+    --generation_type recursion \
     --attention_thresholding_type layer_mean_topk \
-    --attention_threshold "0.9" "0.6" \
+    --attention_threshold "0.9" \
     --attn_norm None \
     --stages "0" "1" \
     --verbosity DEBUG \
