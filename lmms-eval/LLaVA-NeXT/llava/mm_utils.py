@@ -50,8 +50,6 @@ def init_downsampled_vision_towers(vision_tower, stages, positional_embedding_ty
         if positional_embedding_type == "zero":       
             downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions, embed_dim).to(dtype=torch.float16, device=device)
             torch.nn.init.constant_(downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding.weight, 0)
-            downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings = \
-                downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.to(device)
         elif positional_embedding_type == "interpolation":
             print("interpolate embedding type.")
             # Interpolate from the pretrained positional embedding
@@ -65,8 +63,6 @@ def init_downsampled_vision_towers(vision_tower, stages, positional_embedding_ty
             ).transpose(1, 2).squeeze(0)
             downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions, embed_dim).to(dtype=torch.float16, device=device)
             downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding.weight.data.copy_(new_embedding)
-            downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings = \
-                downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.to(device)
         
         elif positional_embedding_type == "reduced":
             print("Reduced embedding type.")
@@ -74,8 +70,6 @@ def init_downsampled_vision_towers(vision_tower, stages, positional_embedding_ty
             original_embedding = downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding.weight.data
             downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions, embed_dim).to(dtype=torch.float16, device=device)
             downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding.weight.data.copy_(original_embedding[:num_positions])
-            downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings = \
-                downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.to(device)
                 
         elif positional_embedding_type == "bilinear_interpolation":
             # Interpolate from the pretrained positional embedding
@@ -97,8 +91,6 @@ def init_downsampled_vision_towers(vision_tower, stages, positional_embedding_ty
             new_embedding = torch.cat([cls_token, resized_positional_embeddings], dim=0)  
             downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(len(new_embedding), embed_dim).to(dtype=torch.float16, device=device)
             downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding.weight.data.copy_(new_embedding)
-            downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings = \
-                downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.to(device)
             
     return downsampled_vision_towers                                
 
