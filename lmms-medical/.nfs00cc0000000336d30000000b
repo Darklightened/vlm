@@ -1,0 +1,134 @@
+The following values were not passed to `accelerate launch` and had defaults used instead:
+	`--num_machines` was set to a value of `1`
+	`--mixed_precision` was set to a value of `'no'`
+	`--dynamo_backend` was set to a value of `'no'`
+To avoid this warning pass in values for each of the problematic parameters or run `accelerate config`.
+wandb: Currently logged in as: wjk9904 (VLM_Hallucination_Woohyeon). Use `wandb login --relogin` to force relogin
+wandb: wandb version 0.18.7 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.16.0
+wandb: Run data is saved locally in /workspace/lmms-medical/wandb/run-20241201_162053-4u5a5fhy
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run 168-336-672-90-70-50
+wandb: ⭐️ View project at https://wandb.ai/VLM_Hallucination_Woohyeon/llava1.6_recursive_eval_medical
+wandb: 🚀 View run at https://wandb.ai/VLM_Hallucination_Woohyeon/llava1.6_recursive_eval_medical/runs/4u5a5fhy
+[32m2024-12-01 16:20:54.688[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate[0m:[36m420[0m - [1mVerbosity set to DEBUG[0m
+[32m2024-12-01 16:20:55.825[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.tasks[0m:[36m_get_task_and_group[0m:[36m452[0m - [34m[1m`group` and `group_alias` keys in tasks' configs will no longer be used in the next release of lmms-eval. `tag` will be used to allow to call a collection of tasks just like `group`. `group` will be removed in order to not cause confusion with the new ConfigurableGroup which will be the offical way to create groups with addition of group-wide configuations.[0m
+[32m2024-12-01 16:20:59.096[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m503[0m - [1mEvaluation tracker args: {'output_path': './logs/'}[0m
+[32m2024-12-01 16:20:59.097[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m592[0m - [1mSelected Tasks: ['pathvqa', 'slake', 'vqa-rad'][0m
+[32m2024-12-01 16:20:59.100[0m | [1mINFO    [0m | [36mlmms_eval.evaluator[0m:[36msimple_evaluate[0m:[36m155[0m - [1mSetting random seed to 0 | Setting numpy seed to 1234 | Setting torch manual seed to 1234[0m
+initialize llava model with modification
+OpenCLIP not installed
+self.merging= None
+model_name: llava-med-v1.5-mistral-7b
+Loaded LLaVA model: microsoft/llava-med-v1.5-mistral-7b
+Loading vision tower: openai/clip-vit-large-patch14-336
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:04<00:12,  4.32s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:07<00:07,  3.89s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:11<00:03,  3.73s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:11<00:00,  2.39s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:11<00:00,  2.95s/it]
+Model Class: LlavaMistralForCausalLM
+device: cuda:3
+generation_type: recursion
+fix_grid: 2x2
+attention_thresholding_type: layer_mean_topk
+attention_norm: None
+attention_threshold: [0.9,0.7,0.5]
+detection_strategy: None
+detection_threshold: 0.8
+save_output: True
+save_output_csv_path: ./generation_output_medical_168-336-672-90-70-50.csv
+target_token_selection_strategy: first
+stages: [-2, -1, 0, 1]
+positional_embedding_type: reduced
+visualize_heatmap: False
+square: 1
+remove unpadding=True, change to 'spatial'
+medical setting
+mistral_instruct
+change positional embedding to reduced
+Reduced embedding type.
+Reduced embedding type.
+downsampled vision tower init
+ModuleDict(
+  (-2): CLIPVisionTower(
+    (vision_tower): CLIPVisionModel(
+      (vision_model): CLIPVisionTransformer(
+        (embeddings): CLIPVisionEmbeddings(
+          (patch_embedding): Conv2d(3, 1024, kernel_size=(14, 14), stride=(14, 14), bias=False)
+          (position_embedding): Embedding(37, 1024)
+        )
+        (pre_layrnorm): LayerNorm((1024,), eps=1e-05, elementwise_affine=True)
+        (encoder): CLIPEncoder(
+          (layers): ModuleList(
+            (0-23): 24 x CLIPEncoderLayer(
+              (self_attn): CLIPSdpaAttention(
+                (k_proj): Linear(in_features=1024, out_features=1024, bias=True)
+                (v_proj): Linear(in_features=1024, out_features=1024, bias=True)
+                (q_proj): Linear(in_features=1024, out_features=1024, bias=True)
+                (out_proj): Linear(in_features=1024, out_features=1024, bias=True)
+              )
+              (layer_norm1): LayerNorm((1024,), eps=1e-05, elementwise_affine=True)
+              (mlp): CLIPMLP(
+                (activation_fn): QuickGELUActivation()
+                (fc1): Linear(in_features=1024, out_features=4096, bias=True)
+                (fc2): Linear(in_features=4096, out_features=1024, bias=True)
+              )
+              (layer_norm2): LayerNorm((1024,), eps=1e-05, elementwise_affine=True)
+            )
+          )
+        )
+        (post_layernorm): LayerNorm((1024,), eps=1e-05, elementwise_affine=True)
+      )
+    )
+  )
+  (-1): CLIPVisionTower(
+    (vision_tower): CLIPVisionModel(
+      (vision_model): CLIPVisionTransformer(
+        (embeddings): CLIPVisionEmbeddings(
+          (patch_embedding): Conv2d(3, 1024, kernel_size=(14, 14), stride=(14, 14), bias=False)
+          (position_embedding): Embedding(145, 1024)
+        )
+        (pre_layrnorm): LayerNorm((1024,), eps=1e-05, elementwise_affine=True)
+        (encoder): CLIPEncoder(
+          (layers): ModuleList(
+            (0-23): 24 x CLIPEncoderLayer(
+              (self_attn): CLIPSdpaAttention(
+                (k_proj): Linear(in_features=1024, out_features=1024, bias=True)
+                (v_proj): Linear(in_features=1024, out_features=1024, bias=True)
+                (q_proj): Linear(in_features=1024, out_features=1024, bias=True)
+                (out_proj): Linear(in_features=1024, out_features=1024, bias=True)
+              )
+              (layer_norm1): LayerNorm((1024,), eps=1e-05, elementwise_affine=True)
+              (mlp): CLIPMLP(
+                (activation_fn): QuickGELUActivation()
+                (fc1): Linear(in_features=1024, out_features=4096, bias=True)
+                (fc2): Linear(in_features=4096, out_features=1024, bias=True)
+              )
+              (layer_norm2): LayerNorm((1024,), eps=1e-05, elementwise_affine=True)
+            )
+          )
+        )
+        (post_layernorm): LayerNorm((1024,), eps=1e-05, elementwise_affine=True)
+      )
+    )
+  )
+)
+[32m2024-12-01 16:21:29.930[0m | [1mINFO    [0m | [36mlmms_eval.models.llava[0m:[36m__init__[0m:[36m343[0m - [1mUsing single device: cuda:3[0m
+[32m2024-12-01 16:21:30.161[0m | [1mINFO    [0m | [36mlmms_eval.evaluator_utils[0m:[36mfrom_taskdict[0m:[36m91[0m - [1mNo metadata found in task config for vqa-rad, using default n_shot=0[0m
+[32m2024-12-01 16:21:30.161[0m | [1mINFO    [0m | [36mlmms_eval.evaluator_utils[0m:[36mfrom_taskdict[0m:[36m91[0m - [1mNo metadata found in task config for slake, using default n_shot=0[0m
+[32m2024-12-01 16:21:30.163[0m | [1mINFO    [0m | [36mlmms_eval.evaluator_utils[0m:[36mfrom_taskdict[0m:[36m91[0m - [1mNo metadata found in task config for pathvqa, using default n_shot=0[0m
+[32m2024-12-01 16:21:30.163[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.caching.cache[0m:[36mload_from_cache[0m:[36m33[0m - [34m[1mrequests-vqa-rad-0shot-rank0-world_size1-tokenizer is not cached, generating...[0m
+[32m2024-12-01 16:21:30.164[0m | [1mINFO    [0m | [36mlmms_eval.api.task[0m:[36mbuild_all_requests[0m:[36m425[0m - [1mBuilding contexts for vqa-rad on rank 0...[0m
+  0%|          | 0/451 [00:00<?, ?it/s]100%|██████████| 451/451 [00:00<00:00, 61826.09it/s]
+[32m2024-12-01 16:21:31.316[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.evaluator[0m:[36mevaluate[0m:[36m455[0m - [34m[1mTask: vqa-rad; number of requests on this rank: 451[0m
+[32m2024-12-01 16:21:31.317[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.caching.cache[0m:[36mload_from_cache[0m:[36m33[0m - [34m[1mrequests-slake-0shot-rank0-world_size1-tokenizer is not cached, generating...[0m
+[32m2024-12-01 16:21:31.318[0m | [1mINFO    [0m | [36mlmms_eval.api.task[0m:[36mbuild_all_requests[0m:[36m425[0m - [1mBuilding contexts for slake on rank 0...[0m
+  0%|          | 0/1061 [00:00<?, ?it/s]100%|██████████| 1061/1061 [00:00<00:00, 76547.35it/s]
+[32m2024-12-01 16:21:34.046[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.evaluator[0m:[36mevaluate[0m:[36m455[0m - [34m[1mTask: slake; number of requests on this rank: 1061[0m
+[32m2024-12-01 16:21:34.046[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.caching.cache[0m:[36mload_from_cache[0m:[36m33[0m - [34m[1mrequests-pathvqa-0shot-rank0-world_size1-tokenizer is not cached, generating...[0m
+[32m2024-12-01 16:21:34.047[0m | [1mINFO    [0m | [36mlmms_eval.api.task[0m:[36mbuild_all_requests[0m:[36m425[0m - [1mBuilding contexts for pathvqa on rank 0...[0m
+  0%|          | 0/6719 [00:00<?, ?it/s] 14%|█▍        | 948/6719 [00:00<00:01, 3945.44it/s]100%|██████████| 6719/6719 [00:00<00:00, 21463.07it/s]
+[32m2024-12-01 16:22:20.813[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.evaluator[0m:[36mevaluate[0m:[36m455[0m - [34m[1mTask: pathvqa; number of requests on this rank: 6719[0m
+[32m2024-12-01 16:22:20.815[0m | [1mINFO    [0m | [36mlmms_eval.evaluator[0m:[36mevaluate[0m:[36m476[0m - [1mRunning generate_until requests[0m
+Model Responding:   0%|          | 0/8231 [00:00<?, ?it/s]CLIPModel is using CLIPSdpaAttention, but `torch.nn.functional.scaled_dot_product_attention` does not support `output_attentions=True`. Falling back to the manual attention implementation, but specifying the manual implementation will be required from Transformers version v5.0.0 onwards. This warning can be removed using the argument `attn_implementation="eager"` when loading the model.
+MistralModel is using MistralSdpaAttention, but `torch.nn.functional.scaled_dot_product_attention` does not support `output_attentions=True`. Falling back to the manual attention implementation, but specifying the manual implementation will be required from Transformers version v5.0.0 onwards. This warning can be removed using the argument `attn_implementation="eager"` when loading the model.
+From v4.47 onwards, when a model cache is to be returned, `generate` will return a `Cache` instance instead by default (as opposed to the legacy tuple of tuples format). If you want to keep returning the legacy format, please set `return_legacy_cache=True`.
+Model Responding:   0%|          | 1/8231 [00:06<14:31:36,  6.35s/it]Model Responding:   0%|          | 2/8231 [00:11<13:07:23,  5.74s/it]Model Responding:   0%|          | 3/8231 [00:16<12:37:08,  5.52s/it]Model Responding:   0%|          | 4/8231 [00:22<12:42:46,  5.56s/it]Model Responding:   0%|          | 5/8231 [00:27<12:30:54,  5.48s/it]Model Responding:   0%|          | 6/8231 [00:33<12:25:29,  5.44s/it]Model Responding:   0%|          | 7/8231 [00:38<12:20:17,  5.40s/it]Model Responding:   0%|          | 8/8231 [00:43<12:20:26,  5.40s/it]Model Responding:   0%|          | 9/8231 [00:49<12:16:46,  5.38s/it]Model Responding:   0%|          | 10/8231 [00:54<12:16:53,  5.38s/it]Model Responding:   0%|          | 11/8231 [01:00<12:26:05,  5.45s/it]Model Responding:   0%|          | 12/8231 [01:05<12:25:27,  5.44s/it]Model Responding:   0%|          | 13/8231 [01:10<12:17:36,  5.39s/it]Model Responding:   0%|          | 14/8231 [01:16<12:14:30,  5.36s/it]Model Responding:   0%|          | 15/8231 [01:21<12:16:22,  5.38s/it]Model Responding:   0%|          | 16/8231 [01:26<12:12:32,  5.35s/it]Model Responding:   0%|          | 17/8231 [01:32<12:07:42,  5.32s/it]Model Responding:   0%|          | 18/8231 [01:37<12:05:35,  5.30s/it]Model Responding:   0%|          | 19/8231 [01:42<12:02:47,  5.28s/it]Model Responding:   0%|          | 20/8231 [01:47<12:02:47,  5.28s/it]Model Responding:   0%|          | 21/8231 [01:53<12:02:59,  5.28s/it]Model Responding:   0%|          | 22/8231 [01:58<12:01:54,  5.28s/it]Model Responding:   0%|          | 23/8231 [02:03<12:02:52,  5.28s/it]Model Responding:   0%|          | 24/8231 [02:09<12:00:24,  5.27s/it]Model Responding:   0%|          | 25/8231 [02:14<12:00:56,  5.27s/it]Model Responding:   0%|          | 26/8231 [02:19<11:59:55,  5.26s/it]Model Responding:   0%|          | 27/8231 [02:24<11:59:23,  5.26s/it]Model Responding:   0%|          | 28/8231 [02:30<11:57:44,  5.25s/it]Model Responding:   0%|          | 29/8231 [02:35<11:54:57,  5.23s/it]Model Responding:   0%|          | 30/8231 [02:40<11:56:23,  5.24s/it]Model Responding:   0%|          | 31/8231 [02:45<11:53:56,  5.22s/it]Model Responding:   0%|          | 32/8231 [02:50<11:54:32,  5.23s/it]Model Responding:   0%|          | 33/8231 [02:56<11:54:52,  5.23s/it]Model Responding:   0%|          | 34/8231 [03:01<11:56:01,  5.24s/it]Model Responding:   0%|          | 35/8231 [03:06<11:55:23,  5.24s/it]
