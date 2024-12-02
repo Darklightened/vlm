@@ -501,10 +501,10 @@ class Llava(lmms):
             split = split[0]
             batched_visuals = [doc_to_visual[0](self.task_dict[task][split][ids]) for ids in doc_id]  # [B, N]
             flattened_visuals = self.flatten(batched_visuals)  # [B*N]
-            # if len(flattened_visuals) != 1:
-            #     res.extend(["skipped"])
-            #     pbar.update(1)
-            #     continue
+            if len(flattened_visuals) != 1:
+                res.extend(["skipped"])
+                pbar.update(1)
+                continue
 
             ## original model accepts several diffrent grids (e.g. 1x2, 1x3, 2x2)
             ## for recursive implementation, we only use 2x2 grid (might be updated in future)
