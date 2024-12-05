@@ -17,7 +17,7 @@ python3 -m accelerate.commands.launch \
     --device cuda:0 \
     --model llava \
     --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
-    --tasks mmbench_en_dev_lite \
+    --tasks vqav2_val_lite \
     --batch_size 1 \
     --log_samples \
     --log_samples_suffix llava_v1.6_pope \
@@ -32,7 +32,7 @@ python3 -m accelerate.commands.launch \
     --stages "-2" "-1" "0" "1" \
     --verbosity DEBUG \
     --square 1 \
-    --wandb_args "project=llava1.6_recursive_eval_1126,entity=VLM_Hallucination_Woohyeon,name=tta-train-mask" \
+    # --wandb_args "project=llava1.6_recursive_eval_1126,entity=VLM_Hallucination_Woohyeon,name=tta-train-mask" \
     # --visualize_heatmap False \
     # --save_output True \
     # --output_csv_path "./generation_output_pope_84-168-336-672-pad-topk-80.csv" \

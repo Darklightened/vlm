@@ -107,7 +107,7 @@ def layer_mean_based_recursion(attn = None, attn_threshold = 0.1 , image_mask = 
 def layer_mean_topk_based_recursion(attn = None, top_k = 0.1, image_mask = None):
     flattened_attn = attn.view(-1) 
     flattened_attn = flattened_attn.float()
-    threshold_index = int(len(flattened_attn) * (top_k)) 
+    threshold_index = (len(flattened_attn) * (top_k)).to(torch.int32)
     threshold_value = torch.topk(flattened_attn, threshold_index).values[-1]
 
     mask = (attn >= threshold_value).float()    
@@ -160,3 +160,22 @@ def print_trainable_parameters(model):
     print(f"\nTotal parameters: {total_params}")
     print(f"Trainable parameters: {trainable_params}")
     print(f"Non-trainable parameters: {total_params - trainable_params}")
+    
+def TTA_recursion(attn, attn_threshold=0.1, image_mask=None):
+    """
+    Update the image mask based on attention values and threshold using broadcasting.
+
+    Args:
+        attn (torch.Tensor): The attention values (2D tensor).
+        attn_threshold (float): The threshold for attention values.
+        image_mask (torch.Tensor): The image mask to be updated.
+
+    Returns:
+        torch.Tensor: Updated image mask.
+    """
+    diff = attn - attn_threshold  
+    image_mask = torch.sigmoid(100 * diff) 
+    nonzero_indices = torch.nonzero(image_mask, as_tuple=True)
+    nonzero_values = image_mask[str(nonzero_indices)]
+
+    return image_mask
