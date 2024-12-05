@@ -62,18 +62,31 @@ def calculate_entropy_and_all_confidences(sequence, scores):
 
     for idx, token_id in enumerate(sequence):
         probs = F.softmax(scores[idx], dim=-1)  # Softmax to get probabilities for the current token
-        token_prob = probs[0, token_id].item()  # Probability of the actual token
+        token_prob = probs[0, token_id]  # Probability of the actual token
 
         # Update cumulative log probability for the full sequence up to this token
-        log_prob_sum_full += np.log(token_prob + 1e-10)
+        log_prob_sum_full += torch.log(token_prob + 1e-10)
         # Calculate and store cumulative confidence for this subsequence
-        cumulative_confidences.append(np.exp(log_prob_sum_full))
+        cumulative_confidences.append(torch.exp(log_prob_sum_full))
         
         # Entropy calculation for the token
-        entropy_sum -= token_prob * np.log(token_prob + 1e-10)
+        entropy_sum -= token_prob * torch.log(token_prob + 1e-10)
+
+    ### old version ###
+    # for idx, token_id in enumerate(sequence):
+    #     probs = F.softmax(scores[idx], dim=-1)  # Softmax to get probabilities for the current token
+    #     token_prob = probs[0, token_id].item()  # Probability of the actual token
+
+    #     # Update cumulative log probability for the full sequence up to this token
+    #     log_prob_sum_full += np.log(token_prob + 1e-10)
+    #     # Calculate and store cumulative confidence for this subsequence
+    #     cumulative_confidences.append(np.exp(log_prob_sum_full))
+        
+    #     # Entropy calculation for the token
+    #     entropy_sum -= token_prob * np.log(token_prob + 1e-10)
 
     # Full sequence confidence (cumulative up to the last token)
-    P_T_given_I_Q_full = cumulative_confidences[-1] if cumulative_confidences else np.exp(log_prob_sum_full)
+    P_T_given_I_Q_full = cumulative_confidences[-1] if cumulative_confidences else torch.exp(log_prob_sum_full)
 
     # print(f"Overall confidence P(T | I, Q): {P_T_given_I_Q_full}")
     # print(f"Entropy H(T | I, Q): {entropy_sum}")
@@ -94,15 +107,21 @@ def layer_mean_based_recursion(attn = None, attn_threshold = 0.1 , image_mask = 
 def layer_mean_topk_based_recursion(attn = None, top_k = 0.1, image_mask = None):
     flattened_attn = attn.view(-1) 
     flattened_attn = flattened_attn.float()
-    threshold_index = int(len(flattened_attn) * (top_k)) 
+    threshold_index = (len(flattened_attn) * (top_k)).to(torch.int32)
     threshold_value = torch.topk(flattened_attn, threshold_index).values[-1]
 
-    for row in range(attn.shape[0]):
-        for col in range(attn.shape[1]):
-            if attn[row, col] >= threshold_value:
-                image_mask[row][col] = 1
+    mask = (attn >= threshold_value).float()    
+    
+    updated_image_mask = torch.max(image_mask, mask)
+    
+    return updated_image_mask
 
-    return image_mask
+    # for row in range(attn.shape[0]):
+    #     for col in range(attn.shape[1]):
+    #         if attn[row, col] >= threshold_value:
+    #             image_mask[row][col] = 1
+
+    # return image_mask
 
 def confidence_topk_based_recursion(attn = None, top_k = 0.1, sequences = None, scores= None, image_mask = None): 
     _, _, cumulative_confidences = calculate_entropy_and_all_confidences(sequence = sequences , scores = scores)
@@ -141,3 +160,22 @@ def print_trainable_parameters(model):
     print(f"\nTotal parameters: {total_params}")
     print(f"Trainable parameters: {trainable_params}")
     print(f"Non-trainable parameters: {total_params - trainable_params}")
+    
+def TTA_recursion(attn, attn_threshold=0.1, image_mask=None):
+    """
+    Update the image mask based on attention values and threshold using broadcasting.
+
+    Args:
+        attn (torch.Tensor): The attention values (2D tensor).
+        attn_threshold (float): The threshold for attention values.
+        image_mask (torch.Tensor): The image mask to be updated.
+
+    Returns:
+        torch.Tensor: Updated image mask.
+    """
+    diff = attn - attn_threshold  
+    image_mask = torch.sigmoid(100 * diff) 
+    nonzero_indices = torch.nonzero(image_mask, as_tuple=True)
+    nonzero_values = image_mask[str(nonzero_indices)]
+
+    return image_mask

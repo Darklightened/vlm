@@ -633,9 +633,9 @@ def get_heatmap(
 
     input_token_len = 0
     for stage in stages:
-        mask_patches_per_side, _ = image_mask[stage].shape
+        mask_patches_per_side, _ = image_mask[str(stage)].shape
         mask_grid = int(mask_patches_per_side * pow(2, stage - max(stages)))
-        mask = torch.nn.functional.interpolate(image_mask[stage].unsqueeze(0).unsqueeze(0), size=(mask_grid, mask_grid), mode='nearest')
+        mask = torch.nn.functional.interpolate(image_mask[str(stage)].unsqueeze(0).unsqueeze(0), size=(mask_grid, mask_grid), mode='nearest')
         patches_in_stage = mask.sum().item()
         input_token_len += patches_in_stage
     input_token_len += len(input_ids[0]) - 1 # -1 for the <image> token
@@ -647,7 +647,7 @@ def get_heatmap(
     output_token_inds = list(range(output_token_start, output_token_end))
 
     # Initialize results
-    ret_attn_list = [torch.zeros_like(image_mask[0]) for _ in output_token_inds]
+    ret_attn_list = [torch.zeros_like(image_mask[str(0)]) for _ in output_token_inds]
     
     input_offset = 0
     for stage in stages:
@@ -662,7 +662,7 @@ def get_heatmap(
             num_patches *= 4
             grid_size *= 2
             
-        used_token_list = torch.nn.functional.interpolate(image_mask[stage].unsqueeze(0).unsqueeze(0), size=(grid_size, grid_size), mode='nearest').squeeze()
+        used_token_list = torch.nn.functional.interpolate(image_mask[str(stage)].unsqueeze(0).unsqueeze(0), size=(grid_size, grid_size), mode='nearest').squeeze()
         used_token_list = used_token_list.view(-1).tolist()
         
         if sum(used_token_list) == 0:
@@ -724,7 +724,7 @@ def get_heatmap(
             h, w = ret_attn_list[i].shape
             attn_over_image = attn_over_image.to(device=model.device)
             attn_over_image = torch.nn.functional.interpolate(attn_over_image.unsqueeze(0).unsqueeze(0), size=(h, w), mode='nearest').squeeze()
-            attn_over_image = attn_over_image * image_mask[stage]
+            attn_over_image = attn_over_image * image_mask[str(stage)]
 
             ret_attn_list[i] = ret_attn_list[i] + attn_over_image
             

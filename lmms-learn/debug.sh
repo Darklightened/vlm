@@ -29,10 +29,10 @@ python3 -m accelerate.commands.launch \
     --positional_embedding_type bilinear_interpolation \
     --remove_unpadding True \
     --attn_norm None \
-    --stages "0" "1" \
+    --stages "-2" "-1" "0" "1" \
     --verbosity DEBUG \
     --square 1 \
-    --visualize_heatmap False \
-    # --wandb_args "project=llava1.6_recursive_eval_1126,entity=VLM_Hallucination_Woohyeon,name=84-168-336-672-ver2" \
+    # --wandb_args "project=llava1.6_recursive_eval_1126,entity=VLM_Hallucination_Woohyeon,name=tta-train-mask" \
+    # --visualize_heatmap False \
     # --save_output True \
     # --output_csv_path "./generation_output_pope_84-168-336-672-pad-topk-80.csv" \

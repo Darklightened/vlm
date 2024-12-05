@@ -458,60 +458,67 @@ class LlavaMetaForCausalLM(ABC):
                             # 1. interpolate mask to encoded size,
                             # 2. elementwise multiplication,
                             # 3. insert only non-zero features to list.
-                            
-                            for downsampled_feature, stage in zip(encoded_downsampled_image_features, stages):
-                                mask = image_mask[stage]
-                                _, num_patches, _ = downsampled_feature.shape
-                                patch_per_side = int(math.sqrt(num_patches))
+                            if type(image_mask) is nn.ParameterDict:
+                                for downsampled_feature, stage in zip(encoded_downsampled_image_features, stages):
+                                    mask = image_mask[str(stage)]
+                                    _, num_patches, _ = downsampled_feature.shape
+                                    patch_per_side = int(math.sqrt(num_patches))
 
-                                resized_mask = torch.nn.functional.interpolate(mask.unsqueeze(0).unsqueeze(0), size=(patch_per_side, patch_per_side), mode='nearest')
+                                    resized_mask = torch.nn.functional.interpolate(mask.unsqueeze(0).unsqueeze(0), size=(patch_per_side, patch_per_side), mode='nearest')
+                                    resized_mask = resized_mask.squeeze().unsqueeze(-1)
 
-                                downsampled_feature = downsampled_feature.squeeze().view(patch_per_side, patch_per_side, -1)
+                                    downsampled_feature = downsampled_feature.squeeze().view(patch_per_side, patch_per_side, -1)
+                                    
+                                    downsampled_feature = downsampled_feature * resized_mask
+                                    downsampled_feature = downsampled_feature.view(num_patches, -1)
+
+                                    downsampled_feature = downsampled_feature[~torch.all(downsampled_feature == 0, dim=1)]
+                                    downsampled_features_list.append(downsampled_feature)
+                                downsampled_feature_cat = torch.cat(downsampled_features_list, dim=0)
+                                
+                                patches_per_side = self.get_vision_tower().num_patches_per_side
+                                stage0_feature = stage0_feature.view(patches_per_side, patches_per_side, -1)
+                                mask = image_mask[str(0)]
+                                resized_mask = torch.nn.functional.interpolate(mask.unsqueeze(0).unsqueeze(0), size=(patches_per_side, patches_per_side), mode='nearest')
                                 resized_mask = resized_mask.squeeze().unsqueeze(-1)
-                                
-                                downsampled_feature = downsampled_feature * resized_mask
-                                downsampled_feature = downsampled_feature.view(num_patches, -1)
-                                
-                                for f in downsampled_feature:
-                                    if f.min() == 0 and f.max() == 0: continue
-                                    downsampled_features_list.append(f.unsqueeze(0))
-                                
-                            
-                            patches_per_side = self.get_vision_tower().num_patches_per_side
-                            stage0_feature = stage0_feature.view(patches_per_side, patches_per_side, -1)
-                            mask = image_mask[0]
-                            resized_mask = torch.nn.functional.interpolate(mask.unsqueeze(0).unsqueeze(0), size=(patches_per_side, patches_per_side), mode='nearest')
-                            resized_mask = resized_mask.squeeze().unsqueeze(-1)
-                            stage0_feature = stage0_feature * resized_mask
-                            stage0_feature = stage0_feature.view(patches_per_side ** 2, -1)
-                            for f in stage0_feature:
-                                if f.min() == 0 and f.max() == 0: continue
-                                stage0_features_list.append(f.unsqueeze(0))
-                            
-                            patches_per_side = self.get_vision_tower().num_patches_per_side * 2
-                            stage1_feature = stage1_feature.view(patches_per_side, patches_per_side, -1)
-                            mask = image_mask[1]
-                            resized_mask = torch.nn.functional.interpolate(mask.unsqueeze(0).unsqueeze(0), size=(patches_per_side, patches_per_side), mode='nearest')
-                            resized_mask = resized_mask.squeeze().unsqueeze(-1)
-                            stage1_feature = stage1_feature * resized_mask
-                            stage1_feature = stage1_feature.view(patches_per_side ** 2, -1)
-                            for f in stage1_feature:
-                                if f.min() == 0 and f.max() == 0: continue
-                                stage1_features_list.append(f.unsqueeze(0))
-                            
-                            concat_list = []
-                            if len(downsampled_features_list) > 0:
-                                downsampled_features = torch.cat(downsampled_features_list, dim=0)
-                                concat_list.append(downsampled_features)
-                            if len(stage0_features_list) > 0:
-                                stage0_features = torch.cat(stage0_features_list, dim=0)
-                                concat_list.append(stage0_features)
-                            if len(stage1_features_list) > 0:
-                                stage1_features = torch.cat(stage1_features_list, dim=0)
-                                concat_list.append(stage1_features)
+                                stage0_feature = stage0_feature * resized_mask
+                                stage0_feature = stage0_feature.view(patches_per_side ** 2, -1)
+                                stage0_feature = stage0_feature[~torch.all(stage0_feature == 0, dim=1)]
 
-                            image_feature = torch.cat(concat_list, dim=0)
-                            image_feature = image_feature.type(torch.float16)
+                                patches_per_side = self.get_vision_tower().num_patches_per_side * 2
+                                stage1_feature = stage1_feature.view(patches_per_side, patches_per_side, -1)
+                                mask = image_mask[str(1)]
+                                resized_mask = torch.nn.functional.interpolate(mask.unsqueeze(0).unsqueeze(0), size=(patches_per_side, patches_per_side), mode='nearest')
+                                resized_mask = resized_mask.squeeze().unsqueeze(-1)
+                                stage1_feature = stage1_feature * resized_mask
+                                stage1_feature = stage1_feature.view(patches_per_side ** 2, -1)
+                                stage1_feature = stage1_feature[~torch.all(stage1_feature == 0, dim=1)]
+
+                                # image_feature = torch.cat(concat_list, dim=0)
+                                # image_feature = torch.cat((downsampled_feature_cat, stage0_feature, stage1_feature), dim=0)
+                                # print("!!!llava_arch shape!!!", downsampled_feature_cat.shape, stage0_feature.shape, stage1_feature.shape)
+                                image_feature = torch.cat((downsampled_feature_cat, stage0_feature, stage1_feature), dim=0)
+                                image_feature = image_feature.type(torch.float16)
+                            else:
+                                for downsampled_feature, stage in zip(encoded_downsampled_image_features, stages):
+                                    _, num_patches, _ = downsampled_feature.shape
+                                    patch_per_side = int(math.sqrt(num_patches))
+                                    downsampled_feature = downsampled_feature.squeeze().view(patch_per_side, patch_per_side, -1)
+                                    downsampled_feature = downsampled_feature.view(num_patches, -1)
+                                    downsampled_features_list.append(downsampled_feature)
+                                downsampled_feature_cat = torch.cat(downsampled_features_list, dim=0)
+                                
+                                patches_per_side = self.get_vision_tower().num_patches_per_side
+                                stage0_feature = stage0_feature.view(patches_per_side, patches_per_side, -1)
+                                stage0_feature = stage0_feature.view(patches_per_side ** 2, -1)
+                                
+                                patches_per_side = self.get_vision_tower().num_patches_per_side * 2
+                                stage1_feature = stage1_feature.view(patches_per_side, patches_per_side, -1)
+                                stage1_feature = stage1_feature.view(patches_per_side ** 2, -1)
+
+                                image_feature = torch.cat((downsampled_feature_cat, stage0_feature, stage1_feature), dim=0)
+                                image_feature = image_feature * image_mask
+                                image_feature = image_feature.type(torch.float16)
 
                         new_image_features.append(image_feature)
                     

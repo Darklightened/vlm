@@ -60,7 +60,9 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
 
         self.model = LlavaLlamaModel(config)
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
-        # Initialize weights and apply final processing
+        self.model.image_mask_tensor = nn.Parameter(torch.ones(3060, 1, device=self.device, requires_grad=True))  
+
+# Initialize weights and apply final processing
         self.post_init()
 
     def get_model(self):
@@ -119,7 +121,7 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
                 return_dict=return_dict,
             )
 
-    @torch.no_grad()
+    @torch.enable_grad()
     def generate(
         self,
         inputs: Optional[torch.Tensor] = None,
@@ -144,7 +146,7 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
         else:
             inputs_embeds = self.get_model().embed_tokens(inputs)
 
-        return super().generate(position_ids=position_ids, attention_mask=attention_mask, inputs_embeds=inputs_embeds, **kwargs)
+        return super().generate.__wrapped__(self, position_ids=position_ids, attention_mask=attention_mask, inputs_embeds=inputs_embeds, **kwargs)
 
     def prepare_inputs_for_generation(self, input_ids, past_key_values=None, inputs_embeds=None, **kwargs):
         images = kwargs.pop("images", None)
@@ -153,6 +155,7 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
         if images is not None:
             inputs["images"] = images
         if image_sizes is not None:
+            
             inputs["image_sizes"] = image_sizes
         return inputs
 
