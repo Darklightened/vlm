@@ -174,8 +174,9 @@ def TTA_recursion(attn, attn_threshold=0.1, image_mask=None):
         torch.Tensor: Updated image mask.
     """
     diff = attn - attn_threshold  
-    image_mask = torch.sigmoid(100 * diff) 
-    nonzero_indices = torch.nonzero(image_mask, as_tuple=True)
-    nonzero_values = image_mask[str(nonzero_indices)]
+    image_mask = torch.sigmoid(1000000 * diff) 
+    image_mask = nn.Parameter(torch.sigmoid(1000000 * diff).requires_grad_())
+    # nonzero_indices = torch.nonzero(image_mask, as_tuple=True)
+    # nonzero_values = image_mask[str(nonzero_indices)]
 
     return image_mask

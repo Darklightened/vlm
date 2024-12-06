@@ -268,8 +268,7 @@ class Llava(lmms):
         
         
         # 만약 n 스테이지라면 다르게 초기화 해야할 것 같긴 합니다.
-        self.learnable_attn_threshold = nn.Parameter(torch.tensor([0.5], requires_grad=True, device=device))
-        print(self.learnable_attn_threshold)
+        self.model.learnable_attn_threshold = nn.Parameter(torch.tensor([0.5], requires_grad=True, device=device))
 
         ##################################################################################
         ## init downsampled vision towers
@@ -289,8 +288,13 @@ class Llava(lmms):
         self.image_size = self.model.model.vision_tower.vision_tower.vision_model.embeddings.image_size
         self.smallest_grid_size = int(self.image_size * pow(2, stages[0]) // self.patch_size)
         self.largest_grid_size = int(self.image_size * pow(2, stages[-1]) // self.patch_size)                
-        # self.model.image_mask_tensor = nn.Parameter(torch.ones(3060, 1, device=self.device, requires_grad=True))  
-        self.reset_image_mask()
+        # self.model.image_mask_tensor = nn.Parameter(torch.ones(3060, 1, device=self.device, requires_grad=False))
+        temp_tensor = torch.cat([torch.ones(36, 1), torch.zeros(3060 - 36, 1)], dim=0)
+        temp_tensor = temp_tensor.to(device = self.device)
+        temp_tensor.requires_grad = True
+        self.model.image_mask_tensor = nn.Parameter(temp_tensor, requires_grad=True)
+        
+        # self.reset_image_mask()
         ## downsampled vision tower end
         ##################################################################################
 
@@ -504,7 +508,7 @@ class Llava(lmms):
         for idx_chunk, chunk in enumerate(chunks):
             
             ## reset image mask and pad mask
-            self.reset_image_mask()
+            # self.reset_image_mask()
             
             contexts, all_gen_kwargs, doc_to_visual, doc_id, task, split = zip(*chunk)
             task = task[0]
@@ -527,7 +531,7 @@ class Llava(lmms):
                         # squared_img.save("./test.png")
                         # exit()
                         temp_list.append(squared_img)
-                        self.set_pad_mask(bounding_x, bounding_y)
+                        # self.set_pad_mask(bounding_x, bounding_y)
                     else:
                         squared_img, _, _ = self.make_square(visual, min_size=360, smallest_grid_size=self.smallest_grid_size)
                         temp_list.append(squared_img)
@@ -623,12 +627,6 @@ class Llava(lmms):
             
             ## main generation part
             # try:
-            mini = self.image_mask["0"].min().item()
-            maxi = self.image_mask["0"].max().item()
-            meani = self.image_mask["0"].mean().item()
-            print(f"mask min : {mini}")
-            print(f"mask max : {maxi}")
-            print(f"mask mean : {meani}")
             if "recursion" in self.generation_type:
                 
                 ## TEMP Settings ##################
@@ -642,22 +640,25 @@ class Llava(lmms):
                 ####################################
                 
                 if self.optimize_threshold and idx_chunk < self.batch * self.num_iterations: # START TTA 
-                    optimizer = optim.Adam([self.learnable_attn_threshold], lr=self.learning_rate)
+                    # Test-time adaptation to maximize confidence
+                    for name, param in self.model.named_parameters():
+                        param.requires_grad = False  # Freeze all parameters
+                    for name, param in self.model.model.named_parameters():
+                        param.requires_grad = False  # Freeze all parameters
+                    self.model.learnable_attn_threshold.requires_grad = False
+                    # self.image_mask.requires_grad = False
+                    # for name, param in self.image_mask.named_parameters():
+                    #     param.requires_grad = False
+                    self.model.image_mask_tensor.requires_grad = True
+
+                    # print(self.image_mask.named_parameters())
+                    # optimizer = optim.Adam([self.model.learnable_attn_threshold, self.model.image_mask_tensor], lr=self.learning_rate)
+                    optimizer = optim.Adam([self.model.image_mask_tensor], lr=self.learning_rate)
                     optimizer.zero_grad()
+                        
                     for stage in self.stages:
                         last_stage = stage == self.stages[-1]
-                        
-                        # Test-time adaptation to maximize confidence
-                        for name, param in self.model.named_parameters():
-                            param.requires_grad = False  # Freeze all parameters
-                        for name, param in self.model.model.named_parameters():
-                            param.requires_grad = False  # Freeze all parameters
-                        
                         ### 이유는 모르겠으나, image_mask의 grad를 풀어주어야 output score의 grad_fn이 잡힘...
-                        # self.image_mask.requires_grad = False
-                        # for name, param in self.image_mask.items():
-                        #     # print(param)
-                        #     param.requires_grad = False
 
                         # TODO generate subset of data
                         cont = self.model.generate(
@@ -674,37 +675,58 @@ class Llava(lmms):
                             use_cache=self.use_cache,
                             generation_type=self.generation_type,
                             return_dict_in_generate=True,
-                            output_attentions=not last_stage,
+                            output_attentions=False,
                             output_scores=True,
                             downsampled_images = downsampled_image_tensors,
-                            image_mask = self.image_mask
+                            image_mask = self.model.image_mask_tensor
                         )
+                        # print(f"stage-2 :", self.image_mask["-2"].grad_fn)
+                        print(f"image_mask_tensor :", self.model.image_mask_tensor.grad_fn)
+                        # exit()
                             
                         scores = cont["scores"]
                         print("!!!scores_grad_fn!!!", scores[0].grad_fn)
+                        # print(f"stage", stage, " :", self.image_mask[str(stage)].grad_fn)
                         # exit()
                         sequences = cont["sequences"][0]
                         text_outputs = self.tokenizer.batch_decode(cont['sequences'], skip_special_tokens=True)
                         
-                        if last_stage: 
+                        if stage == -2: 
                             # if (idx_chunk + 1) % self.batch == 0:
-                            if True:
-                                loss = 1 - self.conf_sum / self.conf_cnt
-                                loss.backward()
-                                optimizer.step()
-                                self.conf_sum = 0
-                                self.conf_len = 0
-                                
-                                print(f"Iteration {idx_chunk // self.batch}/{self.num_iterations}, Loss: {loss.item()}")
-                                print(f"Iteration {idx_chunk // self.batch}/{self.num_iterations}")
-                                mini = self.image_mask["-2"].min()
-                                maxi = self.image_mask["-2"].max()
-                                meani = self.image_mask["-2"].mean()
-                                print(self.learnable_attn_threshold)
-                                print(self.learnable_attn_threshold.grad_fn)
-                                print(f"mask min : {mini.item()}")
-                                print(f"mask max : {maxi.item()}")
-                                exit()
+                            _, _, cumulative_confidences = calculate_entropy_and_all_confidences(
+                            sequences, scores = scores)
+                            # Loss to maximize confidence
+                            stage_loss = sum(cumulative_confidences) / len(cumulative_confidences)
+                            print(f"Stage_loss grad_fn: {stage_loss.grad_fn}")
+                            
+                            '''
+                            TODO
+                            여기에서 topk기반으로는 learnable_attn_threshold의 grad_fn이 끊김.
+                            '''
+                            self.conf_sum += stage_loss
+                            self.conf_cnt += 1
+                            
+                            loss = 1 - stage_loss
+                            loss.backward()
+                            optimizer.step()
+                            self.conf_sum = 0
+                            self.conf_len = 0
+                            
+                            print(f"Iteration {idx_chunk // self.batch}/{self.num_iterations}, Loss: {loss.item()}")
+                            print(f"Iteration {idx_chunk // self.batch}/{self.num_iterations}")
+                            mini = self.model.image_mask_tensor.min()
+                            maxi = self.model.image_mask_tensor.max()
+                            meani = self.model.image_mask_tensor.mean()
+                            print(self.model.learnable_attn_threshold)
+                            print(self.model.learnable_attn_threshold.grad_fn)
+                            print(self.model.image_mask_tensor.grad_fn)
+                            print(f"mask min : {mini.item()}")
+                            print(f"mask max : {maxi.item()}")
+                            # print(f"stage-2 :", self.image_mask["-2"].grad_fn)
+                            # print(f"stage-1 :", self.image_mask["-1"].grad_fn)
+                            # print(f"stage 0 :", self.image_mask["0"].grad_fn)
+                            # print(f"stage 1 :", self.image_mask["1"].grad_fn)
+                            exit()
                                 
                             del cont
                         
@@ -722,26 +744,15 @@ class Llava(lmms):
                                         attn_norm=self.attn_norm,
                                     )
 
-                        self.image_mask[str(stage+1)] = layer_mean_topk_based_recursion(attn = ret_attn,
-                        top_k = self.learnable_attn_threshold,
-                        image_mask = self.image_mask[str(stage+1)])
-                        # self.image_mask[str(stage+1)] = TTA_recursion(attn = ret_attn, # select token index
-                        # attn_threshold = self.learnable_attn_threshold, ### IMPORTANT TODO : Gradient error debugging
+                        # self.image_mask[str(stage+1)] = layer_mean_topk_based_recursion(attn = ret_attn,
+                        # top_k = self.learnable_attn_threshold,
                         # image_mask = self.image_mask[str(stage+1)])
-
-                        _, _, cumulative_confidences = calculate_entropy_and_all_confidences(
-                        sequences, scores = scores)
-                        # Loss to maximize confidence
-                        stage_loss = sum(cumulative_confidences) / len(cumulative_confidences)
-                        print(f"Stage_loss grad_fn: {stage_loss.grad_fn}")
+                        self.image_mask[str(stage+1)] = TTA_recursion(attn = ret_attn, # select token index
+                        attn_threshold = self.model.learnable_attn_threshold, ### IMPORTANT TODO : Gradient error debugging
+                        image_mask = self.image_mask[str(stage+1)]).to(device=self.device)
                         
-                        '''
-                        TODO
-                        여기에서 topk기반으로는 learnable_attn_threshold의 grad_fn이 끊김.
-                        '''
-                        print(f"target: {self.learnable_attn_threshold.grad_fn}")
-                        self.conf_sum += stage_loss
-                        self.conf_cnt += 1
+                        print(f"target: {self.model.learnable_attn_threshold.grad_fn}")
+
                         del cont
                     
                         
@@ -857,9 +868,9 @@ class Llava(lmms):
         for idx, stage in enumerate(self.stages):
             if idx == 0:
                 # activate every token of the first stage
-                self.image_mask[str(stage)] = nn.Parameter(torch.ones(self.largest_grid_size, self.largest_grid_size, device=self.device, requires_grad=False, dtype=torch.float16))        
+                self.image_mask[str(stage)] = nn.Parameter(torch.ones(self.largest_grid_size, self.largest_grid_size, device=self.device, requires_grad=True, dtype=torch.float16))        
             else:
-                self.image_mask[str(stage)] = nn.Parameter(torch.zeros(self.largest_grid_size, self.largest_grid_size, device=self.device, requires_grad=False, dtype=torch.float16))
+                self.image_mask[str(stage)] = nn.Parameter(torch.zeros(self.largest_grid_size, self.largest_grid_size, device=self.device, requires_grad=True, dtype=torch.float16))
               
         self.pad_mask = torch.ones(self.largest_grid_size, self.largest_grid_size, device=self.device)
     
