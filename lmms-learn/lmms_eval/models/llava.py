@@ -696,6 +696,7 @@ class Llava(lmms):
                             _, _, cumulative_confidences = calculate_entropy_and_all_confidences(
                             sequences, scores = scores)
                             # Loss to maximize confidence
+                            
                             stage_loss = sum(cumulative_confidences) / len(cumulative_confidences)
                             print(f"Stage_loss grad_fn: {stage_loss.grad_fn}")
                             
@@ -774,7 +775,7 @@ class Llava(lmms):
                         # output_attentions=True,
                         # output_scores=True,
                         downsampled_images = downsampled_image_tensors,
-                        image_mask = self.image_mask
+                        image_mask = self.model.image_mask_tensor
                     )
                     
                     ## delete sos

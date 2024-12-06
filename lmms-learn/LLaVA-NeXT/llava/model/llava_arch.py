@@ -519,17 +519,9 @@ class LlavaMetaForCausalLM(ABC):
                                 stage1_feature = stage1_feature.view(patches_per_side ** 2, -1)
 
                                 image_feature = torch.cat((downsampled_feature_cat, stage0_feature, stage1_feature), dim=0)
-                                # image_feature = image_feature[torch.all(image_mask > 0.5, dim=1)]
-                                # image_feature = image_feature * image_mask
-                                mask = torch.where(image_mask > 0.5, torch.tensor(1.0, requires_grad=True), torch.tensor(0.0, requires_grad=True))
-                                # mask = torch.any(mask >= 1, dim=1)
-                                # print(mask.shape)
-                                # print(mask.grad_fn)
-                                image_feature = image_feature * mask.unsqueeze(-1)
-                                # print(image_feature.shape)
-                                # print(image_feature.grad_fn)
-                                # print(image_mask.grad_fn)
-                                # exit()
+                                image_feature = image_feature * image_mask
+                                # mask = torch.any(image_mask >= 1, dim=1)
+                                # image_feature = image_feature * mask.unsqueeze(-1).float()
                                 image_feature = image_feature.type(torch.float16)
 
                         new_image_features.append(image_feature)
