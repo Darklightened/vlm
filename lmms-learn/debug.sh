@@ -24,14 +24,16 @@ python3 -m accelerate.commands.launch \
     --output_path ./logs/ \
     --generation_type recursion \
     --fix_grid 2x2 \
-    --attention_thresholding_type layer_mean_topk \
-    --attention_threshold "0.3" \
+    --attention_thresholding_type layer_mean \
+    --attention_threshold "[0.3,0.3,0.3]" \
     --positional_embedding_type bilinear_interpolation \
     --remove_unpadding True \
     --attn_norm norm_relu \
     --stages "-2" "-1" "0" "1" \
     --verbosity DEBUG \
     --square 1 \
+    --tta_learning_rate 1e-03 \
+    --tta_n_iter 40 \
     # --wandb_args "project=llava1.6_recursive_eval_1126,entity=VLM_Hallucination_Woohyeon,name=tta-train-mask" \
     # --visualize_heatmap False \
     # --save_output True \

@@ -122,8 +122,10 @@ class Llava(lmms):
         target_token_selection_strategy="first",
         stages=[-1, 0, 1],
         positional_embedding_type="reduced",
-        visualize_heatmap=False,
+        visualize_heatmap=False,        
         square=1,
+        tta_learning_rate=1e-03,
+        tta_n_iter=40,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -208,6 +210,8 @@ class Llava(lmms):
         self.positional_embedding_type = positional_embedding_type
         self.visualize_heatmap = visualize_heatmap
         self.square = square
+        self.learning_rate = tta_learning_rate
+        self.tta_n_iter = tta_n_iter
 
         print(f"device: {device}")
         print(f"generation_type: {generation_type}")
@@ -294,7 +298,7 @@ class Llava(lmms):
         # temp_tensor.requires_grad = True
         # self.model.image_mask_tensor = nn.Parameter(temp_tensor, requires_grad=True)
         
-        self.model.learnable_attn_threshold = nn.Parameter(torch.tensor([0.5, 0.5, 0.5], device=self.device, requires_grad=True))
+        self.model.learnable_attn_threshold = nn.Parameter(torch.tensor(self.attention_threshold, device=self.device, requires_grad=True))
         self.reset_image_mask()
         ## downsampled vision tower end
         ##################################################################################
@@ -633,15 +637,15 @@ class Llava(lmms):
                 
                 ## TEMP Settings ##################
                 self.optimize_threshold = True
-                self.learning_rate = 1e-2
-                self.batch = 4
-                self.num_iterations = 10
+                # self.learning_rate = 1e-2
+                # self.batch = 4
+                # self.num_iterations = 10
                 self.last_conf = 0
                 self.conf_sum = 0
                 self.conf_cnt = 0
                 ####################################
                 
-                if self.optimize_threshold and idx_chunk < self.batch * self.num_iterations: # START TTA 
+                if self.optimize_threshold and idx_chunk < self.tta_n_iter: # START TTA 
                     # Test-time adaptation to maximize confidence
                     for name, param in self.model.named_parameters():
                         param.requires_grad = False  # Freeze all parameters

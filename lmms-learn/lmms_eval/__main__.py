@@ -265,7 +265,9 @@ def parse_eval_args() -> argparse.Namespace:
         help="Sets trust_remote_code to True to execute code to create HF Datasets from the Hub",
     )
 
-    ## llava recursive generation
+    ########## llava recursive generation ###########
+    #################################################
+    
     parser.add_argument(
         "--generation_type",
         type=str,
@@ -387,6 +389,18 @@ def parse_eval_args() -> argparse.Namespace:
         type=int,
         default=1,
         help="square - int, 1: center, 2: oneside",
+    )
+    parser.add_argument(
+        "--tta_learning_rate",
+        type=float,
+        default=1e-03,
+        help="learning rate for tta",
+    )
+    parser.add_argument(
+        "--tta_n_iter",
+        type=int,
+        default=40,
+        help="number of iterations for tta",
     )
 
 

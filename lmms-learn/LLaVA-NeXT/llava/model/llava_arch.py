@@ -507,7 +507,7 @@ class LlavaMetaForCausalLM(ABC):
 
                                 # image_feature = torch.cat(concat_list, dim=0)
                                 # image_feature = torch.cat((downsampled_feature_cat, stage0_feature, stage1_feature), dim=0)
-                                print("!!!llava_arch shape!!!", downsampled_feature_cat.shape, stage0_feature.shape, stage1_feature.shape)
+                                # print("!!!llava_arch shape!!!", downsampled_feature_cat.shape, stage0_feature.shape, stage1_feature.shape)
                                 image_feature = torch.cat((downsampled_feature_cat, stage0_feature, stage1_feature), dim=0)
                                 image_feature = image_feature.type(torch.float16)
                             else:
