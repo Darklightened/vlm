@@ -28,7 +28,7 @@ python3 -m accelerate.commands.launch \
     --attention_threshold "0.3" \
     --positional_embedding_type bilinear_interpolation \
     --remove_unpadding True \
-    --attn_norm None \
+    --attn_norm norm_relu \
     --stages "-2" "-1" "0" "1" \
     --verbosity DEBUG \
     --square 1 \

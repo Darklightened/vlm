@@ -460,21 +460,24 @@ class LlavaMetaForCausalLM(ABC):
                             # 1. interpolate mask to encoded size,
                             # 2. elementwise multiplication,
                             # 3. insert only non-zero features to list.
-                            if type(image_mask) is nn.ParameterDict:
+                            
+                            # if type(image_mask) is nn.ParameterDict:
+                            if type(image_mask) is nn.ParameterDict or dict:
                                 for downsampled_feature, stage in zip(encoded_downsampled_image_features, stages):
                                     mask = image_mask[str(stage)]
                                     _, num_patches, _ = downsampled_feature.shape
                                     patch_per_side = int(math.sqrt(num_patches))
 
                                     resized_mask = torch.nn.functional.interpolate(mask.unsqueeze(0).unsqueeze(0), size=(patch_per_side, patch_per_side), mode='nearest')
-                                    resized_mask = resized_mask.squeeze().unsqueeze(-1)
-
+                                    resized_mask = resized_mask.squeeze(0).squeeze(0).unsqueeze(-1) 
                                     downsampled_feature = downsampled_feature.squeeze().view(patch_per_side, patch_per_side, -1)
-                                    
-                                    downsampled_feature = downsampled_feature * resized_mask
+                                    downsampled_feature = downsampled_feature.clone() * resized_mask
                                     downsampled_feature = downsampled_feature.view(num_patches, -1)
-
-                                    downsampled_feature = downsampled_feature[~torch.all(downsampled_feature == 0, dim=1)]
+                                    
+                                    mask = torch.any(downsampled_feature != 0, dim=-1)
+                                    downsampled_feature = downsampled_feature[mask]
+                                    # downsampled_feature = downsampled_feature[~torch.all(downsampled_feature == 0, dim=1)]
+                                    
                                     downsampled_features_list.append(downsampled_feature)
                                 downsampled_feature_cat = torch.cat(downsampled_features_list, dim=0)
                                 
@@ -482,23 +485,29 @@ class LlavaMetaForCausalLM(ABC):
                                 stage0_feature = stage0_feature.view(patches_per_side, patches_per_side, -1)
                                 mask = image_mask[str(0)]
                                 resized_mask = torch.nn.functional.interpolate(mask.unsqueeze(0).unsqueeze(0), size=(patches_per_side, patches_per_side), mode='nearest')
-                                resized_mask = resized_mask.squeeze().unsqueeze(-1)
-                                stage0_feature = stage0_feature * resized_mask
+                                resized_mask = resized_mask.squeeze(0).squeeze(0).unsqueeze(-1)
+                                stage0_feature = stage0_feature.clone() * resized_mask
                                 stage0_feature = stage0_feature.view(patches_per_side ** 2, -1)
-                                stage0_feature = stage0_feature[~torch.all(stage0_feature == 0, dim=1)]
-
+                                
+                                mask = torch.any(stage0_feature != 0, dim=-1)
+                                stage0_feature = stage0_feature[mask]
+                                # stage0_feature = stage0_feature[~torch.all(stage0_feature == 0, dim=1)]
+                                
                                 patches_per_side = self.get_vision_tower().num_patches_per_side * 2
                                 stage1_feature = stage1_feature.view(patches_per_side, patches_per_side, -1)
                                 mask = image_mask[str(1)]
                                 resized_mask = torch.nn.functional.interpolate(mask.unsqueeze(0).unsqueeze(0), size=(patches_per_side, patches_per_side), mode='nearest')
-                                resized_mask = resized_mask.squeeze().unsqueeze(-1)
-                                stage1_feature = stage1_feature * resized_mask
+                                resized_mask = resized_mask.squeeze(0).squeeze(0).unsqueeze(-1)
+                                stage1_feature = stage1_feature.clone() * resized_mask
                                 stage1_feature = stage1_feature.view(patches_per_side ** 2, -1)
-                                stage1_feature = stage1_feature[~torch.all(stage1_feature == 0, dim=1)]
+                                
+                                mask = torch.any(stage1_feature != 0, dim=-1)
+                                stage1_feature = stage1_feature[mask]
+                                # stage1_feature = stage1_feature[~torch.all(stage1_feature == 0, dim=1)]
 
                                 # image_feature = torch.cat(concat_list, dim=0)
                                 # image_feature = torch.cat((downsampled_feature_cat, stage0_feature, stage1_feature), dim=0)
-                                # print("!!!llava_arch shape!!!", downsampled_feature_cat.shape, stage0_feature.shape, stage1_feature.shape)
+                                print("!!!llava_arch shape!!!", downsampled_feature_cat.shape, stage0_feature.shape, stage1_feature.shape)
                                 image_feature = torch.cat((downsampled_feature_cat, stage0_feature, stage1_feature), dim=0)
                                 image_feature = image_feature.type(torch.float16)
                             else:
@@ -522,6 +531,7 @@ class LlavaMetaForCausalLM(ABC):
                                 image_feature = image_feature * image_mask
                                 # mask = torch.any(image_mask >= 1, dim=1)
                                 # image_feature = image_feature * mask.unsqueeze(-1).float()
+                                print("222llava_arch shape222", downsampled_feature_cat.shape, stage0_feature.shape, stage1_feature.shape)
                                 image_feature = image_feature.type(torch.float16)
 
                         new_image_features.append(image_feature)

@@ -7,6 +7,16 @@ import torch.nn.functional as F
 import csv
 from pathlib import Path
 
+
+class BinarizeWithSTE(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, input):
+        return torch.round(input) 
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        return grad_output 
+
 def calculate_entropy_for_attn_threshold(attn_map):
     flattened_attn = attn_map.view(-1)
     flattened_attn = flattened_attn / flattened_attn.sum()
@@ -173,10 +183,19 @@ def TTA_recursion(attn, attn_threshold=0.1, image_mask=None):
     Returns:
         torch.Tensor: Updated image mask.
     """
-    diff = attn - attn_threshold  
-    image_mask = torch.sigmoid(1000000 * diff) 
-    image_mask = nn.Parameter(torch.sigmoid(1000000 * diff).requires_grad_())
-    # nonzero_indices = torch.nonzero(image_mask, as_tuple=True)
-    # nonzero_values = image_mask[str(nonzero_indices)]
-
+    # diff = attn - attn_threshold  # learnable_attn_threshold와 연산
+    # print(attn.max())
+    # print(attn.min())
+    # print(attn.mean())
+    # exit()
+    temp = torch.ones_like(attn) * attn_threshold
+    diff = attn - temp  # learnable_attn_threshold와 연산
+    print("Inside TTA Recursion attn_threshold requires_grad:", attn_threshold.requires_grad)
+    print("Inside TTA Recursion attn_threshold grad_fn before sigmoid:", attn_threshold.grad_fn)
+    print("Inside TTA Recursion diff grad_fn:", diff.grad_fn) 
+    print("Inside TTA Recursion diff grad_fn:", attn.grad_fn) 
+    image_mask = image_mask.clone()
+    image_mask = torch.sigmoid(100 * diff)  
+    image_mask = BinarizeWithSTE.apply(image_mask)
+    print("Inside TTA Recursion image_mask grad_fn:", image_mask.grad_fn)
     return image_mask

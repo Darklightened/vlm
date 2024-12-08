@@ -18,6 +18,15 @@ import matplotlib.pyplot as plt
 from torchvision.transforms import ToPILImage
 from matplotlib import cm
 
+class BinarizeWithSTE(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, input):
+        return torch.round(input) 
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        return grad_output 
+    
 def init_downsampled_vision_towers(vision_tower, stages, positional_embedding_type, device):
     print(f"change positional embedding to {positional_embedding_type}")
     downsampled_vision_towers = torch.nn.ModuleDict()
@@ -501,19 +510,18 @@ def aggregate_llm_attention(attn):
         vec = torch.concat((
             # We zero the first entry because it's what's called
             # null attention (https://aclanthology.org/W19-4808.pdf)
-            torch.tensor([0.]),
+            torch.tensor([0.], device=layer.device),
             # usually there's only one item in attns_per_head but
             # on the first generation, there's a row for each token
             # in the prompt as well, so take [-1]
-            attns_per_head[-1][1:].cpu(),
+            attns_per_head[-1][1:],
             # attns_per_head[-1].cpu(),
             # add zero for the final generated token, which never
             # gets any attention
-            torch.tensor([0.]),
+            torch.tensor([0.], device=layer.device),
         ))
         avged.append(vec / vec.sum())
-    
-    #print(f"Aggregated attention shape: {torch.stack(avged).mean(dim=0).shape}")
+
     return torch.stack(avged).mean(dim=0)
 
 def aggregate_llm_attention_single_layer(layer):
@@ -552,22 +560,22 @@ def aggregate_vit_attention(attn, select_layer=-2, all_prev_layers=True):
                 break
             layer_attns = layer.squeeze(0)
             attns_per_head = layer_attns.mean(dim=0)
-            vec = attns_per_head[1:, 1:].cpu() # the first token is <CLS>
+            vec = attns_per_head[1:, 1:] # the first token is <CLS>
             avged.append(vec / vec.sum(-1, keepdim=True))
-        return torch.stack(avged).mean(dim=0)
+        return torch.stack(avged).mean(dim=0).to(device=layer.device)
     else:
         layer = attn[select_layer]
         layer_attns = layer.squeeze(0)
         attns_per_head = layer_attns.mean(dim=0)
-        vec = attns_per_head[1:, 1:].cpu()
-        return vec / vec.sum(-1, keepdim=True)
+        vec = attns_per_head[1:, 1:]
+        return vec / vec.sum(-1, keepdim=True).to(device=layer.device)
 
 
 def heterogenous_stack(vecs):
     '''Pad vectors with zeros then stack'''
     max_length = max(v.shape[0] for v in vecs)
     return torch.stack([
-        torch.concat((v, torch.zeros(max_length - v.shape[0])))
+        torch.concat((v, torch.zeros(max_length - v.shape[0], device=v.device)))
         for v in vecs
     ])
 
@@ -582,10 +590,9 @@ def show_mask_on_image(img, mask):
 
 ### Normalizing functions
 def norm_relu(ret_attn):
-    for i in range(len(ret_attn)):
-        temp = ret_attn[i] / ret_attn[i].max()
-        temp = torch.relu(temp)
-        ret_attn[i] = temp
+    temp = ret_attn / ret_attn.max()
+    temp = torch.relu(temp)
+    ret_attn = temp
     return ret_attn
 
 def norm_min_max(ret_attn):
@@ -614,19 +621,29 @@ def get_heatmap(
     
     # Constructing the LLM attention matrix
     aggregated_prompt_attention = []
+    # for i, layer in enumerate(outputs["attentions"][0]):
+    #     layer_attns = layer.squeeze(0)        
+    #     attns_per_head = layer_attns.mean(dim=0)
+    #     cur = attns_per_head[:-1]
+    #     cur[1:, 0] = 0.0
+    #     cur[1:] = cur[1:] / cur[1:].sum(-1, keepdim=True)
+    #     print(cur.shape)
+    #     aggregated_prompt_attention.append(cur)
     for i, layer in enumerate(outputs["attentions"][0]):
         layer_attns = layer.squeeze(0)        
         attns_per_head = layer_attns.mean(dim=0)
-        cur = attns_per_head[:-1].cpu().clone()
-        cur[1:, 0] = 0.0
-        cur[1:] = cur[1:] / cur[1:].sum(-1, keepdim=True)
-        aggregated_prompt_attention.append(cur)
+        cur = attns_per_head[:-1]
+        h, w = cur.shape
+        temp1 = cur[0].unsqueeze(0)
+        temp2 = torch.zeros((h - 1, 1), device=layer.device)
+        temp3 = cur[1:, 1:] / cur[1:, 1:].sum(dim=-1, keepdim=True)
+        aggregated_prompt_attention.append(torch.cat((temp1, torch.cat((temp2, temp3), dim=1)), dim=0))
     
-    aggregated_prompt_attention = torch.stack(aggregated_prompt_attention).mean(dim=0)    
+    aggregated_prompt_attention = torch.stack(aggregated_prompt_attention).mean(dim=0)
 
     # Constructing the LLM attention matrix
     llm_attn_matrix = heterogenous_stack(
-        [torch.tensor([1])]
+        [torch.tensor([1], device=model.device)]
         + list(aggregated_prompt_attention) 
         + list(map(aggregate_llm_attention, outputs["attentions"]))
     )    
@@ -636,9 +653,10 @@ def get_heatmap(
         mask_patches_per_side, _ = image_mask[str(stage)].shape
         mask_grid = int(mask_patches_per_side * pow(2, stage - max(stages)))
         mask = torch.nn.functional.interpolate(image_mask[str(stage)].unsqueeze(0).unsqueeze(0), size=(mask_grid, mask_grid), mode='nearest')
+        mask = BinarizeWithSTE.apply(mask)
         patches_in_stage = mask.sum().item()
         input_token_len += patches_in_stage
-    input_token_len += len(input_ids[0]) - 1 # -1 for the <image> token
+    input_token_len = input_token_len + len(input_ids[0]) - 1 # -1 for the <image> token
     input_token_len = int(input_token_len)
 
     output_token_len = len(outputs["sequences"][0])
@@ -663,6 +681,7 @@ def get_heatmap(
             grid_size *= 2
             
         used_token_list = torch.nn.functional.interpolate(image_mask[str(stage)].unsqueeze(0).unsqueeze(0), size=(grid_size, grid_size), mode='nearest').squeeze()
+        used_token_list = BinarizeWithSTE.apply(used_token_list)
         used_token_list = used_token_list.view(-1).tolist()
         
         if sum(used_token_list) == 0:
@@ -693,6 +712,7 @@ def get_heatmap(
             select_layer=vision_tower.select_layer,
             all_prev_layers=True
         )
+
         if stage == 1:
             vis_attn_matrix = F.interpolate(vis_attn_matrix.unsqueeze(0).unsqueeze(0), scale_factor=(2, 2), mode='bilinear', align_corners=True).squeeze()
             
@@ -701,6 +721,11 @@ def get_heatmap(
             target_token_ind = output_token_inds[i]        
             attn_weights_over_vis_tokens = llm_attn_matrix[target_token_ind][vision_token_start:vision_token_end]        
             attn_weights_over_vis_tokens = attn_weights_over_vis_tokens / attn_weights_over_vis_tokens.sum()
+            
+            # print("llm: ", llm_attn_matrix.shape)
+            # print("target_token_ind: ", target_token_ind)
+            # print("vision_token_start: ", vision_token_start)
+            # print("vision_token_end: ", vision_token_end)
             
             assert attn_weights_over_vis_tokens.shape[0] == sum(used_token_list), f"{stage},{attn_weights_over_vis_tokens.shape[0]},{sum(used_token_list)}"
 
@@ -760,7 +785,8 @@ def get_heatmap(
     ##### norm ####
     if attn_norm is not None:
         ret_attn = attn_norm(ret_attn)
-    
+        print(f'ret_attn: {ret_attn.shape}')
+        
     if image is not None and save_path is not None:
         for i in range(len(output_token_inds)):
             target_token_ind = output_token_inds[i] 

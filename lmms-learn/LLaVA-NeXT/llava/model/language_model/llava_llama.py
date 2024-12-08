@@ -61,6 +61,7 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
         self.model = LlavaLlamaModel(config)
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
         self.model.image_mask_tensor = nn.Parameter(torch.ones(3060, 1, device=self.device, requires_grad=True))  
+        # self.model.learnable_attn_threshold = nn.Parameter(torch.tensor(0.3, device=self.device, requires_grad=True))
 
 # Initialize weights and apply final processing
         self.post_init()
