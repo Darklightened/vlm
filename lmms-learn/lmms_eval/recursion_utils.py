@@ -190,12 +190,12 @@ def TTA_recursion(attn, attn_threshold=0.1, image_mask=None):
     # exit()
     temp = torch.ones_like(attn) * attn_threshold
     diff = attn - temp  # learnable_attn_threshold와 연산
-    print("Inside TTA Recursion attn_threshold requires_grad:", attn_threshold.requires_grad)
-    print("Inside TTA Recursion attn_threshold grad_fn before sigmoid:", attn_threshold.grad_fn)
-    print("Inside TTA Recursion diff grad_fn:", diff.grad_fn) 
-    print("Inside TTA Recursion diff grad_fn:", attn.grad_fn) 
+    # print("Inside TTA Recursion attn_threshold requires_grad:", attn_threshold.requires_grad)
+    # print("Inside TTA Recursion attn_threshold grad_fn before sigmoid:", attn_threshold.grad_fn)
+    # print("Inside TTA Recursion diff grad_fn:", diff.grad_fn) 
+    # print("Inside TTA Recursion diff grad_fn:", attn.grad_fn) 
     image_mask = image_mask.clone()
     image_mask = torch.sigmoid(100 * diff)  
     image_mask = BinarizeWithSTE.apply(image_mask)
-    print("Inside TTA Recursion image_mask grad_fn:", image_mask.grad_fn)
+    # print("Inside TTA Recursion image_mask grad_fn:", image_mask.grad_fn)
     return image_mask

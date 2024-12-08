@@ -294,7 +294,7 @@ class Llava(lmms):
         # temp_tensor.requires_grad = True
         # self.model.image_mask_tensor = nn.Parameter(temp_tensor, requires_grad=True)
         
-        self.model.learnable_attn_threshold = nn.Parameter(torch.tensor(0.1, device=self.device, requires_grad=True))
+        self.model.learnable_attn_threshold = nn.Parameter(torch.tensor([0.5, 0.5, 0.5], device=self.device, requires_grad=True))
         self.reset_image_mask()
         ## downsampled vision tower end
         ##################################################################################
@@ -633,7 +633,7 @@ class Llava(lmms):
                 
                 ## TEMP Settings ##################
                 self.optimize_threshold = True
-                self.learning_rate = 1e-4
+                self.learning_rate = 1e-2
                 self.batch = 4
                 self.num_iterations = 10
                 self.last_conf = 0
@@ -660,12 +660,12 @@ class Llava(lmms):
                     optimizer = optim.Adam([self.model.learnable_attn_threshold], lr=self.learning_rate)
                     optimizer.zero_grad()
                     
-                    for stage in self.stages:
+                    for idx, stage in enumerate(self.stages):
                         # print("Mask requires_grad:", self.image_mask[str(stage + 1)].requires_grad)
                         last_stage = stage == self.stages[-1]
                         ### 이유는 모르겠으나, image_mask의 grad를 풀어주어야 output score의 grad_fn이 잡힘...
-                        print(f"stage: {stage}")
-                        print("Before model.generate, image_mask grad_fn:", self.image_mask[str(stage)].grad_fn)
+                        #print(f"stage: {stage}")
+                        #print("Before model.generate, image_mask grad_fn:", self.image_mask[str(stage)].grad_fn)
 
                         # TODO generate subset of data
                         cont = self.model.generate(
@@ -697,10 +697,10 @@ class Llava(lmms):
                         sequences = cont["sequences"][0]
                         text_outputs = self.tokenizer.batch_decode(cont['sequences'], skip_special_tokens=True)
                         
-                        print(f"learnable_attn_threshold :", self.model.learnable_attn_threshold)
-                        print("Threshold grad_fn:", self.model.learnable_attn_threshold.grad_fn)
-                        print("Image Mask grad:", self.image_mask[str(stage)].grad_fn)
-                        print("Scores grad_fn:", scores[0].grad_fn)
+                        # print(f"learnable_attn_threshold :", self.model.learnable_attn_threshold)
+                        # print("Threshold grad_fn:", self.model.learnable_attn_threshold.grad_fn)
+                        # print("Image Mask grad:", self.image_mask[str(stage)].grad_fn)
+                        # print("Scores grad_fn:", scores[0].grad_fn)
                         
                         # if stage == -2: 
                         # if (idx_chunk + 1) % self.batch == 0:
@@ -709,7 +709,7 @@ class Llava(lmms):
                         # Loss to maximize confidence
                         
                         stage_loss = sum(cumulative_confidences) / len(cumulative_confidences)
-                        print(f"Stage_loss grad_fn: {stage_loss.grad_fn}")
+                        #print(f"Stage_loss grad_fn: {stage_loss.grad_fn}")
                         
                         '''
                         TODO
@@ -720,7 +720,7 @@ class Llava(lmms):
                         if last_stage:
                             del cont
                             final_conf = self.conf_sum / self.conf_cnt  
-                            print("Before loss.backward, image_mask grad_fn:", self.image_mask[str(stage)].grad_fn)
+                            #print("Before loss.backward, image_mask grad_fn:", self.image_mask[str(stage)].grad_fn)
                             loss = 1 - final_conf
                             self.image_mask["-2"] = self.image_mask["-2"].detach()  
                             self.image_mask["-1"] = self.image_mask["-1"].detach()  
@@ -728,9 +728,10 @@ class Llava(lmms):
                             self.image_mask["1"] = self.image_mask["1"].detach()  
                             # self.model.learnable_attn_threshold = nn.Parameter(self.model.learnable_attn_threshold.detach())
                             loss.backward()
+                            print(f"final grad: {self.model.learnable_attn_threshold.grad}")
                             optimizer.step()
 
-                            print(f"Final Iteration Loss: {self.model.learnable_attn_threshold}")
+                            print(f"Final threshold: {self.model.learnable_attn_threshold}")
                             print(f"Final Iteration Loss: {loss.item()}")
 
                             self.conf_sum = 0
@@ -752,103 +753,80 @@ class Llava(lmms):
                             )
 
                             # TTA_recursion 적용
-                            print(f"Before TTA, next image_mask grad_fn:", self.image_mask[str(stage + 1)].grad_fn)
-                            print("Before TTA Recursion, attn_threshold grad_fn:", self.model.learnable_attn_threshold.grad_fn)
-                            print("Before TTA Recursion, attn_threshold requires_grad:", self.model.learnable_attn_threshold.requires_grad)
+                            # print(f"Before TTA, next image_mask grad_fn:", self.image_mask[str(stage + 1)].grad_fn)
+                            # print("Before TTA Recursion, attn_threshold grad_fn:", self.model.learnable_attn_threshold.grad_fn)
+                            # print("Before TTA Recursion, attn_threshold requires_grad:", self.model.learnable_attn_threshold.requires_grad)
+                            # print(f"ret_attn: {ret_attn}")
+                            # print(f"ret_attn min: {torch.min(ret_attn)}")
+                            # print(f"ret_attn max: {torch.max(ret_attn)}")
+                            # print(f"ret_attn has NaN: {ret_attn.isnan().any()}")
                             
                             ##### TTA_Recursion #######################################
                             self.image_mask[str(stage + 1)] = TTA_recursion(
                                 attn=ret_attn,
-                                attn_threshold=self.model.learnable_attn_threshold,
+                                attn_threshold=self.model.learnable_attn_threshold[idx],
+                                image_mask=self.image_mask[str(stage + 1)]
+                            ).to(device=self.device)
+                else:                    
+                    self.model.learnable_attn_threshold.requires_grad = False                        
+                        
+                    for idx, stage in enumerate(self.stages):                        
+                        last_stage = stage == self.stages[-1]
+                        #print(f"stage: {stage}")                        
+
+                        # TODO generate subset of data
+                        cont = self.model.generate(
+                            input_ids,
+                            attention_mask=attention_masks,
+                            pad_token_id=pad_token_ids,
+                            images=image_tensor,
+                            image_sizes=gen_kwargs["image_sizes"],
+                            do_sample=True if gen_kwargs["temperature"] > 0 else False,
+                            temperature=gen_kwargs["temperature"],
+                            top_p=gen_kwargs["top_p"],
+                            num_beams=gen_kwargs["num_beams"],
+                            max_new_tokens=gen_kwargs["max_new_tokens"],
+                            use_cache=self.use_cache,
+                            generation_type=self.generation_type,
+                            return_dict_in_generate=True,
+                            output_attentions=True,
+                            output_scores=True,
+                            downsampled_images = downsampled_image_tensors,
+                            image_mask = self.image_mask
+                        )
+                       
+                        scores = cont["scores"]
+                        sequences = cont["sequences"][0]
+                        text_outputs = self.tokenizer.batch_decode(cont['sequences'], skip_special_tokens=True)
+                        
+                        _, _, cumulative_confidences = calculate_entropy_and_all_confidences(
+                        sequences, scores = scores)                        
+                       
+                        if last_stage:
+                            pass
+                        else:                            
+                            ret_attn = get_heatmap(
+                                self.model,
+                                cont,
+                                self.tokenizer,
+                                question_input[0],
+                                input_ids,
+                                stage,
+                                self.stages,
+                                self.image_mask,
+                                select_token=None,
+                                image=flattened_visuals[0],
+                                attn_norm=self.attn_norm,
+                            ) 
+                            #print(f"ret_attn has NaN: {ret_attn.isnan().any()}")                           
+                            
+                            self.image_mask[str(stage + 1)] = TTA_recursion(
+                                attn=ret_attn,
+                                attn_threshold=self.model.learnable_attn_threshold[idx],
                                 image_mask=self.image_mask[str(stage + 1)]
                             ).to(device=self.device)
                             
-                            #########################################################
-                            
-                            print(f"After TTA, next image_mask :", self.image_mask[str(stage + 1)].grad_fn)
-                            print("After TTA Recursion, attn_threshold grad_fn:", self.model.learnable_attn_threshold.grad_fn)
-
-                        del cont
-                        # loss = 1 - stage_loss
-                        
-                        # if stage == -2 :
-                        #     pass
-                        
-                        # else:
-                            
-                        #     loss.backward()
-                        #     optimizer.step()
-                        #     self.conf_sum = 0
-                        #     self.conf_len = 0
-                            
-                        #     print(f"Iteration {idx_chunk // self.batch}/{self.num_iterations}, Loss: {loss.item()}")
-                        #     print(f"Iteration {idx_chunk // self.batch}/{self.num_iterations}")
-                        #     # mini = self.model.image_mask_tensor.min()
-                        #     # maxi = self.model.image_mask_tensor.max()
-                        #     # meani = self.model.image_mask_tensor.mean()
-                        #     print(self.model.learnable_attn_threshold)
-                        #     print(self.model.learnable_attn_threshold.grad_fn)
-                        #     # print(self.model.image_mask_tensor.grad_fn)
-                        #     # print(f"mask min : {mini.item()}")
-                        #     # print(f"mask max : {maxi.item()}")
-                        #     # print(f"stage-2 :", self.image_mask["-2"].grad_fn)
-                        #     # print(f"stage-1 :", self.image_mask["-1"].grad_fn)
-                        #     # print(f"stage 0 :", self.image_mask["0"].grad_fn)
-                        #     # print(f"stage 1 :", self.image_mask["1"].grad_fn)
-                        #         # exit()
-                                
-                        # ret_attn = get_heatmap(
-                        #                 self.model,
-                        #                 cont,
-                        #                 self.tokenizer,
-                        #                 question_input[0],
-                        #                 input_ids,
-                        #                 stage,
-                        #                 self.stages,
-                        #                 self.image_mask,
-                        #                 select_token=None,
-                        #                 image=flattened_visuals[0],
-                        #                 attn_norm=self.attn_norm,
-                        #             )
-
-                        # # self.image_mask[str(stage+1)] = layer_mean_topk_based_recursion(attn = ret_attn,
-                        # # top_k = self.learnable_attn_threshold,
-                        # # image_mask = self.image_mask[str(stage+1)])
-                        # self.image_mask[str(stage+1)] = TTA_recursion(attn = ret_attn, # select token index
-                        # attn_threshold = self.model.learnable_attn_threshold, ### IMPORTANT TODO : Gradient error debugging
-                        # image_mask = self.image_mask[str(stage+1)]).to(device=self.device)
-                        
-                        # print(f"target: {self.model.learnable_attn_threshold.grad_fn}")
-
-                        # del cont
-                    
-                        
-                else: 
-                    cont = self.model.generate(
-                        input_ids,
-                        attention_mask=attention_masks,
-                        pad_token_id=pad_token_ids,
-                        images=image_tensor,
-                        image_sizes=gen_kwargs["image_sizes"],
-                        do_sample=True if gen_kwargs["temperature"] > 0 else False,
-                        temperature=gen_kwargs["temperature"],
-                        top_p=gen_kwargs["top_p"],
-                        num_beams=gen_kwargs["num_beams"],
-                        max_new_tokens=gen_kwargs["max_new_tokens"],
-                        use_cache=self.use_cache,
-                        generation_type=self.generation_type,
-                        return_dict_in_generate=True,
-                        # output_attentions=True,
-                        # output_scores=True,
-                        downsampled_images = downsampled_image_tensors,
-                        image_mask = self.image_mask
-                    )
-                    
-                    ## delete sos
-                    if cont["sequences"][0][0] == 1:
-                        cont["sequences"] = cont["sequences"][0][1:].unsqueeze(0)
-                        
-                    text_outputs = self.tokenizer.batch_decode(cont['sequences'], skip_special_tokens=True)
+                            del cont
                     
             elif self.generation_type == "total":
                 self.activate_every_image_masks()

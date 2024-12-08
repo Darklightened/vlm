@@ -590,8 +590,10 @@ def show_mask_on_image(img, mask):
 
 ### Normalizing functions
 def norm_relu(ret_attn):
-    temp = ret_attn / ret_attn.max()
+    max = ret_attn.max() if ret_attn.max() !=0 else 1e-08
+    temp = ret_attn / max
     temp = torch.relu(temp)
+    temp = torch.clamp(temp, min=-10000, max=10000)
     ret_attn = temp
     return ret_attn
 
@@ -785,7 +787,7 @@ def get_heatmap(
     ##### norm ####
     if attn_norm is not None:
         ret_attn = attn_norm(ret_attn)
-        print(f'ret_attn: {ret_attn.shape}')
+        #print(f'ret_attn: {ret_attn.shape}')
         
     if image is not None and save_path is not None:
         for i in range(len(output_token_inds)):
