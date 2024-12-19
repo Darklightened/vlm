@@ -1,0 +1,8 @@
+Doc ID,Stage,Text Output,Cumulative Confidence 1,Cumulative Confidence 2,Cumulative Confidence 3,Cumulative Confidence 4,Cumulative Confidence 5,Cumulative Confidence 6,Cumulative Confidence 7,Cumulative Confidence 8,Cumulative Confidence 9,Cumulative Confidence 10
+"(88,)",Stage 0,['No'],"tensor(0.7371, device='cuda:3')","tensor(0.7371, device='cuda:3')"
+"(88,)",Stage 1,['Yes'],"tensor(0.7279, device='cuda:3', grad_fn=<ExpBackward0>)","tensor(0.7279, device='cuda:3', grad_fn=<ExpBackward0>)"
+"(88,)",Stage 2,['Yes'],"tensor(0.9763, device='cuda:3', grad_fn=<ExpBackward0>)","tensor(0.9763, device='cuda:3', grad_fn=<ExpBackward0>)"
+"(88,)",Stage 3,['Yes'],"tensor(0.9859, device='cuda:3', grad_fn=<ExpBackward0>)","tensor(0.9859, device='cuda:3', grad_fn=<ExpBackward0>)"
+"(88,)",Stage 0,['Yes'],"tensor(0.9859, device='cuda:3', grad_fn=<ExpBackward0>)","tensor(0.9859, device='cuda:3', grad_fn=<ExpBackward0>)"
+"(88,)",Stage 1,['Yes'],"tensor(0.9857, device='cuda:3', grad_fn=<ExpBackward0>)","tensor(0.9857, device='cuda:3', grad_fn=<ExpBackward0>)"
+"(88,)",Stage 2,['Yes'],"tensor(0.9872, device='cuda:3', grad_fn=<ExpBackward0>)","tensor(0.9871, device='cuda:3', grad_fn=<ExpBackward0>)"
