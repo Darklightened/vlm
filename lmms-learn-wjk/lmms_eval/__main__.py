@@ -420,6 +420,12 @@ def parse_eval_args() -> argparse.Namespace:
         default=False,
         help="whether to use deepspeed",
     )
+    parser.add_argument(
+        "--contrastive_alpha",
+        type=float,
+        default=0.0,
+        help="alpha for contrastive decoding",
+    )
 
 
     args = parser.parse_args()

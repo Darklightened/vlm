@@ -164,6 +164,7 @@ class Llava(lmms):
         per_sample_iter=3,
         per_sample_initialize=False,
         use_deepspeed=False,
+        contrastive_alpha=0.0,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -255,6 +256,7 @@ class Llava(lmms):
         self.use_deepspeed = use_deepspeed
         self.total_tta_confidences = []
         self.total_confidences = []
+        self.contrastive_alpha = contrastive_alpha
 
         print(f"device: {device}")
         print(f"generation_type: {generation_type}")
@@ -271,6 +273,10 @@ class Llava(lmms):
         print(f"positional_embedding_type: {positional_embedding_type}")
         print(f"visualize_heatmap: {visualize_heatmap}")
         print(f"square: {square}")
+        print(f"contrastive_alpha: {contrastive_alpha}")
+        
+        if self.contrastive_alpha > 0.0:
+            print("apply contrastive decoding")
         
         ## default = "spatial_unpad" for llava1.6
         ## To remove unpadding, set remove_unpadding=True -> mm.path_merge_type will be 'spatial'
@@ -788,6 +794,10 @@ class Llava(lmms):
                             sequences = cont["sequences"][0]
                             text_outputs = self.tokenizer.batch_decode(cont['sequences'], skip_special_tokens=True)
                             
+                            ## first stage logit for contrastive decoding
+                            if idx==0:
+                                first_stage_logits = scores                           
+                            
                             if self.save_output:                            
                                 _, _, cumulative_confidences = calculate_entropy_and_all_confidences(
                                     sequences, scores = scores
@@ -830,6 +840,21 @@ class Llava(lmms):
                                 else:
                                     loss.backward()
                                     self.optimizer.step()    
+                                
+                                last_stage_logits = scores
+                                
+                                if self.contrastive_alpha > 0.0:                                    
+                                    adjusted_logits = [
+                                        last + self.contrastive_alpha * (last - first)
+                                        for last, first in zip(last_stage_logits, first_stage_logits)
+                                    ]
+                                    print(f"original_text_outputs: {text_outputs}") 
+                                    print(f"original_sequences: {sequences}") 
+                                    adjusted_logits_tensor = torch.stack(adjusted_logits, dim=0)
+                                    final_sequences = torch.argmax(adjusted_logits_tensor, dim=-1).squeeze(dim=-1).unsqueeze(0)
+                                    print(f"final_sequences: {final_sequences}") 
+                                    text_outputs = self.tokenizer.batch_decode(final_sequences, skip_special_tokens=True)
+                                    print(f"text_outputs: {text_outputs}")                            
                                     
                                 # Scale loss
                                 # scaler.scale(loss).backward()
@@ -960,12 +985,31 @@ class Llava(lmms):
                             _, _, cumulative_confidences = calculate_entropy_and_all_confidences(
                             sequences, scores = scores)      
                             
+                            ## first stage logit for contrastive decoding
+                            if idx==0:
+                                first_stage_logits = scores
+                            
                             if self.save_output: 
                                 self.save_stage_to_csv(doc_id, f"Stage {idx}", text_outputs, cumulative_confidences)                  
                         
                             if last_stage:
                                 stage_loss = sum(cumulative_confidences) / len(cumulative_confidences)
                                 self.total_confidences.append(stage_loss.item())
+                                last_stage_logits = scores
+                                
+                                if self.contrastive_alpha > 0.0:                                    
+                                    adjusted_logits = [
+                                        last + self.contrastive_alpha * (last - first)
+                                        for last, first in zip(last_stage_logits, first_stage_logits)
+                                    ]
+                                    print(f"original_text_outputs: {text_outputs}") 
+                                    print(f"original_sequences_shape: {sequences.shape}") 
+                                    adjusted_logits_tensor = torch.stack(adjusted_logits, dim=0)
+                                    final_sequences = torch.argmax(adjusted_logits_tensor, dim=-1).squeeze(dim=-1).unsqueeze(0)
+                                    print(f"final_sequences_shape: {final_sequences.shape}") 
+                                    text_outputs = self.tokenizer.batch_decode(final_sequences, skip_special_tokens=True)
+                                    print(f"text_outputs: {text_outputs}")  
+                                    
                                 print(f"average final confidences until iteration {idx_chunk}: {sum(self.total_confidences)/len(self.total_confidences)}")
                             else:                            
                                 ret_attn = get_heatmap(

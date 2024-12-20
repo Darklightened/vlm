@@ -200,6 +200,7 @@ def simple_evaluate(
                 "per_sample_iter":cli_args.per_sample_iter,
                 "per_sample_initialize":cli_args.per_sample_initialize,
                 "use_deepspeed": cli_args.deepspeed,
+                "contrastive_alpha": cli_args.contrastive_alpha,
                 # "target_token_selection_strategy": cli_args.target_token_selection_strategy,
             },
         )
