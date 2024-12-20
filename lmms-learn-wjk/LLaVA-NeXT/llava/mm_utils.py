@@ -90,6 +90,9 @@ def init_downsampled_vision_towers(vision_tower, stages, positional_embedding_ty
             # Interpolate from the pretrained positional embedding
             print("Bilienar interpolation embedding type.")
             original_embedding = downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding.weight.data
+            print(f"original_embdding shape: {original_embedding.shape}")
+            print(f"original_embdding: {original_embedding}")
+            print(f"original_embdding device: {original_embedding.device}")
             cls_token = original_embedding[:1, :]
             original_embedding = original_embedding[1:, :]  # Skip CLS
             # (1, 1024, 24, 24)

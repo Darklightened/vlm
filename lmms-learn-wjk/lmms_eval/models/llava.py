@@ -35,6 +35,9 @@ import accelerate
 from deepspeed.ops.adam import DeepSpeedCPUAdam
 import torch.utils.checkpoint as checkpoint
 from torch.cuda.amp import autocast, GradScaler
+from deepspeed.runtime.zero.partition_parameters import ZeroParamStatus
+from deepspeed.runtime.zero.partition_parameters import GatheredParameters
+import gc
 
 warnings.filterwarnings("ignore")
 
@@ -212,7 +215,7 @@ class Llava(lmms):
         try:
             # Try to load the model with the multimodal argument
             self._tokenizer, self._model, self._image_processor, self._max_length = load_pretrained_model(pretrained, None, model_name, 
-                                                                                                          device_map=self.device_map, 
+                                                                                                          device_map=None, 
                                                                                                           merging=self.merging, 
                                                                                                           **llava_model_args)
         except TypeError:
@@ -221,6 +224,8 @@ class Llava(lmms):
             self._tokenizer, self._model, self._image_processor, self._max_length = load_pretrained_model(pretrained, None, model_name, device_map=self.device_map, **llava_model_args)
         self._config = self._model.config
         
+        print(f"model location: {self._model.device}")
+        print(self._model.lm_head.weight)
         self.model.eval()
         
         if tie_weights:
@@ -283,7 +288,7 @@ class Llava(lmms):
         if remove_unpadding == True:
             print("remove unpadding=True, change to 'spatial'")
             self._model.config.mm_patch_merge_type = "spatial"      
-        
+
         ## save output confidences to csv
         if self.save_output:
             assert self.output_csv_path is not None, "Output CSV path is not provided."
@@ -301,7 +306,7 @@ class Llava(lmms):
             self.attn_norm = None
         elif attn_norm == "norm":
             self.attn_norm = norm
-        elif attn_norm == "norm":
+        elif attn_norm == "norm_softmax":
             self.attn_norm = norm_softmax
         elif attn_norm == "norm_relu":
             self.attn_norm = norm_relu
@@ -333,18 +338,49 @@ class Llava(lmms):
         ## stage -1: 168
         ## stage  0: 336
         ## stage  1: 672
-        if self.stages[0] < 0:
-            self.model.model.downsampled_vision_towers = init_downsampled_vision_towers(
-                self.model.model.vision_tower,
-                self.stages,
-                self.positional_embedding_type,
-                device,
-            )
+        print(f"model type: {type(self.model)}")
+        print(f"vision tower: {self.model.model.vision_tower.device}")
+        print(f"vision tower weight: {self.model.model.vision_tower.vision_tower.vision_model.embeddings.position_embedding.weight.data}")
+        # if self.stages[0] < 0:
+        #     self.model.model.downsampled_vision_towers = init_downsampled_vision_towers(
+        #         self.model.model.vision_tower,
+        #         self.stages,
+        #         self.positional_embedding_type,
+        #         device,
+        #     )
+        # self.patch_size = 14
+        # self.image_size = self.model.model.vision_tower.vision_tower.vision_model.embeddings.image_size
+        # self.smallest_grid_size = int(self.image_size * pow(2, stages[0]) // self.patch_size)
+        # self.largest_grid_size = int(self.image_size * pow(2, stages[-1]) // self.patch_size)
         
-        self.patch_size = 14
-        self.image_size = self.model.model.vision_tower.vision_tower.vision_model.embeddings.image_size
-        self.smallest_grid_size = int(self.image_size * pow(2, stages[0]) // self.patch_size)
-        self.largest_grid_size = int(self.image_size * pow(2, stages[-1]) // self.patch_size)                
+        if self.stages[0] < 0:
+            gathered_params = {}
+
+            # Gather all parameters in vision_tower
+            for name, param in self.model.model.vision_tower.named_parameters():
+                with GatheredParameters([param], modifier_rank=0):
+                    if torch.distributed.get_rank() == 0:
+                        # Save gathered parameter to a dictionary
+                        gathered_params[name] = param.clone()
+
+            if torch.distributed.get_rank() == 0:
+                # Apply gathered parameters back to vision_tower
+                for name, param in self.model.model.vision_tower.named_parameters():
+                    if name in gathered_params:
+                        param.data = gathered_params[name]
+
+                # Proceed with initialization
+                self.model.model.downsampled_vision_towers = init_downsampled_vision_towers(
+                    self.model.model.vision_tower,
+                    self.stages,
+                    self.positional_embedding_type,
+                    device,
+                )
+                
+                self.patch_size = 14
+                self.image_size =self.model.model.vision_tower.vision_tower.vision_model.embeddings.image_size
+                self.smallest_grid_size = int(self.image_size * pow(2, stages[0]) // self.patch_size)
+                self.largest_grid_size = int(self.image_size * pow(2, stages[-1]) // self.patch_size)                
         # self.model.image_mask_tensor = nn.Parameter(torch.ones(3060, 1, device=self.device, requires_grad=False))
         # temp_tensor = torch.cat([torch.ones(36, 1), torch.zeros(3060 - 36, 1)], dim=0)
         # temp_tensor = temp_tensor.to(device = self.device)
@@ -364,63 +400,91 @@ class Llava(lmms):
         self.reset_image_mask()
         ## downsampled vision tower end
         ##################################################################################
+        self._model, self.optimizer = accelerator.prepare(self.model, self.optimizer)
+        self.accelerator = accelerator
+        self._rank = 0
+        self._word_size = 1
 
         # assert self.batch_size_per_gpu == 1, "Llava currently does not support batched generation. See https://github.com/haotian-liu/LLaVA/issues/754. HF Llava also has this issue."
-        if accelerator.num_processes > 1:
-            print(f"distributed type: {accelerator.distributed_type}")
-            assert accelerator.distributed_type in [DistributedType.FSDP, DistributedType.MULTI_GPU, DistributedType.DEEPSPEED], "Unsupported distributed type provided. Only DDP and FSDP are supported."
-            # If you want to use DistributedType.DEEPSPEED, you have to run accelerate config before using the model
-            # Also, you have to select zero stage 0 (equivalent to DDP) in order to make the prepare model works
-            # I tried to set different parameters in the kwargs to let default zero 2 stage works, but it didn't work.
-            if accelerator.distributed_type == DistributedType.DEEPSPEED:                
-                kwargs = {
-                    "train_micro_batch_size_per_gpu": self.batch_size_per_gpu,
-                    "train_batch_size": self.batch_size_per_gpu * accelerator.num_processes,
-                }
-                AcceleratorState().deepspeed_plugin.deepspeed_config_process(must_match=True, **kwargs)
-                eval_logger.info("Detected that you are using DistributedType.DEEPSPEED. Make sure you run `accelerate config` and set zero stage to 0")
-            if accelerator.distributed_type == DistributedType.FSDP or accelerator.distributed_type == DistributedType.DEEPSPEED:
-                self._model = accelerator.prepare(self.model)
-            else:
-                self._model = accelerator.prepare_model(self.model, evaluation_mode=True)
-            self.accelerator = accelerator
-            if self.accelerator.is_local_main_process:
-                eval_logger.info(f"Using {accelerator.num_processes} devices with data parallelism")
-            self._rank = self.accelerator.local_process_index
-            self._world_size = self.accelerator.num_processes
-        elif accelerator.num_processes == 1 and device_map == "auto":
-            eval_logger.info(f"Using {accelerator.num_processes} devices with tensor parallelism")
-            self._rank = 0
-            self._word_size = 1
-        else:
-            eval_logger.info(f"Using single device: {self._device}")
-            self.model.to(self._device)
+        # if accelerator.num_processes > 1:
+        #     print(f"distributed type: {accelerator.distributed_type}")
+        #     assert accelerator.distributed_type in [DistributedType.FSDP, DistributedType.MULTI_GPU, DistributedType.DEEPSPEED], "Unsupported distributed type provided. Only DDP and FSDP are supported."
+        #     # If you want to use DistributedType.DEEPSPEED, you have to run accelerate config before using the model
+        #     # Also, you have to select zero stage 0 (equivalent to DDP) in order to make the prepare model works
+        #     # I tried to set different parameters in the kwargs to let default zero 2 stage works, but it didn't work.
+        #     if accelerator.distributed_type == DistributedType.DEEPSPEED:                
+        #         kwargs = {
+        #             "train_micro_batch_size_per_gpu": self.batch_size_per_gpu,
+        #             "train_batch_size": self.batch_size_per_gpu * accelerator.num_processes,
+        #         }
+        #         AcceleratorState().deepspeed_plugin.deepspeed_config_process(must_match=True, **kwargs)
+        #         eval_logger.info("Detected that you are using DistributedType.DEEPSPEED. Make sure you run `accelerate config` and set zero stage to 0")
+        #     if accelerator.distributed_type == DistributedType.FSDP or accelerator.distributed_type == DistributedType.DEEPSPEED:
+        #         self._model = accelerator.prepare(self.model)
+        #     else:
+        #         self._model = accelerator.prepare_model(self.model, evaluation_mode=True)
+        #     self.accelerator = accelerator
+        #     if self.accelerator.is_local_main_process:
+        #         eval_logger.info(f"Using {accelerator.num_processes} devices with data parallelism")
+        #     self._rank = self.accelerator.local_process_index
+        #     self._world_size = self.accelerator.num_processes
+        # elif accelerator.num_processes == 1 and device_map == "auto":
+        #     eval_logger.info(f"Using {accelerator.num_processes} devices with tensor parallelism")
+        #     self._rank = 0
+        #     self._word_size = 1
+        # else:
+        #     eval_logger.info(f"Using single device: {self._device}")
+        #     self.model.to(self._device)
             
-            self._rank = 0
-            self._world_size = 1
+        #     self._rank = 0
+        #     self._world_size = 1
             
-            print(f"initial threshold: {self.model.learnable_attn_threshold}")       
-            print(f"threshold in params: {'learnable_attn_threshold' in [name for name, _ in self.model.named_parameters()]}") 
-            self.model.register_parameter('learnable_attn_threshold', self.model.learnable_attn_threshold)                
+        #     print(f"initial threshold: {self.model.learnable_attn_threshold}")       
+        #     print(f"threshold in params: {'learnable_attn_threshold' in [name for name, _ in self.model.named_parameters()]}") 
+        #     self.model.register_parameter('learnable_attn_threshold', self.model.learnable_attn_threshold)                
             
-            if self.use_deepspeed:
-                self.optimizer = DeepSpeedCPUAdam([self.model.learnable_attn_threshold], lr=self.learning_rate)    
-                print(self.optimizer)            
-                self.model_engine, optimizer, _, _ = deepspeed.initialize(
-                    model=self.model,                        
-                    model_parameters=[self.model.learnable_attn_threshold],
-                    optimizer = self.optimizer,
-                    config_params="deepspeed_config.json"
-                )                   
-                self.optimizer = optimizer
-                print(self.optimizer)  
-                #self.model_engine.init_threshold(self.attention_threshold)
-                print(f"initial threshold: {self.model_engine.module.learnable_attn_threshold}")
-                #print(f"initial threshold: {model_parameters}")
-                #print(self.model_engine)
+        #     if self.use_deepspeed:
+        #         self.optimizer = DeepSpeedCPUAdam([self.model.learnable_attn_threshold], lr=self.learning_rate)    
+        #         print(self.optimizer)            
+        #         self.model_engine, optimizer, _, _ = deepspeed.initialize(
+        #             model=self.model,                        
+        #             #model_parameters=[self.model.learnable_attn_threshold],
+        #             model_parameters=[self.model.learnable_attn_threshold],
+        #             optimizer = self.optimizer,
+        #             config_params="deepspeed_config.json"
+        #         )                   
+        #         self.optimizer = optimizer
+        #         torch.cuda.empty_cache()
+        #         gc.collect()
+
+        #         # threshold = self.model_engine.module.learnable_attn_threshold
+
+        #         # with GatheredParameters([threshold], modifier_rank=None):
+        #         #     full_threshold = threshold.clone()  # Clone to avoid modifying the original tensor
+        #         #     print(f"Full learnable_attn_threshold: {full_threshold}")
+        #         # print(self.optimizer)  
+        #         # #self.model_engine.init_threshold(self.attention_threshold)
+        #         # print(f"initial threshold: {self.model_engine.module.learnable_attn_threshold}")
+        #         # print(f"initial model weight: {self.model_engine.module.lm_head}")
+        #         #print(f"initial threshold: {model_parameters}")
+        #         #print(self.model_engine)
+        #         # for name, param in self.model_engine.module.named_parameters():
+        #         #     if param.requires_grad:
+        #         #         print(f"Trainable parameter: {name}")
+
+        #         # for group in self.model_engine.optimizer.param_groups:
+        #         #     for param in group['params']:
+        #         #         print(param)
+                
+        #         # threshold = self.model_engine.module.learnable_attn_threshold
+        #         # print(f"Learnable Attention Threshold: {threshold}")
+
+        #         # for name, param in self.model_engine.module.named_parameters():
+        #         #     print(f"{name}: {param}")
+
             
-            # for name, param in self.model.named_parameters():
-            #     print(f"{name}: {param.shape}, requires_grad={param.requires_grad}")
+        #     # for name, param in self.model.named_parameters():
+        #     #     print(f"{name}: {param.shape}, requires_grad={param.requires_grad}")
                 
     
     # Method to log each stage's results
@@ -730,20 +794,22 @@ class Llava(lmms):
                 if self.optimize_threshold and idx_chunk < self.tta_n_iter: # START TTA 
                     # scaler = GradScaler()
                     # Test-time adaptation to maximize confidence
-                    for name, param in self.model.named_parameters():
-                        param.requires_grad = False  # Freeze all parameters
-                    for name, param in self.model.model.named_parameters():
-                        param.requires_grad = False  # Freeze all parameters                        
+
+                    if not self.use_deepspeed:   
+                        for name, param in self.model.named_parameters():
+                            param.requires_grad = False  # Freeze all parameters
+                        for name, param in self.model.model.named_parameters():
+                            param.requires_grad = False  # Freeze all parameters                        
+                        
+                        # self.image_mask.requires_grad = False
+                        for name, param in self.image_mask.items():
+                            param.requires_grad = False
+                        
+                        if self.per_sample_initialize:                    
+                            self.model.learnable_attn_threshold = nn.Parameter(torch.tensor(self.attention_threshold, device=self.device, requires_grad=True))
+                            self.optimizer = optim.Adam([self.model.learnable_attn_threshold], lr=self.learning_rate)
                     
-                    # self.image_mask.requires_grad = False
-                    for name, param in self.image_mask.items():
-                        param.requires_grad = False
-                    
-                    if self.per_sample_initialize:                    
-                        self.model.learnable_attn_threshold = nn.Parameter(torch.tensor(self.attention_threshold, device=self.device, requires_grad=True))
-                        self.optimizer = optim.Adam([self.model.learnable_attn_threshold], lr=self.learning_rate)
-                    
-                    self.model.learnable_attn_threshold.requires_grad = True                      
+                        self.model.learnable_attn_threshold.requires_grad = True                      
                     
                     for sample_iter_idx in range(self.per_sample_iter):
                         print("__________________________________________________________________________")
@@ -759,29 +825,56 @@ class Llava(lmms):
                             last_stage = stage == self.stages[-1]
                             ### 이유는 모르겠으나, image_mask의 grad를 풀어주어야 output score의 grad_fn이 잡힘...
                             #print(f"stage: {stage}")
-                            #print("Before model.generate, image_mask grad_fn:", self.image_mask[str(stage)].grad_fn)                         
-                            
-                            # # TODO generate subset of data
-                            cont = self.model.generate(
-                                input_ids,
-                                attention_mask=attention_masks,
-                                pad_token_id=pad_token_ids,
-                                images=image_tensor,
-                                image_sizes=gen_kwargs["image_sizes"],
-                                do_sample=True if gen_kwargs["temperature"] > 0 else False,
-                                temperature=gen_kwargs["temperature"],
-                                top_p=gen_kwargs["top_p"],
-                                num_beams=gen_kwargs["num_beams"],
-                                #max_new_tokens=gen_kwargs["max_new_tokens"],
-                                max_new_tokens=10,
-                                use_cache=self.use_cache,
-                                generation_type=self.generation_type,
-                                return_dict_in_generate=True,
-                                output_attentions=True,
-                                output_scores=True,
-                                downsampled_images = downsampled_image_tensors,
-                                image_mask = self.image_mask,                                
-                            )
+                            #print("Before model.generate, image_mask grad_fn:", self.image_mask[str(stage)].grad_fn) 
+
+                            if self.use_deepspeed:    
+                                # for param in self.model_engine.module.parameters():
+                                #     if hasattr(param, 'ds_status') and param.ds_status == ZeroParamStatus.NOT_AVAILABLE:
+                                #         with GatheredParameters([param], modifier_rank=None):
+                                            
+                                # # TODO generate subset of data
+                                cont = self.model_engine.generate(
+                                    input_ids,
+                                    attention_mask=attention_masks,
+                                    pad_token_id=pad_token_ids,
+                                    images=image_tensor,
+                                    image_sizes=gen_kwargs["image_sizes"],
+                                    do_sample=True if gen_kwargs["temperature"] > 0 else False,
+                                    temperature=gen_kwargs["temperature"],
+                                    top_p=gen_kwargs["top_p"],
+                                    num_beams=gen_kwargs["num_beams"],
+                                    #max_new_tokens=gen_kwargs["max_new_tokens"],
+                                    max_new_tokens=10,
+                                    use_cache=self.use_cache,
+                                    generation_type=self.generation_type,
+                                    return_dict_in_generate=True,
+                                    output_attentions=True,
+                                    output_scores=True,
+                                    downsampled_images = downsampled_image_tensors,
+                                    image_mask = self.image_mask,                                
+                                )  
+                            else:  
+                                # # TODO generate subset of data
+                                cont = self.model.generate(
+                                    input_ids,
+                                    attention_mask=attention_masks,
+                                    pad_token_id=pad_token_ids,
+                                    images=image_tensor,
+                                    image_sizes=gen_kwargs["image_sizes"],
+                                    do_sample=True if gen_kwargs["temperature"] > 0 else False,
+                                    temperature=gen_kwargs["temperature"],
+                                    top_p=gen_kwargs["top_p"],
+                                    num_beams=gen_kwargs["num_beams"],
+                                    #max_new_tokens=gen_kwargs["max_new_tokens"],
+                                    max_new_tokens=10,
+                                    use_cache=self.use_cache,
+                                    generation_type=self.generation_type,
+                                    return_dict_in_generate=True,
+                                    output_attentions=True,
+                                    output_scores=True,
+                                    downsampled_images = downsampled_image_tensors,
+                                    image_mask = self.image_mask,                                
+                                )
                             # with autocast():
                             #     cont = checkpoint.checkpoint(generate_with_checkpoint, self.model, input_ids, attention_masks, pad_token_ids, image_tensor, gen_kwargs, self.generation_type, self.image_mask, downsampled_image_tensors)
                             # print(f"stage-2 :", self.image_mask["-2"].grad_fn)
@@ -835,10 +928,16 @@ class Llava(lmms):
                                 # self.model.learnable_attn_threshold = nn.Parameter(self.model.learnable_attn_threshold.detach())
                                 
                                 if self.use_deepspeed:
-                                    self.model.backward(loss)
-                                    self.model.step()
+                                    self.model_engine.backward(loss)
+                                    self.model_engine.step()
                                 else:
                                     loss.backward()
+
+                                    partitioned_threshold = self.model.learnable_attn_threshold
+
+                                    # with GatheredParameters([partitioned_threshold], modifier_rank=None):
+                                    #     print(f"grad: {partitioned_threshold.grad}")
+                                    
                                     self.optimizer.step()    
                                 
                                 last_stage_logits = scores
@@ -867,14 +966,23 @@ class Llava(lmms):
                                 
                                 #print(f"final grad: {self.model.learnable_attn_threshold.grad}")                                
                                 torch.cuda.empty_cache()
+                                gc.collect()
+
+                                if hasattr(self.model.learnable_attn_threshold, "ds_status"):
+                                    if self.model.learnable_attn_threshold.ds_status == ZeroParamStatus.NOT_AVAILABLE:
+                                        # Gather the parameter
+                                        self.model.learnable_attn_threshold.all_gather()
+
+                                # Clone the gathered parameter for inspection
+                                gathered_threshold = self.model.learnable_attn_threshold.clone()
 
                                 for idx, stage in enumerate(self.stages[:-1]):                                
-                                    wandb.log({f'{stage} stage threshold': self.model.learnable_attn_threshold[idx]}, step=idx_chunk)                                    
+                                    wandb.log({f'{stage} stage threshold': gathered_threshold[idx]}, step=idx_chunk)                                    
 
                                 wandb.log({'loss': loss.item()}, step=idx_chunk)
 
-                                print(f"Final threshold: {self.model.learnable_attn_threshold}")
-                                print(f"Final Iteration Loss: {loss.item()}")
+                                print(f"Final threshold: {gathered_threshold}")
+                                # print(f"Final Iteration Loss: {loss.item()}")
                                 self.total_tta_confidences.append(stage_loss.item())
                                 #print(f"average final confidence until iteration {idx_chunk}: {sum(self.total_tta_confidences)/len(self.total_tta_confidences)}")
 
@@ -882,19 +990,35 @@ class Llava(lmms):
                                 self.conf_cnt = 0
                             else:
                                 # 마지막 스테이지가 아닌 경우만 TTA_recursion 수행
-                                ret_attn = get_heatmap(
-                                    self.model,
-                                    cont,
-                                    self.tokenizer,
-                                    question_input[0],
-                                    input_ids,
-                                    stage,
-                                    self.stages,
-                                    self.image_mask,
-                                    select_token=None,
-                                    image=flattened_visuals[0],
-                                    attn_norm=self.attn_norm,
-                                )
+                                if self.use_deepspeed:
+                                    ret_attn = get_heatmap(
+                                        self.model_engine,
+                                        cont,
+                                        self.tokenizer,
+                                        question_input[0],
+                                        input_ids,
+                                        stage,
+                                        self.stages,
+                                        self.image_mask,
+                                        select_token=None,
+                                        image=flattened_visuals[0],
+                                        attn_norm=self.attn_norm,
+                                    )
+                                else:
+                                    ret_attn = get_heatmap(
+                                        self.model,
+                                        cont,
+                                        self.tokenizer,
+                                        question_input[0],
+                                        input_ids,
+                                        stage,
+                                        self.stages,
+                                        self.image_mask,
+                                        select_token=None,
+                                        image=flattened_visuals[0],
+                                        attn_norm=self.attn_norm,
+                                    )
+
 
                                 # TTA_recursion 적용
                                 # print(f"Before TTA, next image_mask grad_fn:", self.image_mask[str(stage + 1)].grad_fn)
@@ -905,36 +1029,46 @@ class Llava(lmms):
                                 # print(f"ret_attn max: {torch.max(ret_attn)}")
                                 # print(f"ret_attn has NaN: {ret_attn.isnan().any()}")
                                 del cont
-                                
-                                #### TTA_Recursion #######################################
-                                if self.attention_thresholding_type == "layer_mean":
-                                    self.image_mask[str(stage + 1)] = TTA_recursion(
-                                        attn=ret_attn,
-                                        attn_threshold=self.model.learnable_attn_threshold[idx],
-                                        image_mask=self.image_mask[str(stage + 1)]
-                                    ).to(device=self.device)
-                                
-                                elif self.attention_thresholding_type == "layer_mean_topk":                                
-                                    self.image_mask[str(stage + 1)] = TTA_soft_topk_recursion(
-                                        attn=ret_attn,
-                                        k=self.model.learnable_attn_threshold[idx],
-                                        image_mask=self.image_mask[str(stage + 1)]
-                                    ).to(device=self.device)
-                                # if self.attention_thresholding_type == "layer_mean":
-                                #     self.image_mask[str(stage + 1)] = checkpoint.checkpoint(
-                                #         tta_recursion_checkpoint,
-                                #         ret_attn,
-                                #         self.model.learnable_attn_threshold[idx],
-                                #         self.image_mask[str(stage + 1)]
-                                #     ).to(device=self.device)
 
-                                # elif self.attention_thresholding_type == "layer_mean_topk":
-                                #     self.image_mask[str(stage + 1)] = checkpoint.checkpoint(
-                                #         tta_soft_topk_recursion_checkpoint,
-                                #         ret_attn,
-                                #         self.model.learnable_attn_threshold[idx],
-                                #         self.image_mask[str(stage + 1)]
-                                #     ).to(device=self.device)
+                                # if self.use_deepspeed:
+                                # partitioned_threshold = self.model_engine.module.learnable_attn_threshold
+                                partitioned_threshold = self.model.learnable_attn_threshold
+
+                                with GatheredParameters([partitioned_threshold], modifier_rank=None):
+                                    threshold = partitioned_threshold.clone()  # Clone to avoid modifying the original tensor                                                          
+                            
+                                    #### TTA_Recursion #######################################
+                                    if self.attention_thresholding_type == "layer_mean":
+                                        self.image_mask[str(stage + 1)] = TTA_recursion(
+                                            attn=ret_attn,
+                                            attn_threshold=threshold[idx],
+                                            image_mask=self.image_mask[str(stage + 1)]
+                                        ).to(device=self.device)
+                                    
+                                    elif self.attention_thresholding_type == "layer_mean_topk":                                
+                                        self.image_mask[str(stage + 1)] = TTA_soft_topk_recursion(
+                                            attn=ret_attn,
+                                            k=threshold[idx],
+                                            image_mask=self.image_mask[str(stage + 1)]
+                                        ).to(device=self.device)
+                                # else:
+                                #     threshold = self.model.learnable_attn_threshold                                                        
+                                
+                                #     #### TTA_Recursion #######################################
+                                #     if self.attention_thresholding_type == "layer_mean":
+                                #         self.image_mask[str(stage + 1)] = TTA_recursion(
+                                #             attn=ret_attn,
+                                #             attn_threshold=threshold[idx],
+                                #             image_mask=self.image_mask[str(stage + 1)]
+                                #         ).to(device=self.device)
+                                    
+                                #     elif self.attention_thresholding_type == "layer_mean_topk":                                
+                                #         self.image_mask[str(stage + 1)] = TTA_soft_topk_recursion(
+                                #             attn=ret_attn,
+                                #             k=threshold[idx],
+                                #             image_mask=self.image_mask[str(stage + 1)]
+                                #         ).to(device=self.device)
+                               
                                 
                                 total_sum = self.image_mask[str(stage + 1)].sum().item()                            
                                 total_len = self.image_mask[str(stage + 1)].numel()
@@ -949,7 +1083,14 @@ class Llava(lmms):
                                 # ).to(device=self.device)
                 else:
                     with torch.no_grad():                    
-                        self.model.learnable_attn_threshold.requires_grad = False      
+                        self.model.learnable_attn_threshold.requires_grad = False 
+
+                        if self.use_deepspeed:
+                            partitioned_threshold = self.model_engine.module.learnable_attn_threshold
+
+                            with GatheredParameters([threshold], modifier_rank=None):
+                                self.model.learnable_attn_threshold = partitioned_threshold.clone()
+
                         print(f"current threshold: {self.model.learnable_attn_threshold}")                  
                             
                         for idx, stage in enumerate(self.stages):                        

@@ -11,8 +11,10 @@
 ## --model_args pretrained="[liuhaotian/llava-v1.6-vicuna-7b, liuhaotian/llava-v1.6-mistral-7b]"\
 ## --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b"\
 
-CUDA_VISIBLE_DEVICES=2 python3 -m accelerate.commands.launch \
+CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
+    --config_file /workspace/vlm/lmms-learn-wjk/custom_accelerate_config.yaml \
     --num_processes=1 \
+    --main_process_port 29700 \
     -m lmms_eval \
     --model llava \
     --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
@@ -24,7 +26,7 @@ CUDA_VISIBLE_DEVICES=2 python3 -m accelerate.commands.launch \
     --generation_type recursion \
     --fix_grid 2x2 \
     --attention_thresholding_type layer_mean_topk \
-    --attention_threshold "[0.9,0.9,0.9]" \
+    --attention_threshold "[0.9,0.9,0.5]" \
     --positional_embedding_type bilinear_interpolation \
     --remove_unpadding True \
     --attn_norm norm \
@@ -33,8 +35,7 @@ CUDA_VISIBLE_DEVICES=2 python3 -m accelerate.commands.launch \
     --square 1 \
     --tta_learning_rate 1e-02 \
     --tta_n_iter 100 \
-    --wandb_args "project=llava1.6_recursive_eval_test,entity=VLM_Hallucination_Woohyeon,name=test" \
-    --deepspeed True \
+    --wandb_args "project=llava1.6_recursive_eval_test,entity=VLM_Hallucination_Woohyeon,name=test"  
     # --visualize_heatmap False \
     # --save_output True \
     # --output_csv_path "./generation_output_pope_84-168-336-672-pad-topk-80.csv" \
