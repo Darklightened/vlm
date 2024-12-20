@@ -29,6 +29,9 @@ import os
 import ast
 import torch.nn as nn
 from pathlib import Path
+import wandb
+import torch.optim.lr_scheduler as lr_scheduler
+
 
 warnings.filterwarnings("ignore")
 
@@ -71,6 +74,7 @@ try:
     from llava.mm_utils import (
         norm_relu,
         norm_min_max,
+        norm_standardize,
     )
     from llava.model.builder import load_pretrained_model
     
@@ -212,6 +216,8 @@ class Llava(lmms):
         self.square = square
         self.learning_rate = tta_learning_rate
         self.tta_n_iter = tta_n_iter
+        self.total_tta_confidences = []
+        self.total_confidences = []
 
         print(f"device: {device}")
         print(f"generation_type: {generation_type}")
@@ -254,6 +260,8 @@ class Llava(lmms):
             self.attn_norm = norm_relu
         elif attn_norm == "norm_min_max":
             self.attn_norm = norm_min_max
+        elif attn_norm == "norm_standardize":
+            self.attn_norm = norm_standardize
         else:
             eval_logger.info(f"Unsupported norm type. Using norm_relu.")
             self.attn_norm = norm_relu
@@ -299,6 +307,11 @@ class Llava(lmms):
         # self.model.image_mask_tensor = nn.Parameter(temp_tensor, requires_grad=True)
         
         self.model.learnable_attn_threshold = nn.Parameter(torch.tensor(self.attention_threshold, device=self.device, requires_grad=True))
+        self.optimizer = optim.Adam([self.model.learnable_attn_threshold], lr=self.learning_rate)
+        # self.scheduler = lr_scheduler.CosineAnnealingLR(
+        #                             self.optimizer, 
+        #                             T_max=self.tta_n_iter,         
+        #                             eta_min=0 )     
         self.reset_image_mask()
         ## downsampled vision tower end
         ##################################################################################
@@ -491,6 +504,7 @@ class Llava(lmms):
         return new_list
     
     def generate_until(self, requests: List[Instance]) -> List[str]:
+        
         res = []
 
         def _collate(x):
@@ -510,10 +524,11 @@ class Llava(lmms):
         chunks = re_ords.get_batched(n=self.batch_size, batch_fn=None)
         num_iters = len(requests) // self.batch_size if len(requests) % self.batch_size == 0 else len(requests) // self.batch_size + 1
         pbar = tqdm(total=num_iters, disable=(self.rank != 0), desc="Model Responding")
+
         for idx_chunk, chunk in enumerate(chunks):
             
             ## reset image mask and pad mask
-            # self.reset_image_mask()
+            self.reset_image_mask()
             
             contexts, all_gen_kwargs, doc_to_visual, doc_id, task, split = zip(*chunk)
             task = task[0]
@@ -642,7 +657,7 @@ class Llava(lmms):
                 # self.num_iterations = 10
                 self.last_conf = 0
                 self.conf_sum = 0
-                self.conf_cnt = 0
+                self.conf_cnt = 0                
                 ####################################
                 
                 if self.optimize_threshold and idx_chunk < self.tta_n_iter: # START TTA 
@@ -661,9 +676,9 @@ class Llava(lmms):
                     # print(self.image_mask.named_parameters())
                     # optimizer = optim.Adam([self.model.learnable_attn_threshold, self.model.image_mask_tensor], lr=self.learning_rate)
                     # optimizer = optim.Adam([self.model.image_mask_tensor], lr=self.learning_rate)
-                    optimizer = optim.Adam([self.model.learnable_attn_threshold], lr=self.learning_rate)
-                    optimizer.zero_grad()
-                    
+                    # self.optimizer = optim.Adam([self.model.learnable_attn_threshold], lr=self.learning_rate)
+                    self.optimizer.zero_grad()
+
                     for idx, stage in enumerate(self.stages):
                         # print("Mask requires_grad:", self.image_mask[str(stage + 1)].requires_grad)
                         last_stage = stage == self.stages[-1]
@@ -706,37 +721,51 @@ class Llava(lmms):
                         # print("Image Mask grad:", self.image_mask[str(stage)].grad_fn)
                         # print("Scores grad_fn:", scores[0].grad_fn)
                         
-                        # if stage == -2: 
-                        # if (idx_chunk + 1) % self.batch == 0:
-                        _, _, cumulative_confidences = calculate_entropy_and_all_confidences(
-                        sequences, scores = scores)
-                        # Loss to maximize confidence
-                        
-                        stage_loss = sum(cumulative_confidences) / len(cumulative_confidences)
-                        #print(f"Stage_loss grad_fn: {stage_loss.grad_fn}")
-                        
                         '''
                         TODO
                         여기에서 topk기반으로는 learnable_attn_threshold의 grad_fn이 끊김.
                         '''
-                        self.conf_sum = self.conf_sum + stage_loss
-                        self.conf_cnt = self.conf_cnt + 1
+                        # self.conf_sum = self.conf_sum + stage_loss
+                        # self.conf_cnt = self.conf_cnt + 1
                         if last_stage:
+                            final_confidence, _, cumulative_confidences = calculate_entropy_and_all_confidences(
+                            sequences, scores = scores)
+                            # Loss to maximize confidence
+                            
+                            stage_loss = sum(cumulative_confidences) / len(cumulative_confidences)
+                            # stage_loss = final_confidence
+                            #print(f"Stage_loss grad_fn: {stage_loss.grad_fn}")
+
                             del cont
-                            final_conf = self.conf_sum / self.conf_cnt  
+                            # final_conf = self.conf_sum / self.conf_cnt  
                             #print("Before loss.backward, image_mask grad_fn:", self.image_mask[str(stage)].grad_fn)
-                            loss = 1 - final_conf
+                            # loss = 1 - final_conf
+
+                            loss = 1/stage_loss - 1
+                            
                             self.image_mask["-2"] = self.image_mask["-2"].detach()  
                             self.image_mask["-1"] = self.image_mask["-1"].detach()  
                             self.image_mask["0"] = self.image_mask["0"].detach()  
                             self.image_mask["1"] = self.image_mask["1"].detach()  
                             # self.model.learnable_attn_threshold = nn.Parameter(self.model.learnable_attn_threshold.detach())
+                            wandb.log({'loss': loss.item()})
                             loss.backward()
                             print(f"final grad: {self.model.learnable_attn_threshold.grad}")
-                            optimizer.step()
+                            self.optimizer.step()
+                            torch.cuda.empty_cache()             
+                            # self.scheduler.step()
+                            # current_lr = self.scheduler.get_last_lr()[0]
+
+                            # wandb.log({'LR': current_lr})
+                            wandb.log({'-2 stage threshold': self.model.learnable_attn_threshold[0]})
+                            wandb.log({'-1 stage threshold': self.model.learnable_attn_threshold[1]})
+                            wandb.log({'0 stage threshold': self.model.learnable_attn_threshold[2]})
+                            # wandb.log({'loss': loss.item()})
 
                             print(f"Final threshold: {self.model.learnable_attn_threshold}")
                             print(f"Final Iteration Loss: {loss.item()}")
+                            self.total_tta_confidences.append(stage_loss.item())
+                            print(f"average final confidence until iteration {idx_chunk}: {sum(self.total_tta_confidences)/len(self.total_tta_confidences)}")
 
                             self.conf_sum = 0
                             self.conf_cnt = 0
@@ -764,15 +793,25 @@ class Llava(lmms):
                             # print(f"ret_attn min: {torch.min(ret_attn)}")
                             # print(f"ret_attn max: {torch.max(ret_attn)}")
                             # print(f"ret_attn has NaN: {ret_attn.isnan().any()}")
+                            del cont
                             
+                            # plot_attention_distribution(ret_attn, save_path=f"/workspace/vlm/lmms-learn/Jake_fig/attention_distribution_norm_std_{stage}_{idx_chunk}.png")
+                            # sys.exit()
+
                             ##### TTA_Recursion #######################################
-                            self.image_mask[str(stage + 1)] = TTA_recursion(
+                            self.image_mask[str(stage + 1)] = TTA_soft_topk_recursion(
                                 attn=ret_attn,
-                                attn_threshold=self.model.learnable_attn_threshold[idx],
+                                k=self.model.learnable_attn_threshold[idx],
                                 image_mask=self.image_mask[str(stage + 1)]
                             ).to(device=self.device)
+                            # self.image_mask[str(stage + 1)] = layer_mean_topk_based_recursion(
+                            #     attn=ret_attn,
+                            #     attn_threshold=self.model.learnable_attn_threshold[idx],
+                            #     image_mask=self.image_mask[str(stage + 1)]
+                            # ).to(device=self.device)
                 else:                    
-                    self.model.learnable_attn_threshold.requires_grad = False                        
+                    self.model.learnable_attn_threshold.requires_grad = False      
+                    print(f"current threshold: {self.model.learnable_attn_threshold}")                  
                         
                     for idx, stage in enumerate(self.stages):                        
                         last_stage = stage == self.stages[-1]
@@ -803,11 +842,16 @@ class Llava(lmms):
                         sequences = cont["sequences"][0]
                         text_outputs = self.tokenizer.batch_decode(cont['sequences'], skip_special_tokens=True)
                         
-                        _, _, cumulative_confidences = calculate_entropy_and_all_confidences(
+                        final_confidence, _ , cumulative_confidences = calculate_entropy_and_all_confidences(
                         sequences, scores = scores)                        
                        
                         if last_stage:
-                            pass
+                            stage_loss = sum(cumulative_confidences) / len(cumulative_confidences)
+                            # stage_loss = final_confidence
+                            self.total_confidences.append(stage_loss.item())
+                            # self.total_confidences.append(stage_loss)
+                            
+                            print(f"average final confidences until iteration {idx_chunk}: {sum(self.total_confidences)/len(self.total_confidences)}")
                         else:                            
                             ret_attn = get_heatmap(
                                 self.model,
@@ -824,13 +868,22 @@ class Llava(lmms):
                             ) 
                             #print(f"ret_attn has NaN: {ret_attn.isnan().any()}")                           
                             
-                            self.image_mask[str(stage + 1)] = TTA_recursion(
+                            self.image_mask[str(stage + 1)] = TTA_soft_topk_recursion(
                                 attn=ret_attn,
                                 attn_threshold=self.model.learnable_attn_threshold[idx],
                                 image_mask=self.image_mask[str(stage + 1)]
                             ).to(device=self.device)
+
+                            image_mask_ratio = torch.mean(self.image_mask[str(stage + 1)].float()).item()
+                            wandb.log({f"Stage {stage+1} Image Mask Ratio": image_mask_ratio})
+
+                            # self.image_mask[str(stage + 1)] = layer_mean_topk_based_recursion(
+                            #     attn=ret_attn,
+                            #     attn_threshold=self.model.learnable_attn_threshold[idx],
+                            #     image_mask=self.image_mask[str(stage + 1)]
+                            # ).to(device=self.device)
                             
-                            del cont
+                        del cont
                     
             elif self.generation_type == "total":
                 self.activate_every_image_masks()
@@ -938,7 +991,7 @@ class Llava(lmms):
                     requires_grad=False,
                     dtype=torch.float16
                 )            
-        self.pad_mask = torch.ones(self.largest_grid_size, self.largest_grid_size, device=self.device)
+        # self.pad_mask = torch.ones(self.largest_grid_size, self.largest_grid_size, device=self.device)
     
     def set_pad_mask(self, bounding_x, bounding_y):
         temp_tensor = torch.zeros(self.smallest_grid_size, self.smallest_grid_size, device=self.device)

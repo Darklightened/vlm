@@ -14,7 +14,7 @@
 python3 -m accelerate.commands.launch \
     --num_processes=1 \
     -m lmms_eval \
-    --device cuda:0 \
+    --device cuda:3 \
     --model llava \
     --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
     --tasks pope_pop \
@@ -25,15 +25,15 @@ python3 -m accelerate.commands.launch \
     --generation_type recursion \
     --fix_grid 2x2 \
     --attention_thresholding_type layer_mean \
-    --attention_threshold "[0.3,0.3,0.3]" \
+    --attention_threshold "[0.0,0.0,0.1]" \
     --positional_embedding_type bilinear_interpolation \
     --remove_unpadding True \
     --attn_norm norm_relu \
     --stages "-2" "-1" "0" "1" \
     --verbosity DEBUG \
     --square 1 \
-    --tta_learning_rate 1e-03 \
-    --tta_n_iter 40 \
+    --tta_learning_rate 1e-02 \
+    --tta_n_iter 100 \
     # --wandb_args "project=llava1.6_recursive_eval_1126,entity=VLM_Hallucination_Woohyeon,name=tta-train-mask" \
     # --visualize_heatmap False \
     # --save_output True \

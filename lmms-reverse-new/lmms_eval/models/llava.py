@@ -708,6 +708,7 @@ class Llava(lmms):
                     if last_stage:
                         del cont
                         torch.cuda.empty_cache()
+                        exit()
                         break
 
                     ### Threshold-based Recursion ######################################################

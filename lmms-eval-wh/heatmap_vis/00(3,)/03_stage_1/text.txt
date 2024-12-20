@@ -1,0 +1,3 @@
+A chat between a curious user and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the user's questions. USER: <image>
+What kind of food dishes can be made from the vegetables and fruits on the table?
+Answer the question using a single word or phrase. ASSISTANT:

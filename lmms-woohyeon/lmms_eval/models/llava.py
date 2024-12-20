@@ -23,7 +23,6 @@ import numpy as np
 import torch.nn.functional as F
 import csv
 import os
-import cv2
 from pathlib import Path
 
 warnings.filterwarnings("ignore")
@@ -478,16 +477,21 @@ class Llava(lmms):
             # Update values from gen_kwargs if present
             if "until" in gen_kwargs:
                 until = gen_kwargs.pop("until")
+                print("1")
                 if isinstance(until, str):
+                    print("2")
                     until = [until]
                 elif not isinstance(until, list):
                     raise ValueError(f"Expected `gen_kwargs['until']` to be of type Union[str,list] but got {type(until)}")
 
             if "image_aspect_ratio" in gen_kwargs.keys() and "image_aspect_ratio" not in self._config.__dict__:
+                print("3")
                 # here we should pop it out of gen_kwargs so that it doesn't get passed to the model for next step of generation
                 self._config.image_aspect_ratio = gen_kwargs.pop("image_aspect_ratio")
                 eval_logger.info(f"Setting image aspect ratio: {self._config.image_aspect_ratio}")
             # encode, pad, and truncate contexts for this batch
+            print(len(flattened_visuals))
+            exit()
             if flattened_visuals:
                 image_tensor, divide_shape = process_images(flattened_visuals, self._image_processor, self._config)
                 if type(image_tensor) is list:
@@ -643,9 +647,6 @@ class Llava(lmms):
                         attn = torch.relu(attn)
                         attn = attn / attn.max()
                         img_with_attn, heatmap = show_mask_on_image(np_img, attn.numpy())
-                        img_with_attn = cv2.cvtColor(img_with_attn, cv2.COLOR_BGR2RGB)
-                        # tt = self.tokenizer.decode(cont["sequences"][0][i]).strip()
-                        # cv2.imwrite(f"{folder}/{str(i).zfill(3)}_{tt}.png", img_with_attn)
 
                     # Delete for memory management
                     del cont

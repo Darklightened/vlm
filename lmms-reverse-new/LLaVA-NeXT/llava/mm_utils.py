@@ -828,12 +828,13 @@ def get_heatmap(
     # med = med.mean(dim=0)
     # for i in range(len(ret_attn_list)):
     #     ret_attn_list[i] = ret_attn_list[i] - med
-    for i in range(len(ret_attn_list)):
-        tensor_norm = ret_attn_list[i].clone()
-        tensor_norm = descending_indices_2d(tensor_norm)
-        tensor_norm = tensor_norm - tensor_norm.min()
-        tensor_norm = tensor_norm / tensor_norm.max()
-        ret_attn_list[i] = tensor_norm
+    
+    # for i in range(len(ret_attn_list)):
+    #     tensor_norm = ret_attn_list[i].clone()
+    #     tensor_norm = descending_indices_2d(tensor_norm)
+    #     tensor_norm = tensor_norm - tensor_norm.min()
+    #     tensor_norm = tensor_norm / tensor_norm.max()
+    #     ret_attn_list[i] = tensor_norm
         
     overall_attn_weights_over_vis_tokens = []
     for i, (row, token) in enumerate(zip(llm_attn_matrix[input_token_len:], outputs["sequences"][0].tolist())):
@@ -879,22 +880,17 @@ def get_heatmap(
             elif "/" in token_string:
                 token_string.replace("/", "slash")
             
-            # # tensor_flattened = token_attn.flatten()
-            # # tensor_flattened = torch.log(tensor_flattened + 1e-6)
-            # token_attn = token_attn.to(model.device)
-            # # tensor_norm = rank_based_normalization_2d(token_attn)
-            # tensor_norm = descending_indices_2d(token_attn)
-            # tensor_norm -= tensor_norm.min()
-            # tensor_norm /= tensor_norm.max()
-            
+            ###################
+            ### draw histogream
+            ###################
             tensor_flattened = token_attn.flatten().cpu()
-
-            # 히스토그램 그리기
             plt.hist(tensor_flattened, bins=500, alpha=0.7, edgecolor='black')
+            plt.xlim(right=tensor_flattened.max())
+            # plt.axvline(x=tensor_flattened.mean(), color='red', linestyle='--', linewidth=2, label='Red Line')
             plt.title("Histogram of 2D Tensor Values")
             plt.xlabel("Value")
             plt.ylabel("Frequency")
-            plt.savefig(f"{save_path}/{str(i).zfill(4)}_{token_string}_distribution.png")
+            plt.savefig(f"{save_path}/{str(i).zfill(4)}_{token_string}_distribution_02.png")
             plt.close('all')
             
             # token_attn = sum(ret_attn_list[:-1])

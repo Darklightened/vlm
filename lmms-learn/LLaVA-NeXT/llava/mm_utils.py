@@ -597,6 +597,13 @@ def norm_relu(ret_attn):
     ret_attn = temp
     return ret_attn
 
+def norm_standardize(ret_attn):
+    # print("Attention Standardize")
+    mean = ret_attn.mean()
+    std = ret_attn.std() if ret_attn.std() != 0 else 1e-8  
+    temp = (ret_attn - mean) / std  
+    return temp
+
 def norm_min_max(ret_attn):
     for i in range(len(ret_attn)):
         temp = ret_attn[i]

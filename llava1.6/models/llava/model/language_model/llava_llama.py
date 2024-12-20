@@ -47,7 +47,7 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
         self.pretraining_tp = config.pretraining_tp
         self.vocab_size = config.vocab_size
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
-
+        self.learnable_attention = nn.Parameter(torch.tensor([0.3], requires_grad=True))
         # Initialize weights and apply final processing
         self.post_init()
 

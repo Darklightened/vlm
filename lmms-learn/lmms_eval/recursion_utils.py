@@ -6,7 +6,30 @@ import torch.optim as optim
 import torch.nn.functional as F
 import csv
 from pathlib import Path
+import matplotlib.pyplot as plt
 
+def plot_attention_distribution(ret_attn, save_path="attention_distribution.png"):
+    """
+    Plots and saves the distribution of attention values.
+
+    Args:
+        ret_attn (torch.Tensor): The attention tensor with shape (48, 48).
+        save_path (str): The path where the plot will be saved.
+    """
+    # Flatten the tensor for visualization
+    flattened_ret_attn = ret_attn.flatten().detach().to('cpu').numpy()
+
+    # Plot the histogram
+    plt.figure(figsize=(8, 6))
+    plt.hist(flattened_ret_attn, bins=30, color='blue', alpha=0.7, edgecolor='black')
+    plt.title("Distribution of Attention Values")
+    plt.xlabel("Value")
+    plt.ylabel("Frequency")
+    plt.grid(True)
+
+    # Save the plot to the specified path
+    plt.savefig(save_path)
+    plt.close()
 
 class BinarizeWithSTE(torch.autograd.Function):
     @staticmethod
@@ -114,17 +137,26 @@ def layer_mean_based_recursion(attn = None, attn_threshold = 0.1 , image_mask = 
     
     return image_mask
 
-def layer_mean_topk_based_recursion(attn = None, top_k = 0.1, image_mask = None):
+def layer_mean_topk_based_recursion(attn = None, attn_threshold = 0.1, image_mask = None):
+    image_mask = image_mask.clone()
     flattened_attn = attn.view(-1) 
-    flattened_attn = flattened_attn.float()
-    threshold_index = (len(flattened_attn) * (top_k)).to(torch.int32)
+    # print(flattened_attn)
+    # flattened_attn = flattened_attn.float()
+    # print(flattened_attn)
+    threshold_index = (len(flattened_attn) * (attn_threshold)).to(torch.int32)
     threshold_value = torch.topk(flattened_attn, threshold_index).values[-1]
 
-    mask = (attn >= threshold_value).float()    
+    # mask = (attn >= threshold_value).to(torch.float16)
+    image_mask = torch.sigmoid((attn - threshold_value) * 100)
+    image_mask = BinarizeWithSTE.apply(image_mask)
+    # print(mask)
+    # mask = mask.float()
+    # print(mask)
     
-    updated_image_mask = torch.max(image_mask, mask)
+    # updated_image_mask = torch.max(updated_image_mask, mask)
+    # return updated_image_mask
+    return image_mask
     
-    return updated_image_mask
 
     # for row in range(attn.shape[0]):
     #     for col in range(attn.shape[1]):
@@ -198,4 +230,21 @@ def TTA_recursion(attn, attn_threshold=0.1, image_mask=None):
     image_mask = torch.sigmoid(100 * diff)  
     image_mask = BinarizeWithSTE.apply(image_mask)
     # print("Inside TTA Recursion image_mask grad_fn:", image_mask.grad_fn)
+    return image_mask
+
+def TTA_soft_topk_recursion(attn, k=0.1, image_mask=None, temperature=0.1):    
+    
+    probs = torch.softmax(attn / temperature, dim=-1)
+    sorted_probs, _ = torch.sort(probs, descending=True, dim=-1)
+    
+    ranks = torch.arange(1, attn.size(-1) + 1, device=attn.device).float()
+    weights = torch.exp((ranks-1) / k)  
+    
+    topk_scores = torch.sum(sorted_probs * weights, dim=-1, keepdim=True)
+    
+    image_mask = image_mask.clone()
+    
+    image_mask = torch.sigmoid(topk_scores)
+    image_mask = BinarizeWithSTE.apply(image_mask)
+
     return image_mask

@@ -1,0 +1,200 @@
+The following values were not passed to `accelerate launch` and had defaults used instead:
+	`--num_machines` was set to a value of `1`
+	`--mixed_precision` was set to a value of `'no'`
+	`--dynamo_backend` was set to a value of `'no'`
+To avoid this warning pass in values for each of the problematic parameters or run `accelerate config`.
+[32m2024-12-04 04:43:39.907[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate[0m:[36m420[0m - [1mVerbosity set to DEBUG[0m
+[32m2024-12-04 04:43:42.769[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.tasks[0m:[36m_get_task_and_group[0m:[36m452[0m - [34m[1m`group` and `group_alias` keys in tasks' configs will no longer be used in the next release of lmms-eval. `tag` will be used to allow to call a collection of tasks just like `group`. `group` will be removed in order to not cause confusion with the new ConfigurableGroup which will be the offical way to create groups with addition of group-wide configuations.[0m
+[32m2024-12-04 04:43:43.486[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m503[0m - [1mEvaluation tracker args: {'output_path': './logs/'}[0m
+[32m2024-12-04 04:43:43.486[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m592[0m - [1mSelected Tasks: ['vqav2_val_lite'][0m
+[32m2024-12-04 04:43:43.489[0m | [1mINFO    [0m | [36mlmms_eval.evaluator[0m:[36msimple_evaluate[0m:[36m155[0m - [1mSetting random seed to 0 | Setting numpy seed to 1234 | Setting torch manual seed to 1234[0m
+You are using a model of type llava to instantiate a model of type llava_llama. This is not supported for all configurations of models and can yield errors.
+initialize llava model with modification
+OpenCLIP not installed
+self.merging= None
+model_name: llava-v1.6-vicuna-7b
+Loaded LLaVA model: liuhaotian/llava-v1.6-vicuna-7b
+loding from here
+Loading vision tower: openai/clip-vit-large-patch14-336
+Loading checkpoint shards:   0%|          | 0/3 [00:00<?, ?it/s]Loading checkpoint shards:  33%|███▎      | 1/3 [00:05<00:10,  5.10s/it]Loading checkpoint shards:  67%|██████▋   | 2/3 [00:09<00:04,  4.83s/it]Loading checkpoint shards: 100%|██████████| 3/3 [00:13<00:00,  4.55s/it]Loading checkpoint shards: 100%|██████████| 3/3 [00:13<00:00,  4.65s/it]
+Model Class: LlavaLlamaForCausalLM
+device: cuda:1
+generation_type: recursion
+fix_grid: 2x2
+attention_thresholding_type: layer_mean_topk
+attention_norm: None
+attention_threshold: [1, 1, 0.3]
+detection_strategy: None
+detection_threshold: 0.8
+save_output: False
+save_output_csv_path: generation_output.csv
+target_token_selection_strategy: first
+stages: [-2, -1, 0, 1]
+positional_embedding_type: bilinear_interpolation
+visualize_heatmap: True
+square: 1
+remove unpadding=True, change to 'spatial'
+change positional embedding to bilinear_interpolation
+Bilienar interpolation embedding type.
+Bilienar interpolation embedding type.
+[32m2024-12-04 04:44:05.771[0m | [1mINFO    [0m | [36mlmms_eval.models.llava[0m:[36m__init__[0m:[36m320[0m - [1mUsing single device: cuda:1[0m
+[32m2024-12-04 04:44:06.000[0m | [1mINFO    [0m | [36mlmms_eval.evaluator_utils[0m:[36mfrom_taskdict[0m:[36m91[0m - [1mNo metadata found in task config for vqav2_val_lite, using default n_shot=0[0m
+[32m2024-12-04 04:44:06.000[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.caching.cache[0m:[36mload_from_cache[0m:[36m33[0m - [34m[1mrequests-vqav2_val_lite-0shot-rank0-world_size1-tokenizer is not cached, generating...[0m
+[32m2024-12-04 04:44:06.000[0m | [1mINFO    [0m | [36mlmms_eval.api.task[0m:[36mbuild_all_requests[0m:[36m425[0m - [1mBuilding contexts for vqav2_val_lite on rank 0...[0m
+  0%|          | 0/500 [00:00<?, ?it/s]100%|██████████| 500/500 [00:00<00:00, 134562.21it/s]
+[32m2024-12-04 04:44:07.232[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.evaluator[0m:[36mevaluate[0m:[36m455[0m - [34m[1mTask: vqav2_val_lite; number of requests on this rank: 500[0m
+[32m2024-12-04 04:44:07.232[0m | [1mINFO    [0m | [36mlmms_eval.evaluator[0m:[36mevaluate[0m:[36m476[0m - [1mRunning generate_until requests[0m
+loading annotations into memory...
+Done (t=0.43s)
+creating index...
+index created!
+Processing:   0%|          | 0/5000 [00:00<?, ?it/s]CLIPModel is using CLIPSdpaAttention, but `torch.nn.functional.scaled_dot_product_attention` does not support `output_attentions=True`. Falling back to the manual attention implementation, but specifying the manual implementation will be required from Transformers version v5.0.0 onwards. This warning can be removed using the argument `attn_implementation="eager"` when loading the model.
+LlamaModel is using LlamaSdpaAttention, but `torch.nn.functional.scaled_dot_product_attention` does not support `output_attentions=True`. Falling back to the manual attention implementation, but specifying the manual implementation will be required from Transformers version v5.0.0 onwards. This warning can be removed using the argument `attn_implementation="eager"` when loading the model.
+From v4.47 onwards, when a model cache is to be returned, `generate` will return a `Cache` instance instead by default (as opposed to the legacy tuple of tuples format). If you want to keep returning the legacy format, please set `return_legacy_cache=True`.
+Processing:   0%|          | 1/5000 [00:33<46:57:41, 33.82s/it]Processing:   0%|          | 2/5000 [00:37<22:24:26, 16.14s/it]Processing:   0%|          | 3/5000 [00:50<20:36:08, 14.84s/it]Processing:   0%|          | 4/5000 [01:00<17:44:43, 12.79s/it]Processing:   0%|          | 5/5000 [01:07<14:37:01, 10.53s/it]Processing:   0%|          | 6/5000 [01:13<12:35:39,  9.08s/it]Processing:   0%|          | 7/5000 [01:19<11:15:13,  8.11s/it]Processing:   0%|          | 8/5000 [01:29<12:19:45,  8.89s/it]Processing:   0%|          | 9/5000 [01:36<11:17:01,  8.14s/it]Processing:   0%|          | 10/5000 [01:49<13:32:59,  9.78s/it]Processing:   0%|          | 11/5000 [02:09<17:44:52, 12.81s/it]Processing:   0%|          | 12/5000 [02:19<16:18:48, 11.77s/it]Processing:   0%|          | 13/5000 [02:25<14:00:59, 10.12s/it]Processing:   0%|          | 14/5000 [02:31<12:21:23,  8.92s/it]Processing:   0%|          | 17/5000 [02:38<7:16:00,  5.25s/it] Processing:   0%|          | 18/5000 [02:45<7:45:00,  5.60s/it]Processing:   0%|          | 19/5000 [02:52<8:05:33,  5.85s/it]Processing:   0%|          | 20/5000 [02:58<8:06:15,  5.86s/it]Processing:   0%|          | 21/5000 [03:01<7:06:34,  5.14s/it]Processing:   0%|          | 22/5000 [03:10<8:48:38,  6.37s/it]Processing:   0%|          | 23/5000 [03:24<11:38:08,  8.42s/it]Processing:   0%|          | 24/5000 [03:30<10:44:57,  7.78s/it]Processing:   0%|          | 25/5000 [03:37<10:27:02,  7.56s/it]Processing:   1%|          | 26/5000 [03:54<13:59:42, 10.13s/it]Processing:   1%|          | 27/5000 [04:00<12:32:43,  9.08s/it]Processing:   1%|          | 29/5000 [04:20<13:03:13,  9.45s/it]Processing:   1%|          | 30/5000 [04:26<11:54:36,  8.63s/it]Processing:   1%|          | 31/5000 [04:33<11:09:29,  8.08s/it]Processing:   1%|          | 32/5000 [04:39<10:32:57,  7.64s/it]Processing:   1%|          | 33/5000 [04:48<11:05:42,  8.04s/it]Processing:   1%|          | 34/5000 [05:07<15:17:13, 11.08s/it]Processing:   1%|          | 35/5000 [05:13<13:24:52,  9.73s/it]Processing:   1%|          | 36/5000 [05:22<13:11:35,  9.57s/it]Processing:   1%|          | 37/5000 [05:32<13:03:30,  9.47s/it]Processing:   1%|          | 38/5000 [05:38<11:55:36,  8.65s/it]Processing:   1%|          | 39/5000 [05:46<11:20:51,  8.23s/it]Processing:   1%|          | 40/5000 [05:55<11:50:22,  8.59s/it]Processing:   1%|          | 41/5000 [06:15<16:37:56, 12.07s/it]Processing:   1%|          | 42/5000 [06:32<18:24:56, 13.37s/it]Processing:   1%|          | 43/5000 [06:49<19:51:52, 14.43s/it]Processing:   1%|          | 44/5000 [06:55<16:22:51, 11.90s/it]Processing:   1%|          | 45/5000 [07:05<15:34:41, 11.32s/it]Processing:   1%|          | 46/5000 [07:12<13:47:34, 10.02s/it]Processing:   1%|          | 47/5000 [07:22<13:54:04, 10.10s/it]Processing:   1%|          | 48/5000 [07:34<14:47:53, 10.76s/it]Processing:   1%|          | 49/5000 [07:44<14:21:44, 10.44s/it]Processing:   1%|          | 50/5000 [07:51<12:48:04,  9.31s/it]Processing:   1%|          | 50/5000 [07:51<12:57:16,  9.42s/it]
+[1]  tv tensor(1.3241) tensor(0.7244)
+[2]  chair tensor(1.3476) tensor(0.6649)
+[3]  person tensor(1.2695) tensor(0.5709)
+[4]  vase tensor(1.2103) tensor(0.7891)
+[5]  refrigerator tensor(1.4767) tensor(0.8789)
+[6]  dining table tensor(1.5618) tensor(0.9129)
+[7]  book tensor(1.6964) tensor(0.9906)
+[8]  potted plant tensor(1.6987) tensor(1.)
+[9]  clock tensor(1.5350) tensor(0.9451)
+[10]  microwave tensor(1.6740) tensor(0.9830)
+[11]  bear tensor(1.6222) tensor(0.7082)
+[12]  bed tensor(1.4689) tensor(0.4385)
+[13]  potted plant tensor(1.1137) tensor(0.3179)
+[14]  chair tensor(1.6447) tensor(0.9129)
+[15]  book tensor(1.5531) tensor(0.8961)
+[16]  stop sign tensor(1.4626) tensor(0.4001)
+[17]  truck tensor(1.4459) tensor(0.9211)
+[18]  car tensor(1.6800) tensor(0.9881)
+[19]  teddy bear tensor(1.5295) tensor(0.3249)
+[20]  bed tensor(1.4968) tensor(0.3576)
+[21]  person tensor(1.5834) tensor(0.7821)
+[22]  skis tensor(1.5645) tensor(0.9191)
+[23]  refrigerator tensor(1.0532) tensor(0.2897)
+[24]  oven tensor(1.1115) tensor(0.3567)
+[25]  person tensor(1.4904) tensor(0.2754)
+[26]  baseball glove tensor(1.2652) tensor(0.8144)
+[27]  sports ball tensor(1.6075) tensor(0.9854)
+[28]  person tensor(1.5904) tensor(0.6071)
+[29]  tennis racket tensor(1.3013) tensor(0.8328)
+[30]  person tensor(1.5727) tensor(0.4672)
+[31]  handbag tensor(1.6629) tensor(0.9283)
+[32]  tennis racket tensor(1.6496) tensor(0.9632)
+[33]  backpack tensor(1.6969) tensor(0.9900)
+[34]  person tensor(1.4167) tensor(0.5313)
+[35]  handbag tensor(1.0942) tensor(0.5708)
+[36]  boat tensor(1.4313) tensor(0.8389)
+[37]  bird tensor(1.2713) tensor(0.7475)
+[38]  backpack tensor(1.3663) tensor(0.8263)
+[39]  cell phone tensor(1.5482) tensor(0.9599)
+[40]  person tensor(1.6908) tensor(0.9095)
+[41]  cell phone tensor(1.3807) tensor(0.5135)
+[42]  clock tensor(1.6952) tensor(1.)
+[43]  person tensor(1.4621) tensor(0.3160)
+[44]  train tensor(1.5970) tensor(0.6287)
+[45]  sandwich tensor(1.3208) tensor(0.4358)
+[46]  bowl tensor(1.1923) tensor(0.3414)
+[47]  car tensor(1.4708) tensor(0.4926)
+[48]  truck tensor(1.6875) tensor(0.9887)
+[49]  bus tensor(1.6158) tensor(0.6636)
+[50]  person tensor(1.3640) tensor(0.6970)
+[51]  cat tensor(1.6106) tensor(0.6946)
+[52]  keyboard tensor(1.4117) tensor(0.3927)
+[53]  airplane tensor(1.6049) tensor(0.9574)
+[54]  person tensor(1.4655) tensor(0.9031)
+[55]  zebra tensor(1.6561) tensor(0.6875)
+[56]  bed tensor(1.5667) tensor(0.6339)
+[57]  chair tensor(1.1978) tensor(0.4087)
+[58]  dining table tensor(1.3251) tensor(0.6461)
+[59]  bus tensor(1.5751) tensor(0.5165)
+[60]  person tensor(1.4296) tensor(0.5584)
+[61]  traffic light tensor(1.3057) tensor(0.9178)
+[62]  tie tensor(1.6498) tensor(0.9631)
+[63]  bowl tensor(1.5785) tensor(0.6950)
+[64]  apple tensor(1.6147) tensor(0.7083)
+[65]  person tensor(1.2711) tensor(0.5011)
+[66]  baseball bat tensor(1.5540) tensor(0.9542)
+[67]  dining table tensor(1.6223) tensor(0.6431)
+[68]  cake tensor(1.3541) tensor(0.5639)
+[69]  wine glass tensor(1.0420) tensor(0.3977)
+[70]  knife tensor(1.3499) tensor(0.7249)
+[71]  cup tensor(1.5189) tensor(0.7743)
+[72]  person tensor(1.1165) tensor(0.3846)
+[73]  surfboard tensor(1.3663) tensor(0.8496)
+[74]  dining table tensor(1.5408) tensor(0.5638)
+[75]  cup tensor(1.4523) tensor(0.4062)
+[76]  person tensor(1.3490) tensor(0.5520)
+[77]  wine glass tensor(1.1411) tensor(0.4643)
+[78]  spoon tensor(1.1852) tensor(0.6762)
+[79]  knife tensor(1.2922) tensor(0.7950)
+[80]  person tensor(1.3533) tensor(0.7131)
+[81]  skis tensor(1.2194) tensor(0.8231)
+[82]  person tensor(1.4179) tensor(0.4784)
+[83]  skis tensor(1.6974) tensor(0.9916)
+[84]  donut tensor(1.3208) tensor(0.3168)
+[85]  banana tensor(1.1739) tensor(0.1494)
+[86]  dining table tensor(1.6717) tensor(0.7451)
+[87]  cup tensor(1.3283) tensor(0.3559)
+[88]  knife tensor(1.2435) tensor(0.3744)
+[89]  person tensor(1.6453) tensor(0.6970)
+[90]  bottle tensor(1.1595) tensor(0.7150)
+[91]  handbag tensor(1.6608) tensor(0.8789)
+[92]  cup tensor(1.6421) tensor(0.9312)
+[93]  wine glass tensor(1.6987) tensor(0.9940)
+[94]  boat tensor(1.4196) tensor(0.8511)
+[95]  bird tensor(1.5766) tensor(0.9604)
+[96]  person tensor(1.5982) tensor(0.5806)
+[97]  toilet tensor(1.1712) tensor(0.4539)
+[98]  sink tensor(1.3302) tensor(0.8697)
+[99]  person tensor(1.1680) tensor(0.6724)
+[100]  backpack tensor(1.5552) tensor(0.9288)
+[101]  skis tensor(1.6883) tensor(0.9952)
+[102]  bowl tensor(1.5661) tensor(0.5911)
+[103]  broccoli tensor(1.0514) tensor(0.2849)
+[104]  person tensor(1.3944) tensor(0.5118)
+[105]  skateboard tensor(1.1205) tensor(0.4703)
+[106]  banana tensor(1.3628) tensor(0.2439)
+[107]  cup tensor(1.1231) tensor(0.2687)
+[108]  keyboard tensor(1.3928) tensor(0.8737)
+[109]  dining table tensor(1.5343) tensor(0.5737)
+[110]  carrot tensor(1.3273) tensor(0.5783)
+[111]  broccoli tensor(1.2326) tensor(0.5234)
+[112]  cup tensor(1.0414) tensor(0.4190)
+[113]  fork tensor(1.4383) tensor(0.9199)
+[114]  spoon tensor(1.5121) tensor(0.9363)
+[115]  person tensor(1.5914) tensor(0.5094)
+[116]  couch tensor(1.2350) tensor(0.6954)
+[117]  remote tensor(1.5406) tensor(0.9519)
+[118]  wine glass tensor(1.6420) tensor(0.9641)
+[119]  cup tensor(1.6925) tensor(0.9874)
+[120]  person tensor(1.6102) tensor(0.6216)
+[121]  dining table tensor(1.3370) tensor(0.6847)
+[122]  tie tensor(1.4201) tensor(0.8489)
+[123]  chair tensor(1.6545) tensor(0.9533)
+[124]  wine glass tensor(1.4429) tensor(0.8853)
+[125]  person tensor(1.6325) tensor(0.7226)
+[126]  tie tensor(1.2394) tensor(0.7218)
+[127]  couch tensor(1.3065) tensor(0.2440)
+[128]  chair tensor(1.1090) tensor(0.4604)
+[129]  tv tensor(1.2696) tensor(0.7063)
+[130]  person tensor(1.4518) tensor(0.3009)
+[131]  surfboard tensor(1.1583) tensor(0.5805)
+[132]  tv tensor(1.6918) tensor(0.8895)
+[133]  cat tensor(1.4508) tensor(0.2638)
+[134]  laptop tensor(1.2638) tensor(0.3405)
+[135]  person tensor(1.6947) tensor(0.9922)
+[136]  scissors tensor(1.5966) tensor(0.8891)
+[137]  handbag tensor(1.5523) tensor(0.9299)
+[138]  bicycle tensor(1.2804) tensor(0.7566)
+[139]  bus tensor(1.6847) tensor(0.8633)
+[140]  person tensor(1.3798) tensor(0.6032)
+[141]  car tensor(1.3124) tensor(0.8594)
+[142]  person tensor(1.3736) tensor(0.4051)
+[143]  cell phone tensor(1.6021) tensor(0.9674)
+Dice CE: 1.4389270544052124
+Dice: 0.6825292110443115
+Count: 143

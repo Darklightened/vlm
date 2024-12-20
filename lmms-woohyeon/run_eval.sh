@@ -15,7 +15,7 @@ python3 -m accelerate.commands.launch \
     -m lmms_eval \
     --model llava \
     --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
-    --tasks vqav2_val_lite,mmstar,mme \
+    --tasks vqav2_val_lite \
     --batch_size 1 \
     --log_samples \
     --log_samples_suffix llava_v1.6_pope \
@@ -28,4 +28,4 @@ python3 -m accelerate.commands.launch \
     --regenerate_condition all \
     --verbosity DEBUG \
     --positional_embedding_type reduced \
-    --wandb_args "project=llava1.6_recursive_eval_woohye0n,entity=VLM_Hallucination_Woohyeon,name=llava-v1.6-7b-168-336-topk0.3"
+    # --wandb_args "project=llava1.6_recursive_eval_woohye0n,entity=VLM_Hallucination_Woohyeon,name=llava-v1.6-7b-168-336-topk0.3"

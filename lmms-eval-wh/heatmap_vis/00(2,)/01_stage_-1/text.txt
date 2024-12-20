@@ -1,0 +1,3 @@
+A chat between a curious user and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the user's questions. USER: <image>
+Aside from the sign, would it still be obvious this is not the height of summer?
+Answer the question using a single word or phrase. ASSISTANT:

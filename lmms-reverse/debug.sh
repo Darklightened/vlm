@@ -10,12 +10,12 @@
 ## regenerate_condition: currently "all": always regenerate when type is "recursion"
 ## --model_args pretrained="[liuhaotian/llava-v1.6-vicuna-7b, liuhaotian/llava-v1.6-mistral-7b]"\
 ## --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b"\
-    # --device cuda:2 \
 
 python3 -m accelerate.commands.launch \
     --num_processes=1 \
     -m lmms_eval \
     --model llava \
+    --device cuda:3 \
     --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
     --tasks vqav2_val_lite \
     --batch_size 1 \

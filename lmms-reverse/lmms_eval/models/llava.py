@@ -706,6 +706,7 @@ class Llava(lmms):
                     
                     # For confidence-based topk attention threshold.
                     if last_stage:
+                        exit()
                         del cont
                         break
 

@@ -1,0 +1,113 @@
+wandb: Currently logged in as: wjk9904 (VLM_Hallucination_Woohyeon). Use `wandb login --relogin` to force relogin
+wandb: Currently logged in as: wjk9904 (VLM_Hallucination_Woohyeon). Use `wandb login --relogin` to force relogin
+wandb: wandb version 0.19.1 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.16.5
+wandb: Run data is saved locally in /workspace/vlm/lmms-eval-wh/wandb/run-20241220_025955-qbbrvaca
+wandb: Run `wandb offline` to turn off syncing.
+wandb: wandb version 0.19.1 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.16.5
+wandb: Run data is saved locally in /workspace/vlm/lmms-eval-wh/wandb/run-20241220_025956-tw6wksok
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run test07
+wandb: Syncing run test07
+wandb: ⭐️ View project at https://wandb.ai/VLM_Hallucination_Woohyeon/llava1.6_recursive_eval_1126
+wandb: ⭐️ View project at https://wandb.ai/VLM_Hallucination_Woohyeon/llava1.6_recursive_eval_1126
+wandb: 🚀 View run at https://wandb.ai/VLM_Hallucination_Woohyeon/llava1.6_recursive_eval_1126/runs/qbbrvaca/workspace
+wandb: 🚀 View run at https://wandb.ai/VLM_Hallucination_Woohyeon/llava1.6_recursive_eval_1126/runs/tw6wksok/workspace
+[32m2024-12-20 02:59:58.383[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate[0m:[36m420[0m - [1mVerbosity set to DEBUG[0m
+[32m2024-12-20 02:59:58.383[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate[0m:[36m420[0m - [1mVerbosity set to DEBUG[0m
+[32m2024-12-20 03:00:03.588[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.tasks[0m:[36m_get_task_and_group[0m:[36m452[0m - [34m[1m`group` and `group_alias` keys in tasks' configs will no longer be used in the next release of lmms-eval. `tag` will be used to allow to call a collection of tasks just like `group`. `group` will be removed in order to not cause confusion with the new ConfigurableGroup which will be the offical way to create groups with addition of group-wide configuations.[0m
+[32m2024-12-20 03:00:04.015[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.tasks[0m:[36m_get_task_and_group[0m:[36m452[0m - [34m[1m`group` and `group_alias` keys in tasks' configs will no longer be used in the next release of lmms-eval. `tag` will be used to allow to call a collection of tasks just like `group`. `group` will be removed in order to not cause confusion with the new ConfigurableGroup which will be the offical way to create groups with addition of group-wide configuations.[0m
+[32m2024-12-20 03:00:04.573[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m503[0m - [1mEvaluation tracker args: {'output_path': './logs/'}[0m
+[32m2024-12-20 03:00:04.574[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m592[0m - [1mSelected Tasks: ['pope_pop', 'vqav2_val_lite'][0m
+[32m2024-12-20 03:00:04.578[0m | [1mINFO    [0m | [36mlmms_eval.evaluator[0m:[36msimple_evaluate[0m:[36m155[0m - [1mSetting random seed to 0 | Setting numpy seed to 1234 | Setting torch manual seed to 1234[0m
+[32m2024-12-20 03:00:04.744[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m503[0m - [1mEvaluation tracker args: {'output_path': './logs/'}[0m
+[32m2024-12-20 03:00:04.745[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m592[0m - [1mSelected Tasks: ['pope_pop', 'vqav2_val_lite'][0m
+[32m2024-12-20 03:00:04.749[0m | [1mINFO    [0m | [36mlmms_eval.evaluator[0m:[36msimple_evaluate[0m:[36m155[0m - [1mSetting random seed to 0 | Setting numpy seed to 1234 | Setting torch manual seed to 1234[0m
+initialize llava model with modification
+initialize llava model with modification
+OpenCLIP not installed
+OpenCLIP not installed
+self.merging= None
+model_name: llava-v1.6-vicuna-7b
+loding from here
+self.merging= None
+model_name: llava-v1.6-vicuna-7b
+Rank 0:  Loaded LLaVA model: liuhaotian/llava-v1.6-vicuna-7b
+loding from here
+You are using a model of type llava to instantiate a model of type llava_llama. This is not supported for all configurations of models and can yield errors.
+You are using a model of type llava to instantiate a model of type llava_llama. This is not supported for all configurations of models and can yield errors.
+Rank 0:  Loading vision tower: openai/clip-vit-large-patch14-336
+Loading checkpoint shards:   0%|          | 0/3 [00:00<?, ?it/s]Loading checkpoint shards:   0%|          | 0/3 [00:00<?, ?it/s]Loading checkpoint shards:  33%|███▎      | 1/3 [00:04<00:09,  4.74s/it]Loading checkpoint shards:  33%|███▎      | 1/3 [00:05<00:11,  5.70s/it]Loading checkpoint shards:  67%|██████▋   | 2/3 [00:09<00:04,  4.77s/it]Loading checkpoint shards:  67%|██████▋   | 2/3 [00:10<00:05,  5.39s/it]Loading checkpoint shards: 100%|██████████| 3/3 [00:13<00:00,  4.48s/it]Loading checkpoint shards: 100%|██████████| 3/3 [00:13<00:00,  4.55s/it]
+device: cuda:0
+generation_type: recursion
+fix_grid: 2x2
+attention_thresholding_type: layer_mean_topk
+attention_norm: None
+attention_threshold: 0.7
+detection_strategy: None
+detection_threshold: 0.8
+save_output: False
+save_output_csv_path: generation_output.csv
+target_token_selection_strategy: first
+stages: [-2, -1, 0, 1]
+positional_embedding_type: bilinear_interpolation
+visualize_heatmap: False
+square: 1
+remove unpadding=True, change to 'spatial'
+change positional embedding to bilinear_interpolation
+Bilienar interpolation embedding type.
+Bilienar interpolation embedding type.
+[32m2024-12-20 03:00:31.409[0m | [1mINFO    [0m | [36mlmms_eval.evaluator_utils[0m:[36mfrom_taskdict[0m:[36m91[0m - [1mNo metadata found in task config for vqav2_val_lite, using default n_shot=0[0m
+[32m2024-12-20 03:00:31.410[0m | [1mINFO    [0m | [36mlmms_eval.evaluator_utils[0m:[36mfrom_taskdict[0m:[36m91[0m - [1mNo metadata found in task config for pope_pop, using default n_shot=0[0m
+[32m2024-12-20 03:00:31.412[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.caching.cache[0m:[36mload_from_cache[0m:[36m33[0m - [34m[1mrequests-vqav2_val_lite-0shot-rank1-world_size2-tokenizer is not cached, generating...[0m
+[32m2024-12-20 03:00:31.412[0m | [1mINFO    [0m | [36mlmms_eval.api.task[0m:[36mbuild_all_requests[0m:[36m425[0m - [1mBuilding contexts for vqav2_val_lite on rank 1...[0m
+Loading checkpoint shards: 100%|██████████| 3/3 [00:15<00:00,  5.08s/it]Loading checkpoint shards: 100%|██████████| 3/3 [00:15<00:00,  5.20s/it]
+Rank 0:  Model Class: LlavaLlamaForCausalLM
+  0%|          | 0/250 [00:00<?, ?it/s]device: cuda:0
+generation_type: recursion
+fix_grid: 2x2100%|██████████| 250/250 [00:00<00:00, 96164.34it/s]
+
+attention_thresholding_type: layer_mean_topk
+attention_norm: None
+attention_threshold: 0.7[32m2024-12-20 03:00:32.578[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.evaluator[0m:[36mevaluate[0m:[36m455[0m - [34m[1mTask: vqav2_val_lite; number of requests on this rank: 250[0m
+
+detection_strategy: None
+detection_threshold: 0.8
+save_output: False
+save_output_csv_path: generation_output.csv
+target_token_selection_strategy: first
+stages: [-2, -1, 0, 1]
+positional_embedding_type: bilinear_interpolation
+visualize_heatmap: False
+square: 1
+remove unpadding=True, change to 'spatial'
+change positional embedding to bilinear_interpolation
+Bilienar interpolation embedding type.
+Bilienar interpolation embedding type.
+[32m2024-12-20 03:00:32.697[0m | [1mINFO    [0m | [36mlmms_eval.models.llava[0m:[36m__init__[0m:[36m306[0m - [1mUsing 2 devices with data parallelism[0m
+[32m2024-12-20 03:00:32.698[0m | [1mINFO    [0m | [36mlmms_eval.evaluator_utils[0m:[36mfrom_taskdict[0m:[36m91[0m - [1mNo metadata found in task config for vqav2_val_lite, using default n_shot=0[0m
+[32m2024-12-20 03:00:32.699[0m | [1mINFO    [0m | [36mlmms_eval.evaluator_utils[0m:[36mfrom_taskdict[0m:[36m91[0m - [1mNo metadata found in task config for pope_pop, using default n_shot=0[0m
+[32m2024-12-20 03:00:32.700[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.caching.cache[0m:[36mload_from_cache[0m:[36m33[0m - [34m[1mrequests-vqav2_val_lite-0shot-rank0-world_size2-tokenizer is not cached, generating...[0m
+[32m2024-12-20 03:00:32.700[0m | [1mINFO    [0m | [36mlmms_eval.api.task[0m:[36mbuild_all_requests[0m:[36m425[0m - [1mBuilding contexts for vqav2_val_lite on rank 0...[0m
+  0%|          | 0/250 [00:00<?, ?it/s]100%|██████████| 250/250 [00:00<00:00, 132045.84it/s]
+[32m2024-12-20 03:00:33.834[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.evaluator[0m:[36mevaluate[0m:[36m455[0m - [34m[1mTask: vqav2_val_lite; number of requests on this rank: 250[0m
+[32m2024-12-20 03:00:35.580[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.caching.cache[0m:[36mload_from_cache[0m:[36m33[0m - [34m[1mrequests-pope_pop-0shot-rank0-world_size2-tokenizer is not cached, generating...[0m
+[32m2024-12-20 03:00:35.580[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.caching.cache[0m:[36mload_from_cache[0m:[36m33[0m - [34m[1mrequests-pope_pop-0shot-rank1-world_size2-tokenizer is not cached, generating...[0m
+[32m2024-12-20 03:00:35.581[0m | [1mINFO    [0m | [36mlmms_eval.api.task[0m:[36mbuild_all_requests[0m:[36m425[0m - [1mBuilding contexts for pope_pop on rank 0...[0m
+[32m2024-12-20 03:00:35.581[0m | [1mINFO    [0m | [36mlmms_eval.api.task[0m:[36mbuild_all_requests[0m:[36m425[0m - [1mBuilding contexts for pope_pop on rank 1...[0m
+  0%|          | 0/1500 [00:00<?, ?it/s]100%|██████████| 1500/1500 [00:00<00:00, 115280.92it/s]
+[32m2024-12-20 03:00:43.113[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.evaluator[0m:[36mevaluate[0m:[36m455[0m - [34m[1mTask: pope_pop; number of requests on this rank: 1500[0m
+  0%|          | 0/1500 [00:00<?, ?it/s]100%|██████████| 1500/1500 [00:00<00:00, 111301.98it/s]
+[32m2024-12-20 03:00:43.272[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.evaluator[0m:[36mevaluate[0m:[36m455[0m - [34m[1mTask: pope_pop; number of requests on this rank: 1500[0m
+[32m2024-12-20 03:00:43.274[0m | [1mINFO    [0m | [36mlmms_eval.evaluator[0m:[36mevaluate[0m:[36m476[0m - [1mRunning generate_until requests[0m
+[32m2024-12-20 03:00:43.274[0m | [1mINFO    [0m | [36mlmms_eval.evaluator[0m:[36mevaluate[0m:[36m476[0m - [1mRunning generate_until requests[0m
+Model Responding:   0%|          | 0/1750 [00:00<?, ?it/s]CLIPModel is using CLIPSdpaAttention, but `torch.nn.functional.scaled_dot_product_attention` does not support `output_attentions=True`. Falling back to the manual attention implementation, but specifying the manual implementation will be required from Transformers version v5.0.0 onwards. This warning can be removed using the argument `attn_implementation="eager"` when loading the model.
+CLIPModel is using CLIPSdpaAttention, but `torch.nn.functional.scaled_dot_product_attention` does not support `output_attentions=True`. Falling back to the manual attention implementation, but specifying the manual implementation will be required from Transformers version v5.0.0 onwards. This warning can be removed using the argument `attn_implementation="eager"` when loading the model.
+LlamaModel is using LlamaSdpaAttention, but `torch.nn.functional.scaled_dot_product_attention` does not support `output_attentions=True`. Falling back to the manual attention implementation, but specifying the manual implementation will be required from Transformers version v5.0.0 onwards. This warning can be removed using the argument `attn_implementation="eager"` when loading the model.
+From v4.47 onwards, when a model cache is to be returned, `generate` will return a `Cache` instance instead by default (as opposed to the legacy tuple of tuples format). If you want to keep returning the legacy format, please set `return_legacy_cache=True`.
+LlamaModel is using LlamaSdpaAttention, but `torch.nn.functional.scaled_dot_product_attention` does not support `output_attentions=True`. Falling back to the manual attention implementation, but specifying the manual implementation will be required from Transformers version v5.0.0 onwards. This warning can be removed using the argument `attn_implementation="eager"` when loading the model.
+From v4.47 onwards, when a model cache is to be returned, `generate` will return a `Cache` instance instead by default (as opposed to the legacy tuple of tuples format). If you want to keep returning the legacy format, please set `return_legacy_cache=True`.
+Model Responding:   0%|          | 1/1750 [00:01<57:16,  1.96s/it]Model Responding:   0%|          | 2/1750 [00:03<43:15,  1.48s/it]Model Responding:   0%|          | 3/1750 [00:04<39:03,  1.34s/it]Model Responding:   0%|          | 4/1750 [00:05<36:29,  1.25s/it]Model Responding:   0%|          | 5/1750 [00:06<36:05,  1.24s/it]Model Responding:   0%|          | 6/1750 [00:07<34:59,  1.20s/it]Model Responding:   0%|          | 7/1750 [00:08<34:53,  1.20s/it]Model Responding:   0%|          | 8/1750 [00:10<34:05,  1.17s/it]Model Responding:   1%|          | 9/1750 [00:11<34:03,  1.17s/it]Model Responding:   1%|          | 10/1750 [00:12<34:35,  1.19s/it]Model Responding:   1%|          | 11/1750 [00:13<33:58,  1.17s/it]Model Responding:   1%|          | 12/1750 [00:14<33:41,  1.16s/it]Model Responding:   1%|          | 13/1750 [00:15<34:23,  1.19s/it]Model Responding:   1%|          | 14/1750 [00:17<33:51,  1.17s/it]Model Responding:   1%|          | 15/1750 [00:18<34:29,  1.19s/it]Model Responding:   1%|          | 16/1750 [00:19<33:50,  1.17s/it]Model Responding:   1%|          | 17/1750 [00:20<33:18,  1.15s/it]Model Responding:   1%|          | 18/1750 [00:21<32:54,  1.14s/it]Model Responding:   1%|          | 19/1750 [00:22<32:51,  1.14s/it]Model Responding:   1%|          | 20/1750 [00:23<32:52,  1.14s/it]Model Responding:   1%|          | 21/1750 [00:25<34:04,  1.18s/it]Model Responding:   1%|▏         | 22/1750 [00:26<33:54,  1.18s/it]Model Responding:   1%|▏         | 23/1750 [00:27<33:28,  1.16s/it]Model Responding:   1%|▏         | 24/1750 [00:28<34:18,  1.19s/it]Model Responding:   1%|▏         | 25/1750 [00:30<34:28,  1.20s/it]Model Responding:   1%|▏         | 26/1750 [00:31<34:45,  1.21s/it]Model Responding:   2%|▏         | 27/1750 [00:32<35:42,  1.24s/it]Model Responding:   2%|▏         | 28/1750 [00:33<34:41,  1.21s/it]Model Responding:   2%|▏         | 29/1750 [00:35<35:32,  1.24s/it]Model Responding:   2%|▏         | 30/1750 [00:36<35:30,  1.24s/it]Model Responding:   2%|▏         | 31/1750 [00:37<35:55,  1.25s/it]Model Responding:   2%|▏         | 32/1750 [00:38<36:10,  1.26s/it]Model Responding:   2%|▏         | 33/1750 [00:39<34:58,  1.22s/it]Model Responding:   2%|▏         | 34/1750 [00:41<34:24,  1.20s/it]Model Responding:   2%|▏         | 35/1750 [00:42<34:01,  1.19s/it]Model Responding:   2%|▏         | 36/1750 [00:43<34:08,  1.20s/it]Model Responding:   2%|▏         | 37/1750 [00:44<33:49,  1.18s/it]Model Responding:   2%|▏         | 38/1750 [00:45<33:20,  1.17s/it]Model Responding:   2%|▏         | 39/1750 [00:46<32:50,  1.15s/it]Model Responding:   2%|▏         | 40/1750 [00:48<32:27,  1.14s/it]Model Responding:   2%|▏         | 41/1750 [00:49<32:14,  1.13s/it]Model Responding:   2%|▏         | 42/1750 [00:50<32:41,  1.15s/it]Model Responding:   2%|▏         | 43/1750 [00:51<32:22,  1.14s/it]Model Responding:   3%|▎         | 44/1750 [00:52<33:02,  1.16s/it]Model Responding:   3%|▎         | 45/1750 [00:53<32:38,  1.15s/it]Model Responding:   3%|▎         | 46/1750 [00:54<32:34,  1.15s/it]Model Responding:   3%|▎         | 47/1750 [00:56<34:10,  1.20s/it]Model Responding:   3%|▎         | 48/1750 [00:57<33:21,  1.18s/it]Model Responding:   3%|▎         | 49/1750 [00:58<33:41,  1.19s/it]Model Responding:   3%|▎         | 50/1750 [00:59<33:00,  1.17s/it]Model Responding:   3%|▎         | 51/1750 [01:01<35:16,  1.25s/it]Model Responding:   3%|▎         | 52/1750 [01:02<34:06,  1.21s/it]Model Responding:   3%|▎         | 53/1750 [01:03<34:16,  1.21s/it]Model Responding:   3%|▎         | 54/1750 [01:04<34:51,  1.23s/it]Model Responding:   3%|▎         | 55/1750 [01:05<34:05,  1.21s/it]Model Responding:   3%|▎         | 56/1750 [01:06<33:20,  1.18s/it]Model Responding:   3%|▎         | 57/1750 [01:08<33:27,  1.19s/it]Model Responding:   3%|▎         | 58/1750 [01:09<32:55,  1.17s/it]Model Responding:   3%|▎         | 59/1750 [01:10<32:27,  1.15s/it]Model Responding:   3%|▎         | 60/1750 [01:11<33:14,  1.18s/it]Model Responding:   3%|▎         | 61/1750 [01:12<33:25,  1.19s/it]
