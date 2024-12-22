@@ -192,8 +192,7 @@ class Llava(lmms):
 
         llava_model_args = {
             "multimodal": True,
-        }
-        
+        }        
         
         # Prepare model merging
         self.merging=merging  
@@ -262,6 +261,8 @@ class Llava(lmms):
         self.total_tta_confidences = []
         self.total_confidences = []
         self.contrastive_alpha = contrastive_alpha
+
+        #deepspeed.utils.logging.set_verbosity(deepspeed.utils.logging.VERBOSE)
 
         print(f"device: {device}")
         print(f"generation_type: {generation_type}")
@@ -353,34 +354,47 @@ class Llava(lmms):
         # self.smallest_grid_size = int(self.image_size * pow(2, stages[0]) // self.patch_size)
         # self.largest_grid_size = int(self.image_size * pow(2, stages[-1]) // self.patch_size)
         
-        if self.stages[0] < 0:
+        if self.stages[0] < 0:    
+
             gathered_params = {}
 
             # Gather all parameters in vision_tower
             for name, param in self.model.model.vision_tower.named_parameters():
                 with GatheredParameters([param], modifier_rank=0):
-                    if torch.distributed.get_rank() == 0:
+                        #if torch.distributed.get_rank() == 0:
                         # Save gathered parameter to a dictionary
                         gathered_params[name] = param.clone()
 
-            if torch.distributed.get_rank() == 0:
+            #if torch.distributed.get_rank() == 0:
                 # Apply gathered parameters back to vision_tower
-                for name, param in self.model.model.vision_tower.named_parameters():
-                    if name in gathered_params:
-                        param.data = gathered_params[name]
+            for name, param in self.model.model.vision_tower.named_parameters():
+                if name in gathered_params:
+                    param.data = gathered_params[name]
 
-                # Proceed with initialization
-                self.model.model.downsampled_vision_towers = init_downsampled_vision_towers(
-                    self.model.model.vision_tower,
-                    self.stages,
-                    self.positional_embedding_type,
-                    device,
-                )
-                
-                self.patch_size = 14
-                self.image_size =self.model.model.vision_tower.vision_tower.vision_model.embeddings.image_size
-                self.smallest_grid_size = int(self.image_size * pow(2, stages[0]) // self.patch_size)
-                self.largest_grid_size = int(self.image_size * pow(2, stages[-1]) // self.patch_size)                
+            # Proceed with initialization
+            self.model.model.downsampled_vision_towers = init_downsampled_vision_towers(
+                self.model.model.vision_tower,
+                self.stages,
+                self.positional_embedding_type,
+                device,
+            )
+            
+            self.patch_size = 14
+            self.image_size =self.model.model.vision_tower.vision_tower.vision_model.embeddings.image_size
+            self.smallest_grid_size = int(self.image_size * pow(2, stages[0]) // self.patch_size)
+            self.largest_grid_size = int(self.image_size * pow(2, stages[-1]) // self.patch_size)  
+            #     broadcast_values = [self.patch_size, self.image_size, self.smallest_grid_size, self.largest_grid_size] 
+            # else:
+            #     self.patch_size = None
+            #     self.image_size = None
+            #     self.smallest_grid_size = None
+            #     self.largest_grid_size = None  
+            #     broadcast_values = [None, None, None, None]              
+
+            # torch.distributed.broadcast_object_list(broadcast_values, src=0)
+
+            # Unpack the broadcasted values on all ranks
+            #self.patch_size, self.image_size, self.smallest_grid_size, self.largest_grid_size = broadcast_values        
         # self.model.image_mask_tensor = nn.Parameter(torch.ones(3060, 1, device=self.device, requires_grad=False))
         # temp_tensor = torch.cat([torch.ones(36, 1), torch.zeros(3060 - 36, 1)], dim=0)
         # temp_tensor = temp_tensor.to(device = self.device)
@@ -400,10 +414,12 @@ class Llava(lmms):
         self.reset_image_mask()
         ## downsampled vision tower end
         ##################################################################################
+        print("preparing model")
         self._model, self.optimizer = accelerator.prepare(self.model, self.optimizer)
         self.accelerator = accelerator
-        self._rank = 0
-        self._word_size = 1
+        self._rank = torch.distributed.get_rank()
+        self._word_size = 2
+        print("model loaded with accelerate")
 
         # assert self.batch_size_per_gpu == 1, "Llava currently does not support batched generation. See https://github.com/haotian-liu/LLaVA/issues/754. HF Llava also has this issue."
         # if accelerator.num_processes > 1:
@@ -873,7 +889,8 @@ class Llava(lmms):
                                     output_attentions=True,
                                     output_scores=True,
                                     downsampled_images = downsampled_image_tensors,
-                                    image_mask = self.image_mask,                                
+                                    image_mask = self.image_mask,  
+                                    synced_gpus =True                              
                                 )
                             # with autocast():
                             #     cont = checkpoint.checkpoint(generate_with_checkpoint, self.model, input_ids, attention_masks, pad_token_ids, image_tensor, gen_kwargs, self.generation_type, self.image_mask, downsampled_image_tensors)
@@ -891,11 +908,12 @@ class Llava(lmms):
                             if idx==0:
                                 first_stage_logits = scores                           
                             
-                            if self.save_output:                            
-                                _, _, cumulative_confidences = calculate_entropy_and_all_confidences(
-                                    sequences, scores = scores
-                                )  
-                                self.save_stage_to_csv(doc_id, f"Stage {idx}", text_outputs, cumulative_confidences)
+                            if self.save_output:     
+                                if torch.distributed.get_rank() == 0:                      
+                                    _, _, cumulative_confidences = calculate_entropy_and_all_confidences(
+                                        sequences, scores = scores
+                                    )  
+                                    self.save_stage_to_csv(doc_id, f"Stage {idx}", text_outputs, cumulative_confidences)
                             
                             # print(f"learnable_attn_threshold :", self.model.learnable_attn_threshold)
                             # print("Threshold grad_fn:", self.model.learnable_attn_threshold.grad_fn)
@@ -933,7 +951,7 @@ class Llava(lmms):
                                 else:
                                     loss.backward()
 
-                                    partitioned_threshold = self.model.learnable_attn_threshold
+                                    # partitioned_threshold = self.model.learnable_attn_threshold
 
                                     # with GatheredParameters([partitioned_threshold], modifier_rank=None):
                                     #     print(f"grad: {partitioned_threshold.grad}")
@@ -968,20 +986,20 @@ class Llava(lmms):
                                 torch.cuda.empty_cache()
                                 gc.collect()
 
-                                if hasattr(self.model.learnable_attn_threshold, "ds_status"):
-                                    if self.model.learnable_attn_threshold.ds_status == ZeroParamStatus.NOT_AVAILABLE:
-                                        # Gather the parameter
-                                        self.model.learnable_attn_threshold.all_gather()
+                                if torch.distributed.get_rank() == 0:
+                                    if hasattr(self.model.learnable_attn_threshold, "ds_status"):
+                                        if self.model.learnable_attn_threshold.ds_status == ZeroParamStatus.NOT_AVAILABLE:                                           
+                                            self.model.learnable_attn_threshold.all_gather()
 
-                                # Clone the gathered parameter for inspection
-                                gathered_threshold = self.model.learnable_attn_threshold.clone()
+                                    # Clone the gathered parameter for inspection
+                                    gathered_threshold = self.model.learnable_attn_threshold.clone()
 
-                                for idx, stage in enumerate(self.stages[:-1]):                                
-                                    wandb.log({f'{stage} stage threshold': gathered_threshold[idx]}, step=idx_chunk)                                    
+                                    for idx, stage in enumerate(self.stages[:-1]):                                
+                                        wandb.log({f'{stage} stage threshold': gathered_threshold[idx]}, step=idx_chunk)                                    
 
-                                wandb.log({'loss': loss.item()}, step=idx_chunk)
+                                    wandb.log({'loss': loss.item()}, step=idx_chunk)
 
-                                print(f"Final threshold: {gathered_threshold}")
+                                    print(f"Final threshold: {gathered_threshold}")
                                 # print(f"Final Iteration Loss: {loss.item()}")
                                 self.total_tta_confidences.append(stage_loss.item())
                                 #print(f"average final confidence until iteration {idx_chunk}: {sum(self.total_tta_confidences)/len(self.total_tta_confidences)}")
@@ -1073,8 +1091,10 @@ class Llava(lmms):
                                 total_sum = self.image_mask[str(stage + 1)].sum().item()                            
                                 total_len = self.image_mask[str(stage + 1)].numel()
                                 ratio = total_sum / total_len
-                                print(f"stage {stage+1} token selection ratio: {ratio}")
-                                wandb.log({f'stage {stage+1} token selection ratio': ratio}, step=idx_chunk)
+
+                                if torch.distributed.get_rank() == 0:    
+                                    print(f"stage {stage+1} token selection ratio: {ratio}")
+                                    wandb.log({f'stage {stage+1} token selection ratio': ratio}, step=idx_chunk)
                                 
                                 # self.image_mask[str(stage + 1)] = layer_mean_topk_based_recursion(
                                 #     attn=ret_attn,

@@ -11,10 +11,10 @@
 ## --model_args pretrained="[liuhaotian/llava-v1.6-vicuna-7b, liuhaotian/llava-v1.6-mistral-7b]"\
 ## --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b"\
 
-CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
+CUDA_VISIBLE_DEVICES=1,3 python3 -m accelerate.commands.launch \
     --config_file /workspace/vlm/lmms-learn-wjk/custom_accelerate_config.yaml \
-    --num_processes=1 \
-    --main_process_port 29700 \
+    --num_processes=2 \
+    --main_process_port 12345 \
     -m lmms_eval \
     --model llava \
     --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
@@ -26,7 +26,7 @@ CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
     --generation_type recursion \
     --fix_grid 2x2 \
     --attention_thresholding_type layer_mean_topk \
-    --attention_threshold "[0.9,0.9,0.5]" \
+    --attention_threshold "[0.9,0.9,0.8]" \
     --positional_embedding_type bilinear_interpolation \
     --remove_unpadding True \
     --attn_norm norm \
