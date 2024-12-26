@@ -13,11 +13,12 @@
     # --device cuda:3 \
 
 python3 -m accelerate.commands.launch \
-    --num_processes=2 \
+    --num_processes=4 \
+    --main_process_port 29823 \
     -m lmms_eval \
     --model llava \
     --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
-    --tasks vqav2_val_lite,pope_pop \
+    --tasks pope_pop \
     --batch_size 1 \
     --log_samples \
     --log_samples_suffix llava_v1.6_pope \
@@ -25,64 +26,14 @@ python3 -m accelerate.commands.launch \
     --generation_type recursion \
     --fix_grid 2x2 \
     --attention_thresholding_type layer_mean_topk \
-    --attention_threshold "0.7" \
-    --positional_embedding_type bilinear_interpolation \
+    --attention_threshold "[1.0,0.3]" \
+    --positional_embedding_type reduced \
     --remove_unpadding True \
     --attn_norm None \
-    --stages "-2" "-1" "0" "1" \
+    --stages "-1" "0" "1" \
     --verbosity DEBUG \
     --square 1 \
-    --wandb_args "project=llava1.6_recursive_eval_1126,entity=VLM_Hallucination_Woohyeon,name=test07" \
-    # --visualize_heatmap True \
-    # --save_output True \
-    # --output_csv_path "./generation_output_pope_84-168-336-672-pad-topk-80.csv" \
-
-python3 -m accelerate.commands.launch \
-    --num_processes=2 \
-    -m lmms_eval \
-    --model llava \
-    --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
-    --tasks vqav2_val_lite,pope_pop \
-    --batch_size 1 \
-    --log_samples \
-    --log_samples_suffix llava_v1.6_pope \
-    --output_path ./logs/ \
-    --generation_type recursion \
-    --fix_grid 2x2 \
-    --attention_thresholding_type layer_mean_topk \
-    --attention_threshold "0.5" \
-    --positional_embedding_type bilinear_interpolation \
-    --remove_unpadding True \
-    --attn_norm None \
-    --stages "-2" "-1" "0" "1" \
-    --verbosity DEBUG \
-    --square 1 \
-    --wandb_args "project=llava1.6_recursive_eval_1126,entity=VLM_Hallucination_Woohyeon,name=test05" \
-    # --visualize_heatmap True \
-    # --save_output True \
-    # --output_csv_path "./generation_output_pope_84-168-336-672-pad-topk-80.csv" \
-
-python3 -m accelerate.commands.launch \
-    --num_processes=2 \
-    -m lmms_eval \
-    --model llava \
-    --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
-    --tasks vqav2_val_lite,pope_pop \
-    --batch_size 1 \
-    --log_samples \
-    --log_samples_suffix llava_v1.6_pope \
-    --output_path ./logs/ \
-    --generation_type recursion \
-    --fix_grid 2x2 \
-    --attention_thresholding_type layer_mean_topk \
-    --attention_threshold "0.9" \
-    --positional_embedding_type bilinear_interpolation \
-    --remove_unpadding True \
-    --attn_norm None \
-    --stages "-2" "-1" "0" "1" \
-    --verbosity DEBUG \
-    --square 1 \
-    --wandb_args "project=llava1.6_recursive_eval_1126,entity=VLM_Hallucination_Woohyeon,name=test09" \
+    # --wandb_args "project=llava1.6_recursive_eval_1126,entity=VLM_Hallucination_Woohyeon,name=test9" \
     # --visualize_heatmap True \
     # --save_output True \
     # --output_csv_path "./generation_output_pope_84-168-336-672-pad-topk-80.csv" \

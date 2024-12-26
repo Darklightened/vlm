@@ -680,7 +680,15 @@ def get_heatmap(
             grid_size *= 2
             
         used_token_list = torch.nn.functional.interpolate(image_mask[stage].unsqueeze(0).unsqueeze(0), size=(grid_size, grid_size), mode='nearest').squeeze()
-        used_token_list = used_token_list.view(-1).tolist()
+
+        if stage == 1:
+            block1 = used_token_list[0:24,  0:24].flatten()   # top-left
+            block2 = used_token_list[0:24, 24:48].flatten()   # top-right
+            block3 = used_token_list[24:48, 0:24].flatten()   # bottom-left
+            block4 = used_token_list[24:48, 24:48].flatten()  # bottom-right
+            used_token_list = torch.cat([block1, block2, block3, block4], dim=0).tolist()
+        else:
+            used_token_list = used_token_list.view(-1).tolist()
         
         if sum(used_token_list) == 0:
             # every token in this stage is masked
@@ -692,6 +700,8 @@ def get_heatmap(
         input_offset += int(sum(used_token_list))
 
         if stage == 1:
+            # print("shape: ", llm_attn_matrix.shape)
+            # print("text_len: ", len(tokenizer(prompt.split("<image>")[1], return_tensors='pt')["input_ids"][0]))
             stage1_dict = dict()
             vision_token_start_1 = vision_token_start
             for stage1_idx in range(4):
@@ -699,7 +709,7 @@ def get_heatmap(
                 used_list = used_token_list[num_patches * stage1_idx : num_patches * (stage1_idx + 1)]
                 vision_token_end_1 = vision_token_start_1 + int(sum(used_list))
                 
-                # print(stage1_idx, sum(used_list))
+                # print("start: ", vision_token_start_1, "end : ", vision_token_end_1)
                 
                 # Connect with the vision encoder attention
                 image_attentions = []
@@ -721,7 +731,7 @@ def get_heatmap(
                     
                     assert attn_weights_over_vis_tokens.shape[0] == sum(used_list), f"{stage},{attn_weights_over_vis_tokens.shape[0]},{sum(used_list)}"
 
-                    if (sum(used_list)) != 0:
+                    if sum(used_list) != 0:
                         attn_over_image = []
                         for idx in range(len(used_list)):
                             # append only used token * weight.
@@ -733,13 +743,10 @@ def get_heatmap(
                                 attn_over_image.append(vis_attn * weight)
 
                         attn_over_image = torch.stack(attn_over_image).sum(dim=0)        
-                        attn_over_image = attn_over_image / attn_over_image.max()
                         
                         h, w = ret_attn_list[i].shape
                         attn_over_image = attn_over_image.to(device=model.device)
                         attn_over_image = torch.nn.functional.interpolate(attn_over_image.unsqueeze(0).unsqueeze(0), size=(h//2, w//2), mode='nearest').squeeze()
-                        # cropped_mask = get_cropped_mask(image_mask[stage], stage1_idx)
-                        # attn_over_image = attn_over_image * cropped_mask
                         stage1_dict[stage1_idx].append(attn_over_image)
                     else:
                         attn_over_image = torch.zeros_like(ret_attn_list[i])
@@ -754,22 +761,12 @@ def get_heatmap(
                 bot = torch.hstack([f3, f4])
                 attn_over_image = torch.vstack([top, bot])
                 attn_over_image = attn_over_image * image_mask[stage]
+                attn_over_image = attn_over_image / attn_over_image.max()
+
+                attn_over_image = attn_over_image * pow(4, stage + 2 - 1) # -1 to equalize with stage0
                 
                 if stage == current_stage:
                     stage_attn_list.append(attn_over_image)
-
-                # attn_over_image = attn_over_image * pow(4, stage + 2)
-                    
-                # ### remove anomaly
-                # attn_over_image[attn_over_image > 0.9] = 0
-                # origin_max = attn_over_image.max()
-                # origin_min = attn_over_image.min()
-                # anomaly_attn = attn_over_image - origin_min
-                # anomaly_attn = attn_over_image / origin_max
-                # anomaly_attn[anomaly_attn > 0.5] = 0
-                # anomaly_attn = anomaly_attn * origin_max
-                # anomaly_removed_attn = anomaly_attn + origin_min
-                # ret_attn_list[i] = ret_attn_list[i] + anomaly_removed_attn
 
                 ret_attn_list[idx] = ret_attn_list[idx] + attn_over_image
 
@@ -804,10 +801,6 @@ def get_heatmap(
                             vis_attn = vis_attn_matrix[idx]
                             vis_attn = vis_attn.reshape(grid_size, grid_size)
                             attn_over_image.append(vis_attn * weight)
-                    ## old version
-                    # for weight, vis_attn in zip(attn_weights_over_vis_tokens, vis_attn_matrix):
-                    #     vis_attn = vis_attn.reshape(grid_size, grid_size)
-                    #     attn_over_image.append(vis_attn * weight)
 
                     attn_over_image = torch.stack(attn_over_image).sum(dim=0)        
                     attn_over_image = attn_over_image / attn_over_image.max()
@@ -818,35 +811,19 @@ def get_heatmap(
                     attn_over_image = attn_over_image * image_mask[stage]
                 else:
                     attn_over_image = torch.zeros_like(ret_attn_list[i])
+                
+                attn_over_image = attn_over_image * pow(4, stage + 2)
 
                 if stage == current_stage:
                     stage_attn_list.append(attn_over_image)
-                
-                # attn_over_image = attn_over_image * pow(4, stage + 2)
-                #
-                # ## remove anomaly
-                # attn_over_image[attn_over_image > 0.9] = 0
-                # origin_max = attn_over_image.max()
-                # origin_min = attn_over_image.min()
-                # anomaly_attn = attn_over_image - origin_min
-                # anomaly_attn = attn_over_image / origin_max
-                # anomaly_attn[anomaly_attn > 0.9] = 0
-                # anomaly_attn = anomaly_attn * origin_max
-                # anomaly_removed_attn = anomaly_attn + origin_min
-                # ret_attn_list[i] = ret_attn_list[i] + anomaly_removed_attn
+
                 ret_attn_list[i] = ret_attn_list[i] + attn_over_image
             
         if stage == current_stage:
             break
 
-    # med = torch.stack(ret_attn_list, dim=0)
-    # med = med.mean(dim=0)
-    # for i in range(len(ret_attn_list)):
-    #     ret_attn_list[i] = ret_attn_list[i] - med
     vis_attn_list = []
     for i in range(len(ret_attn_list)):
-        # ret_attn_list[i] = ret_attn_list[i] - ret_attn_list[i].min()
-        # ret_attn_list[i] = ret_attn_list[i] / ret_attn_list[i].max()
         tensor_norm = ret_attn_list[i].clone()
         tensor_norm = descending_indices_2d(tensor_norm)
         tensor_norm = tensor_norm - tensor_norm.min()
@@ -883,25 +860,35 @@ def get_heatmap(
                 temp_stage.append(attn_s)
         ret_attn = sum(temp_ret)
         stage_attn = sum(temp_stage) / len(temp_stage)
-        # ret_attn = ret_attn - ret_attn.min()
-        # ret_attn = ret_attn / ret_attn.max()
-    
-    abnomal_mask = (stage_attn <= 1.0).to(torch.float16)
-    ret_attn = ret_attn * abnomal_mask
+
+    # stage_attn_nonzero = stage_attn.flatten()
+    # stage_attn_nonzero = stage_attn_nonzero[stage_attn_nonzero != 0]
+    # mean = torch.mean(stage_attn_nonzero)
+    # std = torch.std(stage_attn_nonzero)
+    # z_scores = (stage_attn - mean) / std
+    # upper_threshold = 10
+    # lower_threshold = -0.2
+    # abnormal_mask = (torch.abs(z_scores) < upper_threshold).float()
+    # upper_bound = upper_threshold * std + mean
+    # upper_bound = 10000
+    # lower_bound = lower_threshold * std + mean
+
+    # abnormal_mask = (stage_attn <= 10000000).to(torch.float16)
+    # abnormal_mask = (stage_attn <= 1000  * pow(4, current_stage + 2)).to(torch.float16)
+    # ret_attn = ret_attn * abnormal_mask
+    # stage_attn = stage_attn * abnormal_mask
     
     if image is not None and save_path is not None:
         ret_attn_list.append(ret_attn)
         tensor_norm = descending_indices_2d(ret_attn)
         tensor_norm = tensor_norm - tensor_norm.min()
         tensor_norm = tensor_norm / tensor_norm.max()
-        # vis_attn_list.append(tensor_norm * abnomal_mask)
         vis_attn_list.append(tensor_norm)
         
         ret_attn_list.append(stage_attn)
         tensor_norm = descending_indices_2d(stage_attn)
         tensor_norm = tensor_norm - tensor_norm.min()
         tensor_norm = tensor_norm / tensor_norm.max()
-        # vis_attn_list.append(tensor_norm * abnomal_mask)
         vis_attn_list.append(tensor_norm)
         for i, (raw_attn, vis_attn) in enumerate(zip(ret_attn_list, vis_attn_list)):
             if i == len(ret_attn_list) - 2:
@@ -924,18 +911,27 @@ def get_heatmap(
             ###################
             ### draw histogream
             ###################
-            tensor_flattened = raw_attn.flatten().cpu()
+            tensor_flattened = raw_attn.flatten()
+
+            nonzero_indices = torch.nonzero(tensor_flattened).squeeze()
+            tensor_flattened = tensor_flattened[nonzero_indices].cpu()
+            # tensor_flattened = tensor_flattened.cpu()
+
+            bins = int(math.sqrt(len(tensor_flattened)))
             plt.hist(tensor_flattened, bins=500, alpha=0.7, edgecolor='black')
-            plt.xlim(right=0.2)
-            plt.axvline(x=tensor_flattened.mean(), color='red', linestyle='--', linewidth=2, label='Red Line')
-            plt.title("Histogram of 2D Tensor Values")
+            # plt.xlim(right=max((tensor_flattened.max() * 1.3), upper_bound.cpu()))
+            plt.xlim(right=tensor_flattened.max())
+            # plt.xlim(left=min(0, lower_bound.cpu() - 0.3))
+            # plt.axvline(x=upper_bound.cpu(), color='red', linestyle='--', linewidth=2, label='Upper Line')
+            # plt.axvline(x=lower_bound.cpu(), color='blue', linestyle='--', linewidth=2, label='Lower Line')
+            plt.title(f"Histogram of 2D Tensor Values, bin: {bins}")
             plt.xlabel("Value")
             plt.ylabel("Frequency")
             plt.savefig(f"{save_path}/{str(i).zfill(4)}_{token_string}_distribution_02.png")
             plt.close('all')
             plt.hist(tensor_flattened, bins=500, alpha=0.7, edgecolor='black')
             plt.xlim(right=tensor_flattened.max())
-            plt.title("Histogram of 2D Tensor Values")
+            plt.title(f"Histogram of 2D Tensor Values, bin: {bins}")
             plt.xlabel("Value")
             plt.ylabel("Frequency")
             plt.savefig(f"{save_path}/{str(i).zfill(4)}_{token_string}_distribution.png")
@@ -965,7 +961,7 @@ def get_heatmap(
             # img_with_attn = cv2.cvtColor(img_with_attn, cv2.COLOR_BGR2RGB)
             
             plt.figure(figsize=(8, 8))
-            plt.imshow(img_with_attn )
+            plt.imshow(img_with_attn)
             plt.title(f"Token {token_string}")
             plt.axis("off")
             plt.savefig(f"{save_path}/{str(i).zfill(4)}_{token_string}.png")
@@ -984,7 +980,7 @@ def get_heatmap(
         plt.close('all')
 
 
-    return ret_attn, abnomal_mask
+    return ret_attn
 
 
 # old make_square
@@ -994,24 +990,26 @@ def make_square_center(im, min_size, smallest_grid_size, fill_color=(0, 0, 0)):
     size = max(min_size, x, y)
     new_im = Image.new('RGB', (size, size), fill_color)
     new_im.paste(im, (int((size - x) / 2), int((size - y) / 2)))
-    return new_im, 0, 0, 0 
+    return new_im, size, x, y
 
 
 # one-side padding
-def make_square_oneside(im, min_size, smallest_grid_size, fill_color=(0, 0, 0)):
+def make_square_top_left(im, min_size, smallest_grid_size, fill_color=(0, 0, 0)):
     x, y = im.size
     size = int(max(min_size, x, y))
     new_im = Image.new('RGB', (size, size), fill_color)
     new_im.paste(im, (0, 0))
-    
-    step = size // smallest_grid_size
-    for x_idx, bounding_x in enumerate(range(0, size, step)):
-        if bounding_x >= x: break
-    for y_idx, bounding_y in enumerate(range(0, size, step)):
-        if bounding_y >= y: break
 
     return new_im, size, x, y
-    return new_im, x_idx, y_idx
+
+# one-side padding
+def make_square_bot_right(im, min_size, smallest_grid_size, fill_color=(0, 0, 0)):
+    x, y = im.size
+    size = int(max(min_size, x, y))
+    new_im = Image.new('RGB', (size, size), fill_color)
+    new_im.paste(im, (size - x, size - y))
+
+    return new_im, size, x, y
 
 
 def get_cropped_mask(image_mask, idx):
@@ -1026,122 +1024,4 @@ def get_cropped_mask(image_mask, idx):
         return image_mask[h//2:, :w//2]
     else:
         return 0
-
-
-def get_heatmap_with_layer_visualization(
-    model, outputs, tokenizer, prompt, input_ids, image,
-    save_path=None  # Folder path to save individual heatmaps
-):
-    if save_path:
-        import os
-        os.makedirs(save_path, exist_ok=True)
-
-    # Convert image tensor to PIL image
-    image_pil = ToPILImage()(image.cpu().squeeze(0)) if isinstance(image, torch.Tensor) else image
-
-    # Initialize storage for results
-    layerwise_results = {"llm_layers": []}
-
-    # Aggregate LLM attention
-    llm_layer_heatmaps = []
-    for layer_index, layer in enumerate(outputs["attentions"][0]):  # Assuming [batch, num_heads, seq_len, seq_len]
-        layer_attns = layer.squeeze(0)  # Remove batch dimension
-        #print(f"Layer {layer_index} attention shape after squeeze: {layer_attns.shape}")
-        attns_per_head = layer_attns.mean(dim=0)  # Average across attention heads
-        #print(f"Layer {layer_index} attention per head shape: {attns_per_head.shape}")
-        cur = attns_per_head[:-1].cpu().clone()  # Exclude padding tokens
-        #print(f"Layer {layer_index} attention shape after removing padding tokens: {cur.shape}")
-        cur[1:, 0] = 0.0  # Zero attention to <bos> token except for the first token
-        cur[1:] /= cur[1:].sum(dim=-1, keepdim=True)
-        #print(f"Layer {layer_index} normalized attention shape: {cur.shape}")
-        llm_layer_heatmaps.append(cur)
-
-    # Generate LLM attention matrix per layer
-    llm_attn_matrices = []
-    for layer_index, aggregated_prompt_attention in enumerate(llm_layer_heatmaps):  # llm_layer_heatmaps is per layer
-        #print(f"Constructing LLM attention matrix for layer {layer_index}")
-        llm_attn_matrix = heterogenous_stack(
-            [torch.tensor([1])]  # The first entry
-            + list(aggregated_prompt_attention)  # Aggregated prompt attention for the current layer
-            + [aggregate_llm_attention_single_layer(outputs["attentions"][i][layer_index]) for i in range(len(outputs["attentions"]))]  # Aggregate attention for the same layer
-        )
-        #print(f"Layer {layer_index} LLM attention matrix shape: {llm_attn_matrix.shape}")
-        llm_attn_matrices.append(llm_attn_matrix)
-    
-    # Identify token ranges
-    input_token_len = model.get_vision_tower().num_patches + len(input_ids[0]) - 1  # -1 for <image> token
-    vision_token_start = len(tokenizer(prompt.split("<image>")[0], return_tensors='pt')["input_ids"][0])
-    vision_token_end = vision_token_start + model.get_vision_tower().num_patches
-    output_token_len = len(outputs["sequences"][0])
-    output_token_start = input_token_len
-    output_token_end = input_token_len + output_token_len
-
-    # Connect with the vision encoder attention
-    image_attentions = []
-    for i, layer in enumerate(model.get_vision_tower().image_attentions):
-        layer = layer[0, ...].unsqueeze(0)
-        #print(f"Vision layer {i} shape after squeeze: {layer.shape}")
-        image_attentions.append(layer)
-
-    vis_attn_matrix = aggregate_vit_attention(
-        image_attentions,
-        select_layer=model.get_vision_tower().select_layer,
-        all_prev_layers=True
-    )
-        
-    grid_size = model.get_vision_tower().num_patches_per_side
-
-    heat_torch_stack = []
-
-    for layer_index, llm_attn_matrix in enumerate(llm_attn_matrices):
-        #print(f"Processing layer {layer_index} for output tokens")
-        
-        output_token_inds = list(range(output_token_start, output_token_end))  # Output tokens for this layer
-        for token_index in output_token_inds:
-            attn_weights_over_vis_tokens = llm_attn_matrix[token_index][vision_token_start:vision_token_end]
-            attn_weights_over_vis_tokens /= attn_weights_over_vis_tokens.sum()
-
-            attn_over_image = []
-            for weight, vis_attn in zip(attn_weights_over_vis_tokens, vis_attn_matrix):
-                vis_attn = vis_attn.reshape(grid_size, grid_size)
-                attn_over_image.append(vis_attn * weight)
-
-            attn_over_image = torch.stack(attn_over_image).sum(dim=0)
-            attn_over_image /= attn_over_image.max()
-
-            # Resize the heatmap to match the original image size
-            resized_heatmap = F.interpolate(
-                attn_over_image.unsqueeze(0).unsqueeze(0),  # Add batch and channel dimensions
-                size=(image_pil.height, image_pil.width),  # Resize to match image dimensions
-                mode='nearest',
-                #align_corners=True
-            ).squeeze().numpy()
-
-            # Normalize the resized heatmap
-            resized_heatmap /= resized_heatmap.max()
-
-            np_img = np.array(image_pil)[:, :, ::-1]
-            img_with_attn, heatmap = show_mask_on_image(np_img, resized_heatmap)
-            img_with_attn = cv2.cvtColor(img_with_attn, cv2.COLOR_BGR2RGB)
-            # # Generate the overlay
-            # overlay = plt.cm.jet(resized_heatmap)[:, :, :3] * 255  # Convert heatmap to RGB
-            # blended = (0.5 * np.array(image_pil) + 0.5 * overlay).astype(np.uint8)
-
-            # Save attention visualization for the current token and layer
-            if save_path:
-                plt.figure(figsize=(8, 8))
-                plt.imshow(img_with_attn )
-                plt.title(f"Layer {layer_index}, Token {token_index}")
-                plt.axis("off")
-                plt.savefig(f"{save_path}/layer_{layer_index}_token_{token_index}.png")
-                plt.close()
-
-            # Store heatmap
-            heat_torch_stack.append({
-                "layer_index": layer_index,
-                "token_index": token_index,
-                "heatmap": torch.tensor(resized_heatmap)
-            })
-
-    return layerwise_results
 

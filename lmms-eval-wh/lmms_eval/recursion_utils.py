@@ -83,6 +83,16 @@ def calculate_entropy_and_all_confidences(sequence, scores):
 
 def layer_mean_based_recursion(attn = None, attn_threshold = 0.1 , image_mask = None):
     mask = (attn >= attn_threshold).to(torch.float16)
+    # mask = torch.ones_like(attn)
+    # if attn_threshold != 1.0:
+    #     attn_nonzero = attn.flatten()
+    #     attn_nonzero = attn_nonzero[attn_nonzero != 0]
+    #     mean = torch.mean(attn_nonzero)
+    #     std = torch.std(attn_nonzero)
+    #     z_scores = (attn - mean) / std
+    #     lower_threshold = -attn_threshold
+    #     lower_bound = lower_threshold * std + mean
+    #     mask = (attn >= lower_bound).to(torch.float16)
     
     return mask
 
@@ -90,8 +100,8 @@ def layer_mean_topk_based_recursion(attn = None, top_k = 0.1, image_mask = None)
     flattened_attn = attn.view(-1) 
     flattened_attn = flattened_attn.float()
 
-    nonzero_indices = torch.nonzero(flattened_attn).squeeze()
-    flattened_attn = flattened_attn[nonzero_indices]
+    # nonzero_indices = torch.nonzero(flattened_attn).squeeze()
+    # flattened_attn = flattened_attn[nonzero_indices]
 
     threshold_index = int(len(flattened_attn) * (top_k)) 
     threshold_value = torch.topk(flattened_attn, threshold_index).values[-1]

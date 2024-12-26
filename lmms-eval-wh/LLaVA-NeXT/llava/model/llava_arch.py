@@ -466,17 +466,18 @@ class LlavaMetaForCausalLM(ABC):
 
                                 resized_mask = torch.nn.functional.interpolate(mask.unsqueeze(0).unsqueeze(0), size=(patch_per_side, patch_per_side), mode='nearest')
 
+                                downsampled_feature = downsampled_feature[0]
                                 downsampled_feature = downsampled_feature.squeeze().view(patch_per_side, patch_per_side, -1)
                                 resized_mask = resized_mask.squeeze().unsqueeze(-1)
                                 
                                 downsampled_feature = downsampled_feature * resized_mask
-                                downsampled_feature = downsampled_feature.view(num_patches, -1)
+                                # downsampled_feature = downsampled_feature.view(num_patches, -1)
+                                downsampled_feature = downsampled_feature.flatten(0, 1)
                                 
                                 for f in downsampled_feature:
                                     if f.min() == 0 and f.max() == 0: continue
                                     downsampled_features_list.append(f.unsqueeze(0))
                                 # downsampled_features_list.append(self.model.image_newline.unsqueeze(0))
-                                
                             
                             patches_per_side = self.get_vision_tower().num_patches_per_side
                             stage0_feature = stage0_feature.view(patches_per_side, patches_per_side, -1)
@@ -484,19 +485,23 @@ class LlavaMetaForCausalLM(ABC):
                             resized_mask = torch.nn.functional.interpolate(mask.unsqueeze(0).unsqueeze(0), size=(patches_per_side, patches_per_side), mode='nearest')
                             resized_mask = resized_mask.squeeze().unsqueeze(-1)
                             stage0_feature = stage0_feature * resized_mask
-                            stage0_feature = stage0_feature.view(patches_per_side ** 2, -1)
+                            # stage0_feature = stage0_feature.view(patches_per_side ** 2, -1)
+                            stage0_feature = stage0_feature.flatten(0, 1)
                             for f in stage0_feature:
                                 if f.min() == 0 and f.max() == 0: continue
                                 stage0_features_list.append(f.unsqueeze(0))
                             # stage0_features_list.append(self.model.image_newline.unsqueeze(0))
                             
                             patches_per_side = self.get_vision_tower().num_patches_per_side * 2
+                            stage1_feature = stage1_feature.permute(0, 2, 1, 3, 4).contiguous()
                             stage1_feature = stage1_feature.view(patches_per_side, patches_per_side, -1)
+                            # stage1_feature = stage1_feature.view(patches_per_side, patches_per_side, -1)
                             mask = image_mask[1]
                             resized_mask = torch.nn.functional.interpolate(mask.unsqueeze(0).unsqueeze(0), size=(patches_per_side, patches_per_side), mode='nearest')
                             resized_mask = resized_mask.squeeze().unsqueeze(-1)
                             stage1_feature = stage1_feature * resized_mask
-                            stage1_feature = stage1_feature.view(patches_per_side ** 2, -1)
+                            # stage1_feature = stage1_feature.view(patches_per_side ** 2, -1)
+                            stage1_feature = stage1_feature.flatten(0, 1)
                             for f in stage1_feature:
                                 if f.min() == 0 and f.max() == 0: continue
                                 stage1_features_list.append(f.unsqueeze(0))

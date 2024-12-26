@@ -28,6 +28,7 @@ import csv
 import os
 import ast
 from pathlib import Path
+import math
 
 warnings.filterwarnings("ignore")
 
@@ -64,7 +65,8 @@ try:
         tokenizer_image_token,
         get_heatmap,
         make_square_center,
-        make_square_oneside,
+        make_square_top_left,
+        make_square_bot_right,
         init_downsampled_vision_towers,
     )
     from llava.mm_utils import (
@@ -260,7 +262,12 @@ class Llava(lmms):
         if self.square == 1:
             self.make_square = make_square_center
         elif self.square == 2:
-            self.make_square = make_square_oneside
+            self.make_square = make_square_top_left
+        elif self.square == 3:
+            self.make_square = make_square_bot_right
+
+        self.stage_mean_list = []
+        self.stage_max_list = []
         
         ##################################################################################
         ## init downsampled vision towers
@@ -513,13 +520,13 @@ class Llava(lmms):
                 temp_list = []
                 for idx, visual in enumerate(flattened_visuals):
                     if idx == 0:
-                        squared_img, size, origin_x, origin_y = self.make_square(visual, min_size=360, smallest_grid_size=self.smallest_grid_size)
+                        squared_img, size, origin_x, origin_y = self.make_square(visual, min_size=384, smallest_grid_size=self.smallest_grid_size)
                         # squared_img.save("./test.png")
                         # exit()
                         temp_list.append(squared_img)
-                        # self.set_pad_mask(size, origin_x, origin_y)
+                        self.set_pad_mask(size, origin_x, origin_y)
                     else:
-                        squared_img, _, _ = self.make_square(visual, min_size=360, smallest_grid_size=self.smallest_grid_size)
+                        squared_img, _, _ = self.make_square(visual, min_size=384, smallest_grid_size=self.smallest_grid_size)
                         temp_list.append(squared_img)
                 flattened_visuals = temp_list
             else:
@@ -556,7 +563,7 @@ class Llava(lmms):
                         if stage == 0:
                             break
                         temp_image_size = int(self.image_size * pow(2, stage))
-                        downsampled_image_tensor = F.interpolate(image_tensor[0][0].unsqueeze(0), size=(temp_image_size, temp_image_size), mode='bilinear', align_corners=False)
+                        downsampled_image_tensor = F.interpolate(image_tensor[0], size=(temp_image_size, temp_image_size), mode='bilinear', align_corners=False)
                         downsampled_image_tensor = downsampled_image_tensor.unsqueeze(0)
                         downsampled_image_tensor = downsampled_image_tensor.to(dtype=torch.float16, device=self.device)
                         downsampled_image_tensors[stage] = downsampled_image_tensor
@@ -611,12 +618,14 @@ class Llava(lmms):
             
             ## main generation part
             # try:
+            self.stage_mean_list = []
+            self.stage_max_list = []
             if "recursion" in self.generation_type:
                 for idx_stage, stage in enumerate(self.stages):
                     
                     ## for debugging with visualization
                     if self.visualize_heatmap:
-                        save_path = f"./heatmap_vis/{str(doc_id).zfill(6)}/{str(idx_stage).zfill(2)}_stage_{stage}/"
+                        save_path = f"./heatmap_vis/{str(idx_chunk).zfill(6)}/{str(idx_stage).zfill(2)}_stage_{stage}/"
                         os.makedirs(save_path, exist_ok=True)
                     else:
                         save_path = None
@@ -693,33 +702,33 @@ class Llava(lmms):
                         )  
                         self.save_stage_to_csv(f"Stage {idx_stage}", doc_id, text_outputs, cumulative_confidences)
                         
-                    ret_attn, abnomal_mask = get_heatmap(
-                                                self.model,
-                                                cont,
-                                                self.tokenizer,
-                                                question_input[0],
-                                                input_ids,
-                                                stage,
-                                                self.stages,
-                                                self.image_mask,
-                                                select_token=None,
-                                                image=flattened_visuals[0],
-                                                save_path=save_path,
-                                                attn_norm=self.attn_norm,
-                                            )
+                    ret_attn = get_heatmap(
+                                self.model,
+                                cont,
+                                self.tokenizer,
+                                question_input[0],
+                                input_ids,
+                                stage,
+                                self.stages,
+                                self.image_mask,
+                                select_token=None,
+                                image=flattened_visuals[0],
+                                save_path=save_path,
+                                attn_norm=self.attn_norm,
+                            )
+
+                    # self.stage_mean_list.append(str(stage_mean.item())[:6])
+                    # self.stage_max_list.append(str(stage_max.item())[:6])
 
                     if last_stage:
+                        # with open(f"./stage_mean.csv", "a") as f:
+                        #     f.write(str(",".join(self.stage_mean_list)) + "\n")
+                        # with open(f"./stage_max.csv", "a") as f:
+                        #     f.write(str(",".join(self.stage_max_list)) + "\n")
                         break
 
-                    # ### remove old attentions
-                    for temp_stage in self.stages:
-                        if temp_stage == stage:
-                            ret_attn = ret_attn * self.image_mask[temp_stage]
-                            break
-                        else:
-                            ret_attn = ret_attn * self.image_mask[temp_stage]
-                    self.image_mask[stage] = self.image_mask[stage] * abnomal_mask
-                    ret_attn = ret_attn * abnomal_mask
+                    # self.image_mask[stage] = self.image_mask[stage] * abnormal_mask
+                    # ret_attn = ret_attn * abnormal_mask
                     ### Threshold-based Recursion ######################################################
                     if len(self.attention_threshold) <= idx_stage:
                         attn_threshold_stage = self.attention_threshold[0]
@@ -745,7 +754,7 @@ class Llava(lmms):
                     else: 
                         self.activate_image_mask(self.stages[idx_stage + 1])
                     # self.image_mask[stage] = self.image_mask[stage] * (1 - self.image_mask[stage + 1])
-                    # self.image_mask[stage+1] = self.image_mask[stage+1] * abnomal_mask
+                    # self.image_mask[stage+1] = self.image_mask[stage+1] * abnormal_mask
                         
                     del cont
                     
@@ -836,17 +845,63 @@ class Llava(lmms):
     
     def set_pad_mask(self, size, origin_x, origin_y):
         self.pad_mask = dict()
-        for stage in self.stages:
-            grid = int(self.image_size * pow(2, stage) // self.patch_size)
-            temp_tensor = torch.zeros(grid, grid, device=self.device)
-            step = size // grid
-            for bounding_x, stepped_x in enumerate(range(0, size, step)):
-                if stepped_x >= origin_x: break
-            for bounding_y, stepped_y in enumerate(range(0, size, step)):
-                if stepped_y >= origin_y: break
-            temp_tensor[:bounding_y, :bounding_x] = 1
-            temp_tensor = F.interpolate(temp_tensor.unsqueeze(0).unsqueeze(0), size=(self.largest_grid_size, self.largest_grid_size), mode='nearest').squeeze()
-            self.pad_mask[stage] = temp_tensor
+        if self.square == 1:
+            for stage in self.stages:
+                grid = int(self.image_size * pow(2, stage) // self.patch_size)
+                temp_tensor = torch.zeros(grid, grid, device=self.device)
+                step = size / grid
+
+                init_x, init_y = 0, 0
+                stepped_x, stepped_y = 0, 0
+                while stepped_x <= (size - origin_x) / 2:
+                    stepped_x += step
+                    init_x += 1
+                while stepped_y <= (size - origin_y) / 2:
+                    stepped_y += step
+                    init_y += 1
+                end_x, end_y = init_x, init_y
+                while stepped_x < (size + origin_x) / 2:
+                    stepped_x += step
+                    end_x += 1
+                while stepped_y < (size + origin_y) / 2:
+                    stepped_y += step
+                    end_y += 1
+
+                temp_tensor[init_y - 1:end_y, init_x - 1:end_x] = 1
+                temp_tensor = F.interpolate(temp_tensor.unsqueeze(0).unsqueeze(0), size=(self.largest_grid_size, self.largest_grid_size), mode='nearest').squeeze()
+                self.pad_mask[stage] = temp_tensor
+        elif self.square == 2:
+            for stage in self.stages:
+                grid = int(self.image_size * pow(2, stage) // self.patch_size)
+                temp_tensor = torch.zeros(grid, grid, device=self.device)
+                step = size / grid
+
+                bounding_x, bounding_y = 0, 0
+                stepped_x, stepped_y = 0, 0
+                while stepped_x < origin_x:
+                    stepped_x += step
+                    bounding_x += 1
+                while stepped_y < origin_y:
+                    stepped_y += step
+                    bounding_y += 1
+
+                temp_tensor[:bounding_y, :bounding_x] = 1
+                temp_tensor = F.interpolate(temp_tensor.unsqueeze(0).unsqueeze(0), size=(self.largest_grid_size, self.largest_grid_size), mode='nearest').squeeze()
+                self.pad_mask[stage] = temp_tensor
+        elif self.square == 3:
+            for stage in self.stages:
+                grid = int(self.image_size * pow(2, stage) // self.patch_size)
+                temp_tensor = torch.zeros(grid, grid, device=self.device)
+                step = size // grid
+                bounding_x = 0
+                bounding_y = 0
+                for bounding_x, stepped_x in enumerate(range(0, size - origin_x, step)):
+                    if stepped_x >= size - origin_x: break
+                for bounding_y, stepped_y in enumerate(range(0, size - origin_y, step)):
+                    if stepped_y >= size - origin_y: break
+                temp_tensor[bounding_y:, bounding_x:] = 1
+                temp_tensor = F.interpolate(temp_tensor.unsqueeze(0).unsqueeze(0), size=(self.largest_grid_size, self.largest_grid_size), mode='nearest').squeeze()
+                self.pad_mask[stage] = temp_tensor
     
         # temp_tensor[:bounding_y, :bounding_x] = 1
         # temp_tensor = F.interpolate(temp_tensor.unsqueeze(0).unsqueeze(0), size=(self.largest_grid_size, self.largest_grid_size), mode='nearest').squeeze()
