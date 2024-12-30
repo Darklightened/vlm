@@ -56,25 +56,54 @@
 #     # --output_csv_path "./generation_output_pope_84-168-336-672-topk-80.csv" \
 #     # --visualize_heatmap True \
 
-python3 -m accelerate.commands.launch \
-    --num_processes=3 \
+# python3 -m accelerate.commands.launch \
+#     --num_processes=3 \
+#     -m lmms_eval \
+#     --model llava \
+#     --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
+#     --tasks mmbench_en_dev_lite,mme,mmmu_val,mmstar,vqav2_val_lite,realworldqa,pope_pop,textvqa_val_lite,chartqa_lite \
+#     --batch_size 1 \
+#     --log_samples \
+#     --log_samples_suffix llava_v1.6 \
+#     --output_path ./logs/ \
+#     --generation_type total \
+#     --fix_grid 2x2 \
+#     --remove_unpadding True \
+#     --attention_thresholding_type layer_mean_topk \
+#     --attention_threshold "0.3" \
+#     --attn_norm None \
+#     --stages "-1" "0" "1" \
+#     --verbosity DEBUG \
+#     --wandb_args "project=llava1.6_recursive_eval,entity=VLM_Hallucination_Woohyeon,name=168-336-672-total" \
+#     # --save_output True \
+#     # --output_csv_path "./generation_output_pope_84-168-336-672-topk-80.csv" \
+#     # --visualize_heatmap True \
+
+CUDA_VISIBLE_DEVICES=1 python3 -m accelerate.commands.launch \
+    --main_process_port 12345 \
+    --num_processes=1 \
     -m lmms_eval \
     --model llava \
     --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
-    --tasks mmbench_en_dev_lite,mme,mmmu_val,mmstar,vqav2_val_lite,realworldqa,pope_pop,textvqa_val_lite,chartqa_lite \
+    --tasks pope_gqa_pop \
     --batch_size 1 \
     --log_samples \
-    --log_samples_suffix llava_v1.6 \
+    --log_samples_suffix llava_v1.6_pope \
     --output_path ./logs/ \
-    --generation_type total \
+    --generation_type recursion \
     --fix_grid 2x2 \
-    --remove_unpadding True \
     --attention_thresholding_type layer_mean_topk \
-    --attention_threshold "0.3" \
-    --attn_norm None \
-    --stages "-1" "0" "1" \
+    --attention_threshold "[1.0,1.0,0.7]" \
+    --positional_embedding_type bilinear_interpolation \
+    --remove_unpadding True \
+    --attn_norm norm \
+    --stages "-2" "-1" "0" "1" \
     --verbosity DEBUG \
-    --wandb_args "project=llava1.6_recursive_eval,entity=VLM_Hallucination_Woohyeon,name=168-336-672-total" \
-    # --save_output True \
-    # --output_csv_path "./generation_output_pope_84-168-336-672-topk-80.csv" \
-    # --visualize_heatmap True \
+    --square 1 \
+    --tta_learning_rate 0.01 \
+    --tta_n_iter 0 \
+    --per_sample_iter 1 \
+    --contrastive_alpha 0.7 \
+    --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-100-100-70-bilinear-norm-lr001-iter0-n1-alpha07" \
+    --save_output True \
+    --output_csv_path "./generation_output_pope_aokvqa_pop_tta-topk-100-100-70-bilinear-norm-lr001-iter0-n1-alpha07.csv" \

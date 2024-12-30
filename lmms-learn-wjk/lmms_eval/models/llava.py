@@ -214,7 +214,7 @@ class Llava(lmms):
         try:
             # Try to load the model with the multimodal argument
             self._tokenizer, self._model, self._image_processor, self._max_length = load_pretrained_model(pretrained, None, model_name, 
-                                                                                                          device_map=None, 
+                                                                                                          device_map=self.device_map, 
                                                                                                           merging=self.merging, 
                                                                                                           **llava_model_args)
         except TypeError:
@@ -342,47 +342,47 @@ class Llava(lmms):
         print(f"model type: {type(self.model)}")
         print(f"vision tower: {self.model.model.vision_tower.device}")
         print(f"vision tower weight: {self.model.model.vision_tower.vision_tower.vision_model.embeddings.position_embedding.weight.data}")
-        # if self.stages[0] < 0:
-        #     self.model.model.downsampled_vision_towers = init_downsampled_vision_towers(
-        #         self.model.model.vision_tower,
-        #         self.stages,
-        #         self.positional_embedding_type,
-        #         device,
-        #     )
-        # self.patch_size = 14
-        # self.image_size = self.model.model.vision_tower.vision_tower.vision_model.embeddings.image_size
-        # self.smallest_grid_size = int(self.image_size * pow(2, stages[0]) // self.patch_size)
-        # self.largest_grid_size = int(self.image_size * pow(2, stages[-1]) // self.patch_size)
-        
-        if self.stages[0] < 0:    
-
-            gathered_params = {}
-
-            # Gather all parameters in vision_tower
-            for name, param in self.model.model.vision_tower.named_parameters():
-                with GatheredParameters([param], modifier_rank=0):
-                        #if torch.distributed.get_rank() == 0:
-                        # Save gathered parameter to a dictionary
-                        gathered_params[name] = param.clone()
-
-            #if torch.distributed.get_rank() == 0:
-                # Apply gathered parameters back to vision_tower
-            for name, param in self.model.model.vision_tower.named_parameters():
-                if name in gathered_params:
-                    param.data = gathered_params[name]
-
-            # Proceed with initialization
+        if self.stages[0] < 0:
             self.model.model.downsampled_vision_towers = init_downsampled_vision_towers(
                 self.model.model.vision_tower,
                 self.stages,
                 self.positional_embedding_type,
                 device,
             )
+        self.patch_size = 14
+        self.image_size = self.model.model.vision_tower.vision_tower.vision_model.embeddings.image_size
+        self.smallest_grid_size = int(self.image_size * pow(2, stages[0]) // self.patch_size)
+        self.largest_grid_size = int(self.image_size * pow(2, stages[-1]) // self.patch_size)
+        
+        # if self.stages[0] < 0:    
+
+        #     gathered_params = {}
+
+        #     # Gather all parameters in vision_tower
+        #     for name, param in self.model.model.vision_tower.named_parameters():
+        #         with GatheredParameters([param], modifier_rank=0):
+        #                 #if torch.distributed.get_rank() == 0:
+        #                 # Save gathered parameter to a dictionary
+        #                 gathered_params[name] = param.clone()
+
+        #     #if torch.distributed.get_rank() == 0:
+        #         # Apply gathered parameters back to vision_tower
+        #     for name, param in self.model.model.vision_tower.named_parameters():
+        #         if name in gathered_params:
+        #             param.data = gathered_params[name]
+
+        #     # Proceed with initialization
+        #     self.model.model.downsampled_vision_towers = init_downsampled_vision_towers(
+        #         self.model.model.vision_tower,
+        #         self.stages,
+        #         self.positional_embedding_type,
+        #         device,
+        #     )
             
-            self.patch_size = 14
-            self.image_size =self.model.model.vision_tower.vision_tower.vision_model.embeddings.image_size
-            self.smallest_grid_size = int(self.image_size * pow(2, stages[0]) // self.patch_size)
-            self.largest_grid_size = int(self.image_size * pow(2, stages[-1]) // self.patch_size)  
+        #     self.patch_size = 14
+        #     self.image_size =self.model.model.vision_tower.vision_tower.vision_model.embeddings.image_size
+        #     self.smallest_grid_size = int(self.image_size * pow(2, stages[0]) // self.patch_size)
+        #     self.largest_grid_size = int(self.image_size * pow(2, stages[-1]) // self.patch_size)  
             #     broadcast_values = [self.patch_size, self.image_size, self.smallest_grid_size, self.largest_grid_size] 
             # else:
             #     self.patch_size = None
@@ -414,89 +414,89 @@ class Llava(lmms):
         self.reset_image_mask()
         ## downsampled vision tower end
         ##################################################################################
-        print("preparing model")
-        self._model, self.optimizer = accelerator.prepare(self.model, self.optimizer)
-        self.accelerator = accelerator
-        self._rank = torch.distributed.get_rank()
-        self._word_size = 2
-        print("model loaded with accelerate")
+        # print("preparing model")
+        # self._model, self.optimizer = accelerator.prepare(self.model, self.optimizer)
+        # self.accelerator = accelerator
+        # self._rank = torch.distributed.get_rank()
+        # self._word_size = 2
+        # print("model loaded with accelerate")
 
-        # assert self.batch_size_per_gpu == 1, "Llava currently does not support batched generation. See https://github.com/haotian-liu/LLaVA/issues/754. HF Llava also has this issue."
-        # if accelerator.num_processes > 1:
-        #     print(f"distributed type: {accelerator.distributed_type}")
-        #     assert accelerator.distributed_type in [DistributedType.FSDP, DistributedType.MULTI_GPU, DistributedType.DEEPSPEED], "Unsupported distributed type provided. Only DDP and FSDP are supported."
-        #     # If you want to use DistributedType.DEEPSPEED, you have to run accelerate config before using the model
-        #     # Also, you have to select zero stage 0 (equivalent to DDP) in order to make the prepare model works
-        #     # I tried to set different parameters in the kwargs to let default zero 2 stage works, but it didn't work.
-        #     if accelerator.distributed_type == DistributedType.DEEPSPEED:                
-        #         kwargs = {
-        #             "train_micro_batch_size_per_gpu": self.batch_size_per_gpu,
-        #             "train_batch_size": self.batch_size_per_gpu * accelerator.num_processes,
-        #         }
-        #         AcceleratorState().deepspeed_plugin.deepspeed_config_process(must_match=True, **kwargs)
-        #         eval_logger.info("Detected that you are using DistributedType.DEEPSPEED. Make sure you run `accelerate config` and set zero stage to 0")
-        #     if accelerator.distributed_type == DistributedType.FSDP or accelerator.distributed_type == DistributedType.DEEPSPEED:
-        #         self._model = accelerator.prepare(self.model)
-        #     else:
-        #         self._model = accelerator.prepare_model(self.model, evaluation_mode=True)
-        #     self.accelerator = accelerator
-        #     if self.accelerator.is_local_main_process:
-        #         eval_logger.info(f"Using {accelerator.num_processes} devices with data parallelism")
-        #     self._rank = self.accelerator.local_process_index
-        #     self._world_size = self.accelerator.num_processes
-        # elif accelerator.num_processes == 1 and device_map == "auto":
-        #     eval_logger.info(f"Using {accelerator.num_processes} devices with tensor parallelism")
-        #     self._rank = 0
-        #     self._word_size = 1
-        # else:
-        #     eval_logger.info(f"Using single device: {self._device}")
-        #     self.model.to(self._device)
+        assert self.batch_size_per_gpu == 1, "Llava currently does not support batched generation. See https://github.com/haotian-liu/LLaVA/issues/754. HF Llava also has this issue."
+        if accelerator.num_processes > 1:
+            print(f"distributed type: {accelerator.distributed_type}")
+            assert accelerator.distributed_type in [DistributedType.FSDP, DistributedType.MULTI_GPU, DistributedType.DEEPSPEED], "Unsupported distributed type provided. Only DDP and FSDP are supported."
+            # If you want to use DistributedType.DEEPSPEED, you have to run accelerate config before using the model
+            # Also, you have to select zero stage 0 (equivalent to DDP) in order to make the prepare model works
+            # I tried to set different parameters in the kwargs to let default zero 2 stage works, but it didn't work.
+            if accelerator.distributed_type == DistributedType.DEEPSPEED:                
+                kwargs = {
+                    "train_micro_batch_size_per_gpu": self.batch_size_per_gpu,
+                    "train_batch_size": self.batch_size_per_gpu * accelerator.num_processes,
+                }
+                AcceleratorState().deepspeed_plugin.deepspeed_config_process(must_match=True, **kwargs)
+                eval_logger.info("Detected that you are using DistributedType.DEEPSPEED. Make sure you run `accelerate config` and set zero stage to 0")
+            if accelerator.distributed_type == DistributedType.FSDP or accelerator.distributed_type == DistributedType.DEEPSPEED:
+                self._model = accelerator.prepare(self.model)
+            else:
+                self._model = accelerator.prepare_model(self.model, evaluation_mode=True)
+            self.accelerator = accelerator
+            if self.accelerator.is_local_main_process:
+                eval_logger.info(f"Using {accelerator.num_processes} devices with data parallelism")
+            self._rank = self.accelerator.local_process_index
+            self._world_size = self.accelerator.num_processes
+        elif accelerator.num_processes == 1 and device_map == "auto":
+            eval_logger.info(f"Using {accelerator.num_processes} devices with tensor parallelism")
+            self._rank = 0
+            self._word_size = 1
+        else:
+            eval_logger.info(f"Using single device: {self._device}")
+            self.model.to(self._device)
             
-        #     self._rank = 0
-        #     self._world_size = 1
+            self._rank = 0
+            self._world_size = 1
             
-        #     print(f"initial threshold: {self.model.learnable_attn_threshold}")       
-        #     print(f"threshold in params: {'learnable_attn_threshold' in [name for name, _ in self.model.named_parameters()]}") 
-        #     self.model.register_parameter('learnable_attn_threshold', self.model.learnable_attn_threshold)                
+            print(f"initial threshold: {self.model.learnable_attn_threshold}")       
+            print(f"threshold in params: {'learnable_attn_threshold' in [name for name, _ in self.model.named_parameters()]}") 
+            self.model.register_parameter('learnable_attn_threshold', self.model.learnable_attn_threshold)                
             
-        #     if self.use_deepspeed:
-        #         self.optimizer = DeepSpeedCPUAdam([self.model.learnable_attn_threshold], lr=self.learning_rate)    
-        #         print(self.optimizer)            
-        #         self.model_engine, optimizer, _, _ = deepspeed.initialize(
-        #             model=self.model,                        
-        #             #model_parameters=[self.model.learnable_attn_threshold],
-        #             model_parameters=[self.model.learnable_attn_threshold],
-        #             optimizer = self.optimizer,
-        #             config_params="deepspeed_config.json"
-        #         )                   
-        #         self.optimizer = optimizer
-        #         torch.cuda.empty_cache()
-        #         gc.collect()
+            if self.use_deepspeed:
+                self.optimizer = DeepSpeedCPUAdam([self.model.learnable_attn_threshold], lr=self.learning_rate)    
+                print(self.optimizer)            
+                self.model_engine, optimizer, _, _ = deepspeed.initialize(
+                    model=self.model,                        
+                    #model_parameters=[self.model.learnable_attn_threshold],
+                    model_parameters=[self.model.learnable_attn_threshold],
+                    optimizer = self.optimizer,
+                    config_params="deepspeed_config.json"
+                )                   
+                self.optimizer = optimizer
+                torch.cuda.empty_cache()
+                gc.collect()
 
-        #         # threshold = self.model_engine.module.learnable_attn_threshold
+                # threshold = self.model_engine.module.learnable_attn_threshold
 
-        #         # with GatheredParameters([threshold], modifier_rank=None):
-        #         #     full_threshold = threshold.clone()  # Clone to avoid modifying the original tensor
-        #         #     print(f"Full learnable_attn_threshold: {full_threshold}")
-        #         # print(self.optimizer)  
-        #         # #self.model_engine.init_threshold(self.attention_threshold)
-        #         # print(f"initial threshold: {self.model_engine.module.learnable_attn_threshold}")
-        #         # print(f"initial model weight: {self.model_engine.module.lm_head}")
-        #         #print(f"initial threshold: {model_parameters}")
-        #         #print(self.model_engine)
-        #         # for name, param in self.model_engine.module.named_parameters():
-        #         #     if param.requires_grad:
-        #         #         print(f"Trainable parameter: {name}")
+                # with GatheredParameters([threshold], modifier_rank=None):
+                #     full_threshold = threshold.clone()  # Clone to avoid modifying the original tensor
+                #     print(f"Full learnable_attn_threshold: {full_threshold}")
+                # print(self.optimizer)  
+                # #self.model_engine.init_threshold(self.attention_threshold)
+                # print(f"initial threshold: {self.model_engine.module.learnable_attn_threshold}")
+                # print(f"initial model weight: {self.model_engine.module.lm_head}")
+                #print(f"initial threshold: {model_parameters}")
+                #print(self.model_engine)
+                # for name, param in self.model_engine.module.named_parameters():
+                #     if param.requires_grad:
+                #         print(f"Trainable parameter: {name}")
 
-        #         # for group in self.model_engine.optimizer.param_groups:
-        #         #     for param in group['params']:
-        #         #         print(param)
+                # for group in self.model_engine.optimizer.param_groups:
+                #     for param in group['params']:
+                #         print(param)
                 
-        #         # threshold = self.model_engine.module.learnable_attn_threshold
-        #         # print(f"Learnable Attention Threshold: {threshold}")
+                # threshold = self.model_engine.module.learnable_attn_threshold
+                # print(f"Learnable Attention Threshold: {threshold}")
 
-        #         # for name, param in self.model_engine.module.named_parameters():
-        #         #     print(f"{name}: {param}")
+                # for name, param in self.model_engine.module.named_parameters():
+                #     print(f"{name}: {param}")
 
             
         #     # for name, param in self.model.named_parameters():

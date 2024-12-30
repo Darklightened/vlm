@@ -1,6 +1,0 @@
-A chat between a curious user and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the user's questions. USER: <image>
-What part of the statue's outfit isn't made of the same material as the statue?
-Answer the question using a single word or phrase. ASSISTANT:
-A chat between a curious user and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the user's questions. USER: <image>
-What part of the statue's outfit isn't made of the same material as the statue?
-Answer the question using a single word or phrase. ASSISTANT:

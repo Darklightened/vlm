@@ -753,37 +753,8 @@
 #     --save_output True \
 #     --output_csv_path "./generation_output_pope_pop_tta-topk-50-50-50-bilinear-norm-lr0.01-iter1000-n5.csv" \
 
-CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
-    --main_process_port 29600 \
-    --num_processes=1 \
-    -m lmms_eval \
-    --model llava \
-    --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
-    --tasks pope \
-    --batch_size 1 \
-    --log_samples \
-    --log_samples_suffix llava_v1.6_pope \
-    --output_path ./logs/ \
-    --generation_type recursion \
-    --fix_grid 2x2 \
-    --attention_thresholding_type layer_mean_topk \
-    --attention_threshold "[0.9,0.9,0.3]" \
-    --positional_embedding_type bilinear_interpolation \
-    --remove_unpadding True \
-    --attn_norm norm \
-    --stages "-2" "-1" "0" "1" \
-    --verbosity DEBUG \
-    --square 1 \
-    --tta_learning_rate 0.01 \
-    --tta_n_iter 100 \
-    --per_sample_iter 1 \
-    --contrastive_alpha 0.7 \
-    --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-90-90-30-bilinear-norm-lr001-iter100-n1-alpha07" \
-    --save_output True \
-    --output_csv_path "./generation_output_pope_tta-topk-90-90-30-bilinear-norm-lr001-iter100-n1-alpha07.csv" \
-
 # CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
-#     --main_process_port 29600 \
+#     --main_process_port 12345 \
 #     --num_processes=1 \
 #     -m lmms_eval \
 #     --model llava \
@@ -796,7 +767,7 @@ CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
 #     --generation_type recursion \
 #     --fix_grid 2x2 \
 #     --attention_thresholding_type layer_mean_topk \
-#     --attention_threshold "[0.9,0.9,0.3]" \
+#     --attention_threshold "[0.9,0.9,0.4]" \
 #     --positional_embedding_type bilinear_interpolation \
 #     --remove_unpadding True \
 #     --attn_norm norm \
@@ -804,15 +775,305 @@ CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
 #     --verbosity DEBUG \
 #     --square 1 \
 #     --tta_learning_rate 0.01 \
-#     --tta_n_iter 100 \
+#     --tta_n_iter 0 \
 #     --per_sample_iter 1 \
-#     --contrastive_alpha 0.0 \
-#     --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-90-90-30-bilinear-norm-lr001-iter100-n1" \
+#     --contrastive_alpha 0.7 \
+#     --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-90-90-40-bilinear-norm-lr001-iter0-n1-alpha07" \
 #     --save_output True \
-#     --output_csv_path "./generation_output_pope_tta-topk-90-90-30-bilinear-norm-lr001-iter100-n1.csv" \
+#     --output_csv_path "./generation_output_pope_tta-topk-90-90-40-bilinear-norm-lr001-iter0-n1-alpha07.csv" \
 
 # CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
-#     --main_process_port 29600 \
+#     --main_process_port 12345 \
+#     --num_processes=1 \
+#     -m lmms_eval \
+#     --model llava \
+#     --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
+#     --tasks pope \
+#     --batch_size 1 \
+#     --log_samples \
+#     --log_samples_suffix llava_v1.6_pope \
+#     --output_path ./logs/ \
+#     --generation_type recursion \
+#     --fix_grid 2x2 \
+#     --attention_thresholding_type layer_mean_topk \
+#     --attention_threshold "[0.9,0.9,0.5]" \
+#     --positional_embedding_type bilinear_interpolation \
+#     --remove_unpadding True \
+#     --attn_norm norm \
+#     --stages "-2" "-1" "0" "1" \
+#     --verbosity DEBUG \
+#     --square 1 \
+#     --tta_learning_rate 0.01 \
+#     --tta_n_iter 0 \
+#     --per_sample_iter 1 \
+#     --contrastive_alpha 0.7 \
+#     --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-90-90-50-bilinear-norm-lr001-iter0-n1-alpha07" \
+#     --save_output True \
+#     --output_csv_path "./generation_output_pope_tta-topk-90-90-50-bilinear-norm-lr001-iter0-n1-alpha07.csv" \
+
+# CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
+#     --main_process_port 12345 \
+#     --num_processes=1 \
+#     -m lmms_eval \
+#     --model llava \
+#     --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
+#     --tasks pope \
+#     --batch_size 1 \
+#     --log_samples \
+#     --log_samples_suffix llava_v1.6_pope \
+#     --output_path ./logs/ \
+#     --generation_type recursion \
+#     --fix_grid 2x2 \
+#     --attention_thresholding_type layer_mean_topk \
+#     --attention_threshold "[0.9,0.9,0.6]" \
+#     --positional_embedding_type bilinear_interpolation \
+#     --remove_unpadding True \
+#     --attn_norm norm \
+#     --stages "-2" "-1" "0" "1" \
+#     --verbosity DEBUG \
+#     --square 1 \
+#     --tta_learning_rate 0.01 \
+#     --tta_n_iter 0 \
+#     --per_sample_iter 1 \
+#     --contrastive_alpha 0.7 \
+#     --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-90-90-60-bilinear-norm-lr001-iter0-n1-alpha07" \
+#     --save_output True \
+#     --output_csv_path "./generation_output_pope_tta-topk-90-90-60-bilinear-norm-lr001-iter0-n1-alpha07.csv" \
+
+# CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
+#     --main_process_port 12345 \
+#     --num_processes=1 \
+#     -m lmms_eval \
+#     --model llava \
+#     --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
+#     --tasks pope \
+#     --batch_size 1 \
+#     --log_samples \
+#     --log_samples_suffix llava_v1.6_pope \
+#     --output_path ./logs/ \
+#     --generation_type recursion \
+#     --fix_grid 2x2 \
+#     --attention_thresholding_type layer_mean_topk \
+#     --attention_threshold "[0.9,0.9,0.7]" \
+#     --positional_embedding_type bilinear_interpolation \
+#     --remove_unpadding True \
+#     --attn_norm norm \
+#     --stages "-2" "-1" "0" "1" \
+#     --verbosity DEBUG \
+#     --square 1 \
+#     --tta_learning_rate 0.01 \
+#     --tta_n_iter 0 \
+#     --per_sample_iter 1 \
+#     --contrastive_alpha 0.7 \
+#     --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-90-90-70-bilinear-norm-lr001-iter0-n1-alpha07" \
+#     --save_output True \
+#     --output_csv_path "./generation_output_pope_tta-topk-90-90-70-bilinear-norm-lr001-iter0-n1-alpha07.csv" \
+
+# CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
+#     --main_process_port 12345 \
+#     --num_processes=1 \
+#     -m lmms_eval \
+#     --model llava \
+#     --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
+#     --tasks pope \
+#     --batch_size 1 \
+#     --log_samples \
+#     --log_samples_suffix llava_v1.6_pope \
+#     --output_path ./logs/ \
+#     --generation_type recursion \
+#     --fix_grid 2x2 \
+#     --attention_thresholding_type layer_mean_topk \
+#     --attention_threshold "[0.9,0.9,0.4]" \
+#     --positional_embedding_type bilinear_interpolation \
+#     --remove_unpadding True \
+#     --attn_norm norm \
+#     --stages "-2" "-1" "0" "1" \
+#     --verbosity DEBUG \
+#     --square 1 \
+#     --tta_learning_rate 0.01 \
+#     --tta_n_iter 0 \
+#     --per_sample_iter 1 \
+#     --contrastive_alpha 0.7 \
+#     --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-90-90-40-bilinear-norm-lr001-iter0-n1-alpha07" \
+#     --save_output True \
+#     --output_csv_path "./generation_output_pope_tta-topk-90-90-40-bilinear-norm-lr001-iter0-n1-alpha07.csv" \
+
+# CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
+#     --main_process_port 12345 \
+#     --num_processes=1 \
+#     -m lmms_eval \
+#     --model llava \
+#     --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
+#     --tasks pope \
+#     --batch_size 1 \
+#     --log_samples \
+#     --log_samples_suffix llava_v1.6_pope \
+#     --output_path ./logs/ \
+#     --generation_type recursion \
+#     --fix_grid 2x2 \
+#     --attention_thresholding_type layer_mean_topk \
+#     --attention_threshold "[0.9,0.9,0.5]" \
+#     --positional_embedding_type bilinear_interpolation \
+#     --remove_unpadding True \
+#     --attn_norm norm \
+#     --stages "-2" "-1" "0" "1" \
+#     --verbosity DEBUG \
+#     --square 1 \
+#     --tta_learning_rate 0.01 \
+#     --tta_n_iter 0 \
+#     --per_sample_iter 1 \
+#     --contrastive_alpha 0.7 \
+#     --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-90-90-50-bilinear-norm-lr001-iter0-n1-alpha07" \
+#     --save_output True \
+#     --output_csv_path "./generation_output_pope_tta-topk-90-90-50-bilinear-norm-lr001-iter0-n1-alpha07.csv" \
+
+# CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
+#     --main_process_port 12345 \
+#     --num_processes=1 \
+#     -m lmms_eval \
+#     --model llava \
+#     --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
+#     --tasks pope \
+#     --batch_size 1 \
+#     --log_samples \
+#     --log_samples_suffix llava_v1.6_pope \
+#     --output_path ./logs/ \
+#     --generation_type recursion \
+#     --fix_grid 2x2 \
+#     --attention_thresholding_type layer_mean_topk \
+#     --attention_threshold "[0.9,0.9,0.6]" \
+#     --positional_embedding_type bilinear_interpolation \
+#     --remove_unpadding True \
+#     --attn_norm norm \
+#     --stages "-2" "-1" "0" "1" \
+#     --verbosity DEBUG \
+#     --square 1 \
+#     --tta_learning_rate 0.01 \
+#     --tta_n_iter 0 \
+#     --per_sample_iter 1 \
+#     --contrastive_alpha 0.7 \
+#     --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-90-90-60-bilinear-norm-lr001-iter0-n1-alpha07" \
+#     --save_output True \
+#     --output_csv_path "./generation_output_pope_tta-topk-90-90-60-bilinear-norm-lr001-iter0-n1-alpha07.csv" \
+
+# CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
+#     --main_process_port 12345 \
+#     --num_processes=1 \
+#     -m lmms_eval \
+#     --model llava \
+#     --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
+#     --tasks pope \
+#     --batch_size 1 \
+#     --log_samples \
+#     --log_samples_suffix llava_v1.6_pope \
+#     --output_path ./logs/ \
+#     --generation_type recursion \
+#     --fix_grid 2x2 \
+#     --attention_thresholding_type layer_mean_topk \
+#     --attention_threshold "[0.9,0.9,0.7]" \
+#     --positional_embedding_type bilinear_interpolation \
+#     --remove_unpadding True \
+#     --attn_norm norm \
+#     --stages "-2" "-1" "0" "1" \
+#     --verbosity DEBUG \
+#     --square 1 \
+#     --tta_learning_rate 0.01 \
+#     --tta_n_iter 0 \
+#     --per_sample_iter 1 \
+#     --contrastive_alpha 0.7 \
+#     --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-90-90-70-bilinear-norm-lr001-iter0-n1-alpha07" \
+#     --save_output True \
+#     --output_csv_path "./generation_output_pope_tta-topk-90-90-70-bilinear-norm-lr001-iter0-n1-alpha07.csv" \
+
+CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
+    --main_process_port 12345 \
+    --num_processes=1 \
+    -m lmms_eval \
+    --model llava \
+    --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
+    --tasks pope \
+    --batch_size 1 \
+    --log_samples \
+    --log_samples_suffix llava_v1.6_pope \
+    --output_path ./logs/ \
+    --generation_type recursion \
+    --fix_grid 2x2 \
+    --attention_thresholding_type layer_mean_topk \
+    --attention_threshold "[0.9,0.9,0.8]" \
+    --positional_embedding_type bilinear_interpolation \
+    --remove_unpadding True \
+    --attn_norm norm \
+    --stages "-2" "-1" "0" "1" \
+    --verbosity DEBUG \
+    --square 1 \
+    --tta_learning_rate 0.01 \
+    --tta_n_iter 0 \
+    --per_sample_iter 1 \
+    --contrastive_alpha 0.9 \
+    --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-90-90-80-bilinear-norm-lr001-iter0-n1-alpha09" \
+    --save_output True \
+    --output_csv_path "./generation_output_pope_tta-topk-90-90-80-bilinear-norm-lr001-iter0-n1-alpha09.csv" \
+
+CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
+    --main_process_port 12345 \
+    --num_processes=1 \
+    -m lmms_eval \
+    --model llava \
+    --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
+    --tasks pope \
+    --batch_size 1 \
+    --log_samples \
+    --log_samples_suffix llava_v1.6_pope \
+    --output_path ./logs/ \
+    --generation_type recursion \
+    --fix_grid 2x2 \
+    --attention_thresholding_type layer_mean_topk \
+    --attention_threshold "[0.9,0.9,0.8]" \
+    --positional_embedding_type bilinear_interpolation \
+    --remove_unpadding True \
+    --attn_norm norm \
+    --stages "-2" "-1" "0" "1" \
+    --verbosity DEBUG \
+    --square 1 \
+    --tta_learning_rate 0.01 \
+    --tta_n_iter 0 \
+    --per_sample_iter 1 \
+    --contrastive_alpha 1.0 \
+    --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-90-90-80-bilinear-norm-lr001-iter0-n1-alpha10" \
+    --save_output True \
+    --output_csv_path "./generation_output_pope_tta-topk-90-90-80-bilinear-norm-lr001-iter0-n1-alpha10.csv" \
+
+# CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
+#     --main_process_port 12345 \
+#     --num_processes=1 \
+#     -m lmms_eval \
+#     --model llava \
+#     --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
+#     --tasks pope \
+#     --batch_size 1 \
+#     --log_samples \
+#     --log_samples_suffix llava_v1.6_pope \
+#     --output_path ./logs/ \
+#     --generation_type recursion \
+#     --fix_grid 2x2 \
+#     --attention_thresholding_type layer_mean_topk \
+#     --attention_threshold "[0.9,0.9,0.9]" \
+#     --positional_embedding_type bilinear_interpolation \
+#     --remove_unpadding True \
+#     --attn_norm norm \
+#     --stages "-2" "-1" "0" "1" \
+#     --verbosity DEBUG \
+#     --square 1 \
+#     --tta_learning_rate 0.01 \
+#     --tta_n_iter 0 \
+#     --per_sample_iter 1 \
+#     --contrastive_alpha 0.7 \
+#     --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-90-90-90-bilinear-norm-lr001-iter0-n1-alpha07" \
+#     --save_output True \
+#     --output_csv_path "./generation_output_pope_tta-topk-90-90-90-bilinear-norm-lr001-iter0-n1-alpha07.csv" \
+
+# CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
+#     --main_process_port 12345 \
 #     --num_processes=1 \
 #     -m lmms_eval \
 #     --model llava \
@@ -820,12 +1081,12 @@ CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
 #     --tasks mme \
 #     --batch_size 1 \
 #     --log_samples \
-#     --log_samples_suffix llava_v1.6_pope \
+#     --log_samples_suffix llava_v1.6_mme \
 #     --output_path ./logs/ \
 #     --generation_type recursion \
 #     --fix_grid 2x2 \
 #     --attention_thresholding_type layer_mean_topk \
-#     --attention_threshold "[0.9,0.9,0.3]" \
+#     --attention_threshold "[0.9,0.9,0.4]" \
 #     --positional_embedding_type bilinear_interpolation \
 #     --remove_unpadding True \
 #     --attn_norm norm \
@@ -833,15 +1094,15 @@ CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
 #     --verbosity DEBUG \
 #     --square 1 \
 #     --tta_learning_rate 0.01 \
-#     --tta_n_iter 100 \
+#     --tta_n_iter 0 \
 #     --per_sample_iter 1 \
 #     --contrastive_alpha 0.7 \
-#     --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-90-90-30-bilinear-norm-lr001-iter100-n1-alpha07" \
+#     --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-90-90-40-bilinear-norm-lr001-iter0-n1-alpha07" \
 #     --save_output True \
-#     --output_csv_path "./generation_output_mme_tta-topk-90-90-30-bilinear-norm-lr001-iter100-n1-alpha07.csv" \
+#     --output_csv_path "./generation_output_mme_tta-topk-90-90-40-bilinear-norm-lr001-iter0-n1-alpha07.csv" \
 
 # CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
-#     --main_process_port 29600 \
+#     --main_process_port 12345 \
 #     --num_processes=1 \
 #     -m lmms_eval \
 #     --model llava \
@@ -849,12 +1110,12 @@ CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
 #     --tasks mme \
 #     --batch_size 1 \
 #     --log_samples \
-#     --log_samples_suffix llava_v1.6_pope \
+#     --log_samples_suffix llava_v1.6_mme \
 #     --output_path ./logs/ \
 #     --generation_type recursion \
 #     --fix_grid 2x2 \
 #     --attention_thresholding_type layer_mean_topk \
-#     --attention_threshold "[0.9,0.9,0.3]" \
+#     --attention_threshold "[0.9,0.9,0.5]" \
 #     --positional_embedding_type bilinear_interpolation \
 #     --remove_unpadding True \
 #     --attn_norm norm \
@@ -862,57 +1123,28 @@ CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
 #     --verbosity DEBUG \
 #     --square 1 \
 #     --tta_learning_rate 0.01 \
-#     --tta_n_iter 100 \
-#     --per_sample_iter 1 \
-#     --contrastive_alpha 0.0 \
-#     --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-90-90-30-bilinear-norm-lr001-iter100-n1" \
-#     --save_output True \
-#     --output_csv_path "./generation_output_mme_tta-topk-90-90-30-bilinear-norm-lr001-iter100-n1.csv" \
-
-# CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
-#     --main_process_port 29600 \
-#     --num_processes=1 \
-#     -m lmms_eval \
-#     --model llava \
-#     --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
-#     --tasks gqa_lite \
-#     --batch_size 1 \
-#     --log_samples \
-#     --log_samples_suffix llava_v1.6_pope \
-#     --output_path ./logs/ \
-#     --generation_type recursion \
-#     --fix_grid 2x2 \
-#     --attention_thresholding_type layer_mean_topk \
-#     --attention_threshold "[0.9,0.9,0.3]" \
-#     --positional_embedding_type bilinear_interpolation \
-#     --remove_unpadding True \
-#     --attn_norm norm \
-#     --stages "-2" "-1" "0" "1" \
-#     --verbosity DEBUG \
-#     --square 1 \
-#     --tta_learning_rate 0.01 \
-#     --tta_n_iter 100 \
+#     --tta_n_iter 0 \
 #     --per_sample_iter 1 \
 #     --contrastive_alpha 0.7 \
-#     --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-90-90-30-bilinear-norm-lr001-iter100-n1-alpha07" \
+#     --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-90-90-50-bilinear-norm-lr001-iter0-n1-alpha07" \
 #     --save_output True \
-#     --output_csv_path "./generation_output_gqa_lite_tta-topk-90-90-30-bilinear-norm-lr001-iter100-n1-alpha07.csv" \
+#     --output_csv_path "./generation_output_mme_tta-topk-90-90-50-bilinear-norm-lr001-iter0-n1-alpha07.csv" \
 
 # CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
-#     --main_process_port 29600 \
+#     --main_process_port 12345 \
 #     --num_processes=1 \
 #     -m lmms_eval \
 #     --model llava \
 #     --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
-#     --tasks gqa_lite \
+#     --tasks mme \
 #     --batch_size 1 \
 #     --log_samples \
-#     --log_samples_suffix llava_v1.6_pope \
+#     --log_samples_suffix llava_v1.6_mme \
 #     --output_path ./logs/ \
 #     --generation_type recursion \
 #     --fix_grid 2x2 \
 #     --attention_thresholding_type layer_mean_topk \
-#     --attention_threshold "[0.9,0.9,0.3]" \
+#     --attention_threshold "[0.9,0.9,0.6]" \
 #     --positional_embedding_type bilinear_interpolation \
 #     --remove_unpadding True \
 #     --attn_norm norm \
@@ -920,57 +1152,28 @@ CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
 #     --verbosity DEBUG \
 #     --square 1 \
 #     --tta_learning_rate 0.01 \
-#     --tta_n_iter 100 \
-#     --per_sample_iter 1 \
-#     --contrastive_alpha 0.0 \
-#     --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-90-90-30-bilinear-norm-lr001-iter100-n1" \
-#     --save_output True \
-#     --output_csv_path "./generation_output_gqa_lite_tta-topk-90-90-30-bilinear-norm-lr001-iter100-n1.csv" \
-
-# CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
-#     --main_process_port 29600 \
-#     --num_processes=1 \
-#     -m lmms_eval \
-#     --model llava \
-#     --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
-#     --tasks realworldqa \
-#     --batch_size 1 \
-#     --log_samples \
-#     --log_samples_suffix llava_v1.6_pope \
-#     --output_path ./logs/ \
-#     --generation_type recursion \
-#     --fix_grid 2x2 \
-#     --attention_thresholding_type layer_mean_topk \
-#     --attention_threshold "[0.9,0.9,0.3]" \
-#     --positional_embedding_type bilinear_interpolation \
-#     --remove_unpadding True \
-#     --attn_norm norm \
-#     --stages "-2" "-1" "0" "1" \
-#     --verbosity DEBUG \
-#     --square 1 \
-#     --tta_learning_rate 0.01 \
-#     --tta_n_iter 100 \
+#     --tta_n_iter 0 \
 #     --per_sample_iter 1 \
 #     --contrastive_alpha 0.7 \
-#     --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-90-90-30-bilinear-norm-lr001-iter100-n1-alpha07" \
+#     --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-90-90-60-bilinear-norm-lr001-iter0-n1-alpha07" \
 #     --save_output True \
-#     --output_csv_path "./generation_output_realworldqa_tta-topk-90-90-30-bilinear-norm-lr001-iter100-n1-alpha07.csv" \
+#     --output_csv_path "./generation_output_mme_tta-topk-90-90-60-bilinear-norm-lr001-iter0-n1-alpha07.csv" \
 
 # CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
-#     --main_process_port 29600 \
+#     --main_process_port 12345 \
 #     --num_processes=1 \
 #     -m lmms_eval \
 #     --model llava \
 #     --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
-#     --tasks realworldqa \
+#     --tasks mme \
 #     --batch_size 1 \
 #     --log_samples \
-#     --log_samples_suffix llava_v1.6_pope \
+#     --log_samples_suffix llava_v1.6_mme \
 #     --output_path ./logs/ \
 #     --generation_type recursion \
 #     --fix_grid 2x2 \
 #     --attention_thresholding_type layer_mean_topk \
-#     --attention_threshold "[0.9,0.9,0.3]" \
+#     --attention_threshold "[0.9,0.9,0.7]" \
 #     --positional_embedding_type bilinear_interpolation \
 #     --remove_unpadding True \
 #     --attn_norm norm \
@@ -978,57 +1181,28 @@ CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
 #     --verbosity DEBUG \
 #     --square 1 \
 #     --tta_learning_rate 0.01 \
-#     --tta_n_iter 100 \
-#     --per_sample_iter 1 \
-#     --contrastive_alpha 0.0 \
-#     --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-90-90-30-bilinear-norm-lr001-iter100-n1" \
-#     --save_output True \
-#     --output_csv_path "./generation_output_realworldqa_tta-topk-90-90-30-bilinear-norm-lr001-iter100-n1.csv" \
-
-# CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
-#     --main_process_port 29600 \
-#     --num_processes=1 \
-#     -m lmms_eval \
-#     --model llava \
-#     --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
-#     --tasks ok_vqa \
-#     --batch_size 1 \
-#     --log_samples \
-#     --log_samples_suffix llava_v1.6_pope \
-#     --output_path ./logs/ \
-#     --generation_type recursion \
-#     --fix_grid 2x2 \
-#     --attention_thresholding_type layer_mean_topk \
-#     --attention_threshold "[0.9,0.9,0.3]" \
-#     --positional_embedding_type bilinear_interpolation \
-#     --remove_unpadding True \
-#     --attn_norm norm \
-#     --stages "-2" "-1" "0" "1" \
-#     --verbosity DEBUG \
-#     --square 1 \
-#     --tta_learning_rate 0.01 \
-#     --tta_n_iter 100 \
+#     --tta_n_iter 0 \
 #     --per_sample_iter 1 \
 #     --contrastive_alpha 0.7 \
-#     --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-90-90-30-bilinear-norm-lr001-iter100-n1-alpha07" \
+#     --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-90-90-70-bilinear-norm-lr001-iter0-n1-alpha07" \
 #     --save_output True \
-#     --output_csv_path "./generation_output_ok_vqa_tta-topk-90-90-30-bilinear-norm-lr001-iter100-n1-alpha07.csv" \
+#     --output_csv_path "./generation_output_mme_tta-topk-90-90-70-bilinear-norm-lr001-iter0-n1-alpha07.csv" \
 
 # CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
-#     --main_process_port 29600 \
+#     --main_process_port 12345 \
 #     --num_processes=1 \
 #     -m lmms_eval \
 #     --model llava \
 #     --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
-#     --tasks ok_vqa \
+#     --tasks mme \
 #     --batch_size 1 \
 #     --log_samples \
-#     --log_samples_suffix llava_v1.6_pope \
+#     --log_samples_suffix llava_v1.6_mme \
 #     --output_path ./logs/ \
 #     --generation_type recursion \
 #     --fix_grid 2x2 \
 #     --attention_thresholding_type layer_mean_topk \
-#     --attention_threshold "[0.9,0.9,0.3]" \
+#     --attention_threshold "[0.9,0.9,0.4]" \
 #     --positional_embedding_type bilinear_interpolation \
 #     --remove_unpadding True \
 #     --attn_norm norm \
@@ -1036,12 +1210,357 @@ CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
 #     --verbosity DEBUG \
 #     --square 1 \
 #     --tta_learning_rate 0.01 \
-#     --tta_n_iter 100 \
+#     --tta_n_iter 0 \
 #     --per_sample_iter 1 \
-#     --contrastive_alpha 0.0 \
-#     --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-90-90-30-bilinear-norm-lr001-iter100-n1" \
+#     --contrastive_alpha 0.7 \
+#     --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-90-90-40-bilinear-norm-lr001-iter0-n1-alpha07" \
 #     --save_output True \
-#     --output_csv_path "./generation_output_ok_vqa_tta-topk-90-90-30-bilinear-norm-lr001-iter100-n1.csv" \
+#     --output_csv_path "./generation_output_mme_tta-topk-90-90-40-bilinear-norm-lr001-iter0-n1-alpha07.csv" \
+
+# CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
+#     --main_process_port 12345 \
+#     --num_processes=1 \
+#     -m lmms_eval \
+#     --model llava \
+#     --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
+#     --tasks mme \
+#     --batch_size 1 \
+#     --log_samples \
+#     --log_samples_suffix llava_v1.6_mme \
+#     --output_path ./logs/ \
+#     --generation_type recursion \
+#     --fix_grid 2x2 \
+#     --attention_thresholding_type layer_mean_topk \
+#     --attention_threshold "[0.9,0.9,0.5]" \
+#     --positional_embedding_type bilinear_interpolation \
+#     --remove_unpadding True \
+#     --attn_norm norm \
+#     --stages "-2" "-1" "0" "1" \
+#     --verbosity DEBUG \
+#     --square 1 \
+#     --tta_learning_rate 0.01 \
+#     --tta_n_iter 0 \
+#     --per_sample_iter 1 \
+#     --contrastive_alpha 0.7 \
+#     --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-90-90-50-bilinear-norm-lr001-iter0-n1-alpha07" \
+#     --save_output True \
+#     --output_csv_path "./generation_output_mme_tta-topk-90-90-50-bilinear-norm-lr001-iter0-n1-alpha07.csv" \
+
+# CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
+#     --main_process_port 12345 \
+#     --num_processes=1 \
+#     -m lmms_eval \
+#     --model llava \
+#     --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
+#     --tasks mme \
+#     --batch_size 1 \
+#     --log_samples \
+#     --log_samples_suffix llava_v1.6_mme \
+#     --output_path ./logs/ \
+#     --generation_type recursion \
+#     --fix_grid 2x2 \
+#     --attention_thresholding_type layer_mean_topk \
+#     --attention_threshold "[0.9,0.9,0.6]" \
+#     --positional_embedding_type bilinear_interpolation \
+#     --remove_unpadding True \
+#     --attn_norm norm \
+#     --stages "-2" "-1" "0" "1" \
+#     --verbosity DEBUG \
+#     --square 1 \
+#     --tta_learning_rate 0.01 \
+#     --tta_n_iter 0 \
+#     --per_sample_iter 1 \
+#     --contrastive_alpha 0.7 \
+#     --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-90-90-60-bilinear-norm-lr001-iter0-n1-alpha07" \
+#     --save_output True \
+#     --output_csv_path "./generation_output_mme_tta-topk-90-90-60-bilinear-norm-lr001-iter0-n1-alpha07.csv" \
+
+CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
+    --main_process_port 12345 \
+    --num_processes=1 \
+    -m lmms_eval \
+    --model llava \
+    --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
+    --tasks mme \
+    --batch_size 1 \
+    --log_samples \
+    --log_samples_suffix llava_v1.6_mme \
+    --output_path ./logs/ \
+    --generation_type recursion \
+    --fix_grid 2x2 \
+    --attention_thresholding_type layer_mean_topk \
+    --attention_threshold "[0.0,0.0,0.0]" \
+    --positional_embedding_type bilinear_interpolation \
+    --remove_unpadding True \
+    --attn_norm norm \
+    --stages "-2" "-1" "0" "1" \
+    --verbosity DEBUG \
+    --square 1 \
+    --tta_learning_rate 0.01 \
+    --tta_n_iter 0 \
+    --per_sample_iter 1 \
+    --contrastive_alpha 0.0 \
+    --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-0-0-0-bilinear-norm-lr001-iter0-n1" \
+
+CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
+    --main_process_port 12345 \
+    --num_processes=1 \
+    -m lmms_eval \
+    --model llava \
+    --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
+    --tasks mme \
+    --batch_size 1 \
+    --log_samples \
+    --log_samples_suffix llava_v1.6_mme \
+    --output_path ./logs/ \
+    --generation_type recursion \
+    --fix_grid 2x2 \
+    --attention_thresholding_type layer_mean_topk \
+    --attention_threshold "[1.0,0.0,0.0]" \
+    --positional_embedding_type bilinear_interpolation \
+    --remove_unpadding True \
+    --attn_norm norm \
+    --stages "-2" "-1" "0" "1" \
+    --verbosity DEBUG \
+    --square 1 \
+    --tta_learning_rate 0.01 \
+    --tta_n_iter 0 \
+    --per_sample_iter 1 \
+    --contrastive_alpha 0.0 \
+    --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-100-0-0-bilinear-norm-lr001-iter0-n1" \  
+
+CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
+    --main_process_port 12345 \
+    --num_processes=1 \
+    -m lmms_eval \
+    --model llava \
+    --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
+    --tasks mme \
+    --batch_size 1 \
+    --log_samples \
+    --log_samples_suffix llava_v1.6_mme \
+    --output_path ./logs/ \
+    --generation_type recursion \
+    --fix_grid 2x2 \
+    --attention_thresholding_type layer_mean_topk \
+    --attention_threshold "[1.0,1.0,0.0]" \
+    --positional_embedding_type bilinear_interpolation \
+    --remove_unpadding True \
+    --attn_norm norm \
+    --stages "-2" "-1" "0" "1" \
+    --verbosity DEBUG \
+    --square 1 \
+    --tta_learning_rate 0.01 \
+    --tta_n_iter 0 \
+    --per_sample_iter 1 \
+    --contrastive_alpha 0.0 \
+    --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-100-100-0-bilinear-norm-lr001-iter0-n1-alpha07" \
+    --save_output True \
+    --output_csv_path "./generation_output_mme_tta-topk-90-90-80-bilinear-norm-lr001-iter0-n1-alpha07.csv" \
+
+CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
+    --main_process_port 12345 \
+    --num_processes=1 \
+    -m lmms_eval \
+    --model llava \
+    --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
+    --tasks mme \
+    --batch_size 1 \
+    --log_samples \
+    --log_samples_suffix llava_v1.6_mme \
+    --output_path ./logs/ \
+    --generation_type recursion \
+    --fix_grid 2x2 \
+    --attention_thresholding_type layer_mean_topk \
+    --attention_threshold "[1.0,1.0,1.0]" \
+    --positional_embedding_type bilinear_interpolation \
+    --remove_unpadding True \
+    --attn_norm norm \
+    --stages "-2" "-1" "0" "1" \
+    --verbosity DEBUG \
+    --square 1 \
+    --tta_learning_rate 0.01 \
+    --tta_n_iter 0 \
+    --per_sample_iter 1 \
+    --contrastive_alpha 0.0 \
+    --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-100-100-100-bilinear-norm-lr001-iter0-n1-alpha07" \
+    --save_output True \
+    --output_csv_path "./generation_output_mme_tta-topk-90-90-90-bilinear-norm-lr001-iter0-n1-alpha07.csv" \
+
+CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
+    --main_process_port 12345 \
+    --num_processes=1 \
+    -m lmms_eval \
+    --model llava \
+    --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
+    --tasks mmstar \
+    --batch_size 1 \
+    --log_samples \
+    --log_samples_suffix llava_v1.6_pope \
+    --output_path ./logs/ \
+    --generation_type recursion \
+    --fix_grid 2x2 \
+    --attention_thresholding_type layer_mean_topk \
+    --attention_threshold "[0.9,0.9,0.8]" \
+    --positional_embedding_type bilinear_interpolation \
+    --remove_unpadding True \
+    --attn_norm norm \
+    --stages "-2" "-1" "0" "1" \
+    --verbosity DEBUG \
+    --square 1 \
+    --tta_learning_rate 0.01 \
+    --tta_n_iter 0 \
+    --per_sample_iter 1 \
+    --contrastive_alpha 0.7 \
+    --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-90-90-80-bilinear-norm-lr001-iter0-n1-alpha07" \
+    --save_output True \
+    --output_csv_path "./generation_output_pope_tta-topk-90-90-80-bilinear-norm-lr001-iter0-n1-alpha07.csv" \
+
+CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
+    --main_process_port 12345 \
+    --num_processes=1 \
+    -m lmms_eval \
+    --model llava \
+    --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
+    --tasks mmstar \
+    --batch_size 1 \
+    --log_samples \
+    --log_samples_suffix llava_v1.6_pope \
+    --output_path ./logs/ \
+    --generation_type recursion \
+    --fix_grid 2x2 \
+    --attention_thresholding_type layer_mean_topk \
+    --attention_threshold "[0.9,0.9,0.7]" \
+    --positional_embedding_type bilinear_interpolation \
+    --remove_unpadding True \
+    --attn_norm norm \
+    --stages "-2" "-1" "0" "1" \
+    --verbosity DEBUG \
+    --square 1 \
+    --tta_learning_rate 0.01 \
+    --tta_n_iter 0 \
+    --per_sample_iter 1 \
+    --contrastive_alpha 0.7 \
+    --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-90-90-70-bilinear-norm-lr001-iter0-n1-alpha07" \
+    --save_output True \
+    --output_csv_path "./generation_output_pope_tta-topk-90-90-70-bilinear-norm-lr001-iter0-n1-alpha07.csv" \
+
+CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
+    --main_process_port 12345 \
+    --num_processes=1 \
+    -m lmms_eval \
+    --model llava \
+    --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
+    --tasks mmstar \
+    --batch_size 1 \
+    --log_samples \
+    --log_samples_suffix llava_v1.6_pope \
+    --output_path ./logs/ \
+    --generation_type recursion \
+    --fix_grid 2x2 \
+    --attention_thresholding_type layer_mean_topk \
+    --attention_threshold "[0.9,0.9,0.6]" \
+    --positional_embedding_type bilinear_interpolation \
+    --remove_unpadding True \
+    --attn_norm norm \
+    --stages "-2" "-1" "0" "1" \
+    --verbosity DEBUG \
+    --square 1 \
+    --tta_learning_rate 0.01 \
+    --tta_n_iter 0 \
+    --per_sample_iter 1 \
+    --contrastive_alpha 0.7 \
+    --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-90-90-60-bilinear-norm-lr001-iter0-n1-alpha07" \
+    --save_output True \
+    --output_csv_path "./generation_output_pope_tta-topk-90-90-60-bilinear-norm-lr001-iter0-n1-alpha07.csv" \
+
+CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
+    --main_process_port 12345 \
+    --num_processes=1 \
+    -m lmms_eval \
+    --model llava \
+    --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
+    --tasks pope \
+    --batch_size 1 \
+    --log_samples \
+    --log_samples_suffix llava_v1.6_pope \
+    --output_path ./logs/ \
+    --generation_type recursion \
+    --fix_grid 2x2 \
+    --attention_thresholding_type layer_mean_topk \
+    --attention_threshold "[1.0,1.0,0.6]" \
+    --positional_embedding_type bilinear_interpolation \
+    --remove_unpadding True \
+    --attn_norm norm \
+    --stages "-2" "-1" "0" "1" \
+    --verbosity DEBUG \
+    --square 1 \
+    --tta_learning_rate 0.01 \
+    --tta_n_iter 0 \
+    --per_sample_iter 1 \
+    --contrastive_alpha 0.7 \
+    --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-100-100-60-bilinear-norm-lr001-iter0-n1-alpha07" \
+    --save_output True \
+    --output_csv_path "./generation_output_pope_tta-topk-100-100-60-bilinear-norm-lr001-iter0-n1-alpha07.csv" \
+
+CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
+    --main_process_port 12345 \
+    --num_processes=1 \
+    -m lmms_eval \
+    --model llava \
+    --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
+    --tasks pope \
+    --batch_size 1 \
+    --log_samples \
+    --log_samples_suffix llava_v1.6_pope \
+    --output_path ./logs/ \
+    --generation_type recursion \
+    --fix_grid 2x2 \
+    --attention_thresholding_type layer_mean_topk \
+    --attention_threshold "[1.0,1.0,0.7]" \
+    --positional_embedding_type bilinear_interpolation \
+    --remove_unpadding True \
+    --attn_norm norm \
+    --stages "-2" "-1" "0" "1" \
+    --verbosity DEBUG \
+    --square 1 \
+    --tta_learning_rate 0.01 \
+    --tta_n_iter 0 \
+    --per_sample_iter 1 \
+    --contrastive_alpha 0.7 \
+    --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-100-100-70-bilinear-norm-lr001-iter0-n1-alpha07" \
+    --save_output True \
+    --output_csv_path "./generation_output_pope_tta-topk-100-100-70-bilinear-norm-lr001-iter0-n1-alpha07.csv" \
+
+CUDA_VISIBLE_DEVICES=3 python3 -m accelerate.commands.launch \
+    --main_process_port 12345 \
+    --num_processes=1 \
+    -m lmms_eval \
+    --model llava \
+    --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
+    --tasks pope \
+    --batch_size 1 \
+    --log_samples \
+    --log_samples_suffix llava_v1.6_pope \
+    --output_path ./logs/ \
+    --generation_type recursion \
+    --fix_grid 2x2 \
+    --attention_thresholding_type layer_mean_topk \
+    --attention_threshold "[1.0,1.0,0.8]" \
+    --positional_embedding_type bilinear_interpolation \
+    --remove_unpadding True \
+    --attn_norm norm \
+    --stages "-2" "-1" "0" "1" \
+    --verbosity DEBUG \
+    --square 1 \
+    --tta_learning_rate 0.01 \
+    --tta_n_iter 0 \
+    --per_sample_iter 1 \
+    --contrastive_alpha 0.7 \
+    --wandb_args "project=llava1.6_recursive_eval_1219,entity=VLM_Hallucination_Woohyeon,name=tta-topk-100-100-80-bilinear-norm-lr001-iter0-n1-alpha07" \
+    --save_output True \
+    --output_csv_path "./generation_output_pope_tta-topk-100-100-80-bilinear-norm-lr001-iter0-n1-alpha07.csv" \
+
 
 
 

@@ -153,4 +153,6 @@ data/
 *.jpg
 *.png
 *.json
+*.jsonl
 *.whl
+*.zip
