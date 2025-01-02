@@ -631,7 +631,7 @@ class Llava(lmms):
                         save_path = None
                     
                     ## Necessary for unpad
-                    self.combine_image_and_pad_mask()
+                    # self.combine_image_and_pad_mask()
                     
                     last_stage = (stage == self.stages[-1])
 
