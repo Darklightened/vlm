@@ -51,6 +51,7 @@ class LlavaRecursionConfig():
     square: int = 1
     fix_grid: Optional[str] = "2x2"
     _device: str = "cuda:0"
+    use_noised_for_contrastive: bool = False
 
 class LlavaLlamaForRecursion(LlavaLlamaForCausalLM):
     config_class = LlavaRecursionConfig
@@ -107,6 +108,7 @@ class LlavaLlamaForRecursion(LlavaLlamaForCausalLM):
         self.save_output = recursion_config.save_output
         self.output_csv_path = recursion_config.output_csv_path
         self.contrastive_alphas = recursion_config.contrastive_alphas    
+        self.use_noised_for_contrastive = recursion_config.use_noised_for_contrastive
     
     def init_downsampled_vision_towers(self, vision_tower, stages, positional_embedding_type, device):
         print(f"change positional embedding to {positional_embedding_type}")
@@ -299,12 +301,16 @@ class LlavaLlamaForRecursion(LlavaLlamaForCausalLM):
         tokenizer = kwargs.pop("tokenizer", None)
         question_input = kwargs.pop("question_input", None)
 
+        if self.use_noised_for_contrastive:
+            noised_images = add_diffusion_noise(images, 500)
+
         self.reset_image_mask() 
-        final_text = "" 
+        #final_text = "" 
+        final_token = []        
 
         for token_idx in range(max_length):
             self.reset_image_mask()
-            stage_logit_list = []
+            stage_logit_list = []            
 
             for idx_stage, stage in enumerate(self.stages):
                 # Necessary for unpadding
@@ -352,16 +358,41 @@ class LlavaLlamaForRecursion(LlavaLlamaForCausalLM):
                     self.save_stage_to_csv(doc_id, f"Stage {idx_stage}", text_outputs, cumulative_confidences)
 
                 if last_stage:
-                    # Multi-stage contrastive decoding
+                    # Contrastive decoding
                     final_logit = scores[0]
-                    for idx in range(len(self.stages) - 1):
-                        final_logit += self.contrastive_alphas[idx] * (stage_logit_list[idx + 1] - stage_logit_list[idx])
+
+                    # use noised version of image for decoding
+                    if self.use_noised_for_contrastive:
+                        print("use noised anti")
+                        noised_cont = self.generate(
+                            input_ids,
+                            attention_mask=attention_mask,
+                            pad_token_id=pad_token_ids,
+                            images=noised_images,
+                            image_sizes=gen_kwargs["image_sizes"],
+                            do_sample=True if gen_kwargs["temperature"] > 0 else False,
+                            temperature=gen_kwargs["temperature"],
+                            top_p=gen_kwargs["top_p"],
+                            num_beams=gen_kwargs["num_beams"],
+                            max_new_tokens=1,                    
+                            generation_type=None,
+                            return_dict_in_generate=True,
+                            output_attentions=False,
+                            output_scores=True                            
+                        )
+                        noised_scores = noised_cont.scores[0]
+                        final_logit += self.contrastive_alphas[-1]*(final_logit - noised_scores)
+                    else:
+                        # use multi-stage contrastive decoding
+                        for idx in range(len(self.stages) - 1):
+                            final_logit += self.contrastive_alphas[idx] * (stage_logit_list[idx + 1] - stage_logit_list[idx])
 
                     best_token = torch.argmax(final_logit, dim=-1)
-                    stage_text = tokenizer.batch_decode(best_token, skip_special_tokens=True)[0]
+                    final_token.append(best_token.item())
+                    #stage_text = tokenizer.batch_decode(best_token, skip_special_tokens=True)[0]
 
                     # Append decoded text to final output
-                    final_text += stage_text
+                    final_text = tokenizer.batch_decode([final_token], skip_special_tokens=True)[0]
                     print(f'final_text: {final_text}')
 
                     # Update input_ids and attention_mask for the next token

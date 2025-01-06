@@ -195,6 +195,8 @@ def simple_evaluate(
                 # "detection": cli_args.detection,
                 "save_output": cli_args.save_output,
                 "output_csv_path": cli_args.output_csv_path,
+                "contrastive_alphas": cli_args.contrastive_alphas,
+                "use_noised_for_contrastive": cli_args.use_noised_for_contrastive,
                 # "target_token_selection_strategy": cli_args.target_token_selection_strategy,
             },
         )

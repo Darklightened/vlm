@@ -123,6 +123,9 @@ class Llava(lmms):
         positional_embedding_type="reduced",
         square=1,
         contrastive_alphas=[1.0,1.0,1.0],
+        use_noised_for_contrastive=False,
+        save_logit=False,
+        output_logit_path = "logit.csv",
         **kwargs,
     ) -> None:
         super().__init__()
@@ -195,6 +198,7 @@ class Llava(lmms):
         self.recursion_config.fix_grid = fix_grid
         self.recursion_config.contrastive_alphas = contrastive_alphas
         self.recursion_config._device = device
+        self.recursion_config.use_noised_for_contrastive = use_noised_for_contrastive
 
         print(self.recursion_config)
         
@@ -575,7 +579,7 @@ class Llava(lmms):
                 pad_token_id=pad_token_ids,
                 images=image_tensor,
                 gen_kwargs = gen_kwargs,               
-                max_length = 10,
+                max_length = 1,
                 use_cache=self.use_cache,                 
                 downsampled_images = downsampled_image_tensors,
                 doc_id = doc_id,

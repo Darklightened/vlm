@@ -307,20 +307,21 @@ class LlavaMetaForCausalLM(ABC):
             split_sizes = [image.shape[0] for image in images_list]
             encoded_image_features = self.encode_images(concat_images)
             
-            ## get stages
-            stages = []
-            for stage in downsampled_images.keys():
-                if stage < 0:
-                    stages.append(stage)
-            if len(stages) > 0:
-                stages.sort()
+            if downsampled_images is not None:
+                ## get stages
+                stages = []
+                for stage in downsampled_images.keys():
+                    if stage < 0:
+                        stages.append(stage)
+                if len(stages) > 0:
+                    stages.sort()
             
-            ## encode downsampled images
-            encoded_downsampled_image_features = []
-            for stage in stages:
-                encoded_downsampled_image_features.append(
-                    self.encode_downsampled_images(downsampled_images[stage].squeeze(0), stage)
-                )
+                ## encode downsampled images
+                encoded_downsampled_image_features = []
+                for stage in stages:
+                    encoded_downsampled_image_features.append(
+                        self.encode_downsampled_images(downsampled_images[stage].squeeze(0), stage)
+                    )
             # image_features,all_faster_video_features = self.encode_multimodals(concat_images, video_idx_in_batch, split_sizes)
             # This is a list, each element is [num_images, patch * patch, dim]
             # rank_print(f"Concat images : {concat_images.shape}")

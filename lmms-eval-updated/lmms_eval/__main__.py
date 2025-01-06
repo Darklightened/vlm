@@ -388,6 +388,19 @@ def parse_eval_args() -> argparse.Namespace:
         default=1,
         help="square - int, 1: center, 2: oneside",
     )
+    parser.add_argument(
+        "--contrastive_alphas",
+        nargs="*",
+        type=float,
+        default=[1.0, 1.0, 1.0],
+        help="alphas for contrastive decoding",
+    )
+    parser.add_argument(
+        "--use_noised_for_contrastive",        
+        type=bool,
+        default=False,
+        help="whether to use noised image for contrastive decoding",
+    )
 
 
     args = parser.parse_args()
