@@ -15,7 +15,7 @@ python3 -m accelerate.commands.launch \
     --num_processes=1 \
     --main_process_port 29823 \
     -m lmms_eval \
-    --device cuda:2 \
+    --device cuda:3 \
     --model llava \
     --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
     --tasks vqav2_val_lite \
@@ -32,8 +32,8 @@ python3 -m accelerate.commands.launch \
     --attn_norm None \
     --stages "-2" "-1" "0" "1" \
     --verbosity DEBUG \
-    --square 2 \
-    --wandb_args "project=llava1.6_recursive_eval_1126,entity=VLM_Hallucination_Woohyeon,name=red-90" \
+    --square 1 \
+    --wandb_args "project=llava1.6_recursive_eval_1126,entity=VLM_Hallucination_Woohyeon,name=vqa-1-red-conf" \
     # --visualize_heatmap True \
     # --save_output True \
     # --output_csv_path "./generation_output_pope_84-168-336-672-pad-topk-80.csv" \

@@ -1,0 +1,37 @@
+[32m2025-01-02 03:57:42.631[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate[0m:[36m420[0m - [1mVerbosity set to DEBUG[0m
+[32m2025-01-02 03:57:43.989[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.tasks[0m:[36m_get_task_and_group[0m:[36m452[0m - [34m[1m`group` and `group_alias` keys in tasks' configs will no longer be used in the next release of lmms-eval. `tag` will be used to allow to call a collection of tasks just like `group`. `group` will be removed in order to not cause confusion with the new ConfigurableGroup which will be the offical way to create groups with addition of group-wide configuations.[0m
+[32m2025-01-02 03:57:44.728[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m503[0m - [1mEvaluation tracker args: {'output_path': './logs/'}[0m
+[32m2025-01-02 03:57:44.729[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m592[0m - [1mSelected Tasks: ['mmbench_en_dev_lite'][0m
+[32m2025-01-02 03:57:44.734[0m | [1mINFO    [0m | [36mlmms_eval.evaluator[0m:[36msimple_evaluate[0m:[36m155[0m - [1mSetting random seed to 0 | Setting numpy seed to 1234 | Setting torch manual seed to 1234[0m
+initialize llava model with modification
+OpenCLIP not installed
+self.merging= None
+model_name: llava-v1.6-vicuna-7b
+Loaded LLaVA model: liuhaotian/llava-v1.6-vicuna-7b
+loding from here
+Loading vision tower: openai/clip-vit-large-patch14-336
+Model Class: LlavaLlamaForCausalLM
+device: cuda:3
+generation_type: recursion
+fix_grid: 2x2
+attention_thresholding_type: layer_mean_topk
+attention_norm: None
+attention_threshold: 0.9
+detection_strategy: None
+detection_threshold: 0.8
+save_output: False
+save_output_csv_path: generation_output.csv
+target_token_selection_strategy: first
+stages: [-2, -1, 0, 1]
+positional_embedding_type: reduced
+visualize_heatmap: False
+square: 1
+remove unpadding=True, change to 'spatial'
+change positional embedding to reduced
+Reduced embedding type.
+Reduced embedding type.
+[32m2025-01-02 03:58:09.635[0m | [1mINFO    [0m | [36mlmms_eval.models.llava[0m:[36m__init__[0m:[36m324[0m - [1mUsing single device: cuda:3[0m
+[32m2025-01-02 03:58:10.084[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.caching.cache[0m:[36mload_from_cache[0m:[36m33[0m - [34m[1mrequests-mmbench_en_dev_lite-0shot-rank0-world_size1-tokenizer is not cached, generating...[0m
+[32m2025-01-02 03:58:10.084[0m | [1mINFO    [0m | [36mlmms_eval.api.task[0m:[36mbuild_all_requests[0m:[36m425[0m - [1mBuilding contexts for mmbench_en_dev_lite on rank 0...[0m
+[32m2025-01-02 03:58:10.465[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.evaluator[0m:[36mevaluate[0m:[36m455[0m - [34m[1mTask: mmbench_en_dev_lite; number of requests on this rank: 500[0m
+[32m2025-01-02 03:58:10.465[0m | [1mINFO    [0m | [36mlmms_eval.evaluator[0m:[36mevaluate[0m:[36m476[0m - [1mRunning generate_until requests[0m

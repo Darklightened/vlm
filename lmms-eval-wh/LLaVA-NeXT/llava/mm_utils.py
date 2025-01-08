@@ -992,6 +992,25 @@ def make_square_center(im, min_size, smallest_grid_size, fill_color=(0, 0, 0)):
     new_im.paste(im, (int((size - x) / 2), int((size - y) / 2)))
     return new_im, size, x, y
 
+# resize, center
+def make_square_resize(im, min_size, smallest_grid_size, fill_color=(0, 0, 0)):
+    x, y = im.size
+    if x < min_size and y < min_size:
+        if x >= y:
+            w_percent = min_size / float(x)
+            new_height = int(float(y) * w_percent)
+            im = im.resize((min_size, new_height), Image.LANCZOS)
+        else:
+            h_percent = min_size / float(y)
+            new_width = int(float(x) * h_percent)
+            im = im.resize((new_width, min_size), Image.LANCZOS)
+    x, y = im.size
+    size = (max(min_size, x, y))
+    size = max(min_size, x, y)
+    new_im = Image.new('RGB', (size, size), fill_color)
+    new_im.paste(im, (int((size - x) / 2), int((size - y) / 2)))
+    return new_im, size, x, y
+
 
 # one-side padding
 def make_square_top_left(im, min_size, smallest_grid_size, fill_color=(0, 0, 0)):

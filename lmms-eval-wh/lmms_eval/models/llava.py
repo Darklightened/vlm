@@ -67,6 +67,7 @@ try:
         make_square_center,
         make_square_top_left,
         make_square_bot_right,
+        make_square_resize,
         init_downsampled_vision_towers,
     )
     from llava.mm_utils import (
@@ -265,9 +266,12 @@ class Llava(lmms):
             self.make_square = make_square_top_left
         elif self.square == 3:
             self.make_square = make_square_bot_right
+        elif self.square == 4:
+            self.make_square = make_square_resize
 
         self.stage_mean_list = []
         self.stage_max_list = []
+        self.last_conf = 0
         
         ##################################################################################
         ## init downsampled vision towers
@@ -695,11 +699,11 @@ class Llava(lmms):
                             cv2.imwrite(f"{save_path}/mask_{temp_stage}.png", mask_image)
                             if temp_stage == stage: break
                                  
+                    _, _, cumulative_confidences = calculate_entropy_and_all_confidences(
+                        sequences, scores = scores
+                    )  
                     # Save confidence for analysis
                     if self.save_output:                            
-                        _, _, cumulative_confidences = calculate_entropy_and_all_confidences(
-                            sequences, scores = scores
-                        )  
                         self.save_stage_to_csv(f"Stage {idx_stage}", doc_id, text_outputs, cumulative_confidences)
                         
                     ret_attn = get_heatmap(
@@ -719,12 +723,13 @@ class Llava(lmms):
 
                     # self.stage_mean_list.append(str(stage_mean.item())[:6])
                     # self.stage_max_list.append(str(stage_max.item())[:6])
-
+                    
                     if last_stage:
                         # with open(f"./stage_mean.csv", "a") as f:
                         #     f.write(str(",".join(self.stage_mean_list)) + "\n")
                         # with open(f"./stage_max.csv", "a") as f:
                         #     f.write(str(",".join(self.stage_max_list)) + "\n")
+                        del cont
                         break
 
                     # self.image_mask[stage] = self.image_mask[stage] * abnormal_mask
@@ -742,7 +747,8 @@ class Llava(lmms):
                         
                     elif self.attention_thresholding_type == "layer_mean_topk":
                         self.image_mask[stage+1] = layer_mean_topk_based_recursion(attn = ret_attn, # select token index
-                                                   top_k = self.attention_threshold[idx_stage], 
+                                                #    top_k = self.attention_threshold[idx_stage], 
+                                                   top_k = 1 - cumulative_confidences[-1], 
                                                    image_mask = self.image_mask[stage+1])
                     
                     elif self.attention_thresholding_type == "confidence_topk": 

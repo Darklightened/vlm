@@ -495,13 +495,13 @@ class LlavaMetaForCausalLM(ABC):
                             patches_per_side = self.get_vision_tower().num_patches_per_side * 2
                             stage1_feature = stage1_feature.permute(0, 2, 1, 3, 4).contiguous()
                             stage1_feature = stage1_feature.view(patches_per_side, patches_per_side, -1)
-                            # stage1_feature = stage1_feature.view(patches_per_side, patches_per_side, -1)
                             mask = image_mask[1]
                             resized_mask = torch.nn.functional.interpolate(mask.unsqueeze(0).unsqueeze(0), size=(patches_per_side, patches_per_side), mode='nearest')
                             resized_mask = resized_mask.squeeze().unsqueeze(-1)
                             stage1_feature = stage1_feature * resized_mask
                             # stage1_feature = stage1_feature.view(patches_per_side ** 2, -1)
                             stage1_feature = stage1_feature.flatten(0, 1)
+
                             for f in stage1_feature:
                                 if f.min() == 0 and f.max() == 0: continue
                                 stage1_features_list.append(f.unsqueeze(0))
