@@ -1,0 +1,55 @@
+#!/bin/bash
+
+# python cd_gridsearch_test.py \
+#     --logit_file_path "./logit_mmbench_en_dev_lite_70_50_10_bilinear_s1.json" \
+#     --response_file_path "./logs/liuhaotian__llava-v1.6-vicuna-7b/20250109_032749_samples_mmbench_en_dev_lite.jsonl" \
+#     --output_path_grid_search "./cd_grid_mmbench_70-50-10.json" \
+#     --mode mmbench \
+
+# python cd_gridsearch_test.py \
+#     --logit_file_path "./logit_mmbench_en_dev_lite_70_70_30_bilinear_s1.json" \
+#     --response_file_path "./logs/liuhaotian__llava-v1.6-vicuna-7b/20250109_032749_samples_mmbench_en_dev_lite.jsonl" \
+#     --output_path_grid_search "./cd_grid_mmbench_70-70-30.json" \
+#     --mode mmbench \
+
+# python cd_gridsearch_test.py \
+#     --logit_file_path "./logit_mmbench_en_dev_lite_100_50_30_bilinear_s1.json" \
+#     --response_file_path "./logs/liuhaotian__llava-v1.6-vicuna-7b/20250109_032749_samples_mmbench_en_dev_lite.jsonl" \
+#     --output_path_grid_search "./cd_grid_mmbench_100-50-30.json" \
+#     --mode mmbench \
+
+# python cd_gridsearch_test.py \
+#     --logit_file_path "./logit_mmstar_50_100_50_bilinear_s1.json" \
+#     --response_file_path "./logs/liuhaotian__llava-v1.6-vicuna-7b/20250109_024012_samples_mmstar.jsonl" \
+#     --output_path_grid_search "./cd_grid_mmstar_50-100-50.json" \
+#     --mode mmstar \
+
+# python cd_gridsearch_test.py \
+#     --logit_file_path "./logit_mmstar_100_30_70_bilinear_s1.json" \
+#     --response_file_path "./logs/liuhaotian__llava-v1.6-vicuna-7b/20250109_024012_samples_mmstar.jsonl" \
+#     --output_path_grid_search "./cd_grid_mmstar_100-30-70.json" \
+#     --mode mmstar \
+
+# python cd_gridsearch_test.py \
+#     --logit_file_path "./logit_mmstar_100_70_50_bilinear_s1.json" \
+#     --response_file_path "./logs/liuhaotian__llava-v1.6-vicuna-7b/20250109_024012_samples_mmstar.jsonl" \
+#     --output_path_grid_search "./cd_grid_mmstar_100-70-50.json" \
+#     --mode mmstar \
+
+# python cd_gridsearch_test.py \
+#     --logit_file_path "./logit_pope_aokvqa_pop_50_100_30_bilinear_s1.json" \
+#     --response_file_path "./logs/liuhaotian__llava-v1.6-vicuna-7b/20250109_113650_samples_pope_aokvqa_pop.jsonl" \
+#     --output_path_grid_search "./cd_grid_pope_aokvqa_pop_50-100-30.json" \
+#     --mode pope_aokvqa \
+
+# python cd_gridsearch_test.py \
+#     --logit_file_path "./logit_pope_aokvqa_pop_100_100_70_bilinear_s1.json" \
+#     --response_file_path "./logs/liuhaotian__llava-v1.6-vicuna-7b/20250109_113650_samples_pope_aokvqa_pop.jsonl" \
+#     --output_path_grid_search "./cd_grid_pope_aokvqa_pop_100-100-70.json" \
+#     --mode pope_aokvqa \
+
+python cd_gridsearch_test.py \
+    --logit_file_path "./logit_pope_aokvqa_pop_70_100_30_bilinear_s1.json" \
+    --response_file_path "./logs/liuhaotian__llava-v1.6-vicuna-7b/20250109_113650_samples_pope_aokvqa_pop.jsonl" \
+    --output_path_grid_search "./cd_grid_pope_aokvqa_pop_70-100-30.json" \
+    --mode pope_aokvqa \

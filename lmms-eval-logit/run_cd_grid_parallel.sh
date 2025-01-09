@@ -1,0 +1,59 @@
+#!/bin/bash
+
+# Run all Python scripts concurrently with output redirection
+python cd_gridsearch_test.py \
+    --logit_file_path "./logit_mmbench_en_dev_lite_70_50_10_bilinear_s1.json" \
+    --response_file_path "./logs/liuhaotian__llava-v1.6-vicuna-7b/20250109_032749_samples_mmbench_en_dev_lite.jsonl" \
+    --output_path_grid_search "./cd_grid_mmbench_70-50-10.json" \
+    --mode mmbench > "./logs_p/job1.out" 2> "./logs_p/job1.err" &
+
+python cd_gridsearch_test.py \
+    --logit_file_path "./logit_mmbench_en_dev_lite_70_70_30_bilinear_s1.json" \
+    --response_file_path "./logs/liuhaotian__llava-v1.6-vicuna-7b/20250109_032749_samples_mmbench_en_dev_lite.jsonl" \
+    --output_path_grid_search "./cd_grid_mmbench_70-70-30.json" \
+    --mode mmbench > "./logs_p/job2.out" 2> "./logs_p/job2.err" &
+
+python cd_gridsearch_test.py \
+    --logit_file_path "./logit_mmbench_en_dev_lite_100_50_30_bilinear_s1.json" \
+    --response_file_path "./logs/liuhaotian__llava-v1.6-vicuna-7b/20250109_032749_samples_mmbench_en_dev_lite.jsonl" \
+    --output_path_grid_search "./cd_grid_mmbench_100-50-30.json" \
+    --mode mmbench > "./logs_p/job3.out" 2> "./logs_p/job3.err" &
+
+python cd_gridsearch_test.py \
+    --logit_file_path "./logit_mmstar_50_100_50_bilinear_s1.json" \
+    --response_file_path "./logs/liuhaotian__llava-v1.6-vicuna-7b/20250109_024012_samples_mmstar.jsonl" \
+    --output_path_grid_search "./cd_grid_mmstar_50-100-50.json" \
+    --mode mmstar > "./logs_p/job4.out" 2> "./logs_p/job4.err" &
+
+python cd_gridsearch_test.py \
+    --logit_file_path "./logit_mmstar_100_30_70_bilinear_s1.json" \
+    --response_file_path "./logs/liuhaotian__llava-v1.6-vicuna-7b/20250109_024012_samples_mmstar.jsonl" \
+    --output_path_grid_search "./cd_grid_mmstar_100-30-70.json" \
+    --mode mmstar > "./logs_p/job5.out" 2> "./logs_p/job5.err" &
+
+python cd_gridsearch_test.py \
+    --logit_file_path "./logit_mmstar_100_70_50_bilinear_s1.json" \
+    --response_file_path "./logs/liuhaotian__llava-v1.6-vicuna-7b/20250109_024012_samples_mmstar.jsonl" \
+    --output_path_grid_search "./cd_grid_mmstar_100-70-50.json" \
+    --mode mmstar > "./logs_p/job6.out" 2> "./logs_p/job6.err" &
+
+python cd_gridsearch_test.py \
+    --logit_file_path "./logit_pope_pop_50_100_30_bilinear_s1.json" \
+    --response_file_path "./logs/liuhaotian__llava-v1.6-vicuna-7b/20250109_075904_samples_pope_pop.jsonl" \
+    --output_path_grid_search "./cd_grid_pope_pop_50-100-30.json" \
+    --mode pope > "./logs_p/job7.out" 2> "./logs_p/job7.err" &
+
+python cd_gridsearch_test.py \
+    --logit_file_path "./logit_pope_pop_70_100_30_bilinear_s1.json" \
+    --response_file_path "./logs/liuhaotian__llava-v1.6-vicuna-7b/20250109_075904_samples_pope_pop.jsonl" \
+    --output_path_grid_search "./cd_grid_pope_pop_70-100-30.json" \
+    --mode pope > "./logs_p/job8.out" 2> "./logs_p/job8.err" &
+
+python cd_gridsearch_test.py \
+    --logit_file_path "./logit_pope_pop_100_100_70_bilinear_s1.json" \
+    --response_file_path "./logs/liuhaotian__llava-v1.6-vicuna-7b/20250109_075904_samples_pope_pop.jsonl" \
+    --output_path_grid_search "./cd_grid_pope_pop_100-100-70.json" \
+    --mode pope > "./logs_p/job9.out" 2> "./logs_p/job9.err" &
+
+# Wait for all background processes to complete
+wait
