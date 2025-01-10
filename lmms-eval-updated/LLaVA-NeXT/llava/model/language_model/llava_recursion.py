@@ -383,9 +383,32 @@ class LlavaLlamaForRecursion(LlavaLlamaForCausalLM):
                         noised_scores = noised_cont.scores[0]
                         final_logit += self.contrastive_alphas[-1]*(final_logit - noised_scores)
                     else:
-                        # use multi-stage contrastive decoding
-                        for idx in range(len(self.stages) - 1):
-                            final_logit += self.contrastive_alphas[idx] * (stage_logit_list[idx + 1] - stage_logit_list[idx])
+                        code_adaptive = True
+
+                        if code_adaptive:
+                            # Use multi-stage contrastive decoding
+                            for idx in range(len(self.stages) - 1):
+                                p_v = nn.functional.softmax(stage_logit_list[idx + 1], dim=-1)
+                                p_d = nn.functional.softmax(stage_logit_list[idx], dim=-1)
+
+                                # Calculate KL-based adaptive weight
+                                cd_alpha = self.contrastive_alphas[idx]
+                                kl_d = 0.5 * ((torch.log2(torch.abs(p_v - p_d) ** cd_alpha + 1)) * (p_v + p_d)).sum(dim=-1).unsqueeze(-1)
+                                kld_alpha = 1 - kl_d
+
+                                # Calculate cutoff threshold
+                                cutoff = kl_d * p_v.max(dim=-1, keepdim=True).values
+
+                                # Calculate stage-specific contrastive logits
+                                diffs = (1 + kld_alpha) * stage_logit_list[idx + 1] - kld_alpha * stage_logit_list[idx]
+                                cd_logits = diffs.masked_fill(p_v < cutoff, -float("inf"))
+
+                                # Update final logits with weighted stage contributions
+                                final_logit += cd_logits
+                        else:
+                            # use multi-stage contrastive decoding
+                            for idx in range(len(self.stages) - 1):
+                                final_logit += self.contrastive_alphas[idx] * (stage_logit_list[idx + 1] - stage_logit_list[idx])
 
                     best_token = torch.argmax(final_logit, dim=-1)
                     final_token.append(best_token.item())

@@ -30,18 +30,17 @@ def entropy_based_threshold(attn_map, base_threshold=0.2, scaling_factor=2, max_
     threshold = min(max(threshold, 0.1), 0.9)  # Ensure it stays within range
     return threshold
 
-def confidence_based_threshold(cumulative_confidences, base_threshold=0.2):
+def confidence_based_threshold(cumulative_confidences, base_threshold=0.3):
     # Take the last value from cumulative_confidences as the final confidence
     final_confidence = cumulative_confidences[-1]
 
-    # Use exponential scaling for sensitivity
-    sensitive_confidence = torch.exp(torch.tensor(final_confidence))  # Center around 1
+    # Use reciprocal scaling
+    sensitive_confidence = 1 / (1 + final_confidence)  # Avoid division by zero
     
-    print(f'Calculated Sensitive Confidence: {sensitive_confidence}')  
-    
-    # Modify the threshold based on the sensitive confidence
-    threshold = base_threshold * sensitive_confidence  # Increase threshold as confidence rises
-    threshold = min(max(threshold, 0.1), 0.9)  # Ensure threshold stays within range
+    # Modify the threshold
+    threshold = base_threshold * sensitive_confidence  # Decrease threshold as confidence rises
+    threshold = min(max(threshold, 0.0), 1.0)  # Ensure threshold stays within range
+    print(f'Calculated Threshold: {threshold}')
     return threshold
 
 def calculate_entropy_and_all_confidences(sequence, scores):
@@ -123,4 +122,83 @@ def confidence_topk_based_recursion(attn = None, top_k = 0.1, sequences = None, 
             if attn[row, col] >= threshold_value:
                 image_mask[row][col] = 1
     
+    return image_mask
+
+import torch
+
+def calculate_attention_entropy(attn):
+    """
+    Calculate the entropy of the attention map.
+    Args:
+        attn (torch.Tensor): Attention map of shape (num_heads, seq_len, seq_len).
+    Returns:
+        float: Mean entropy across all attention heads.
+    """
+    # Normalize attention map along the last dimension (softmax-like normalization)
+    attn_probs = attn / attn.sum(dim=-1, keepdim=True)
+
+    # Avoid log(0) by adding a small epsilon
+    eps = 1e-9
+    attn_probs = attn_probs + eps
+
+    # Compute entropy: -sum(p * log(p))
+    entropy = -torch.sum(attn_probs * torch.log(attn_probs), dim=-1)
+
+    # Average entropy across all heads
+    mean_entropy = entropy.mean().item()
+    return mean_entropy
+
+
+def attn_entropy_topk_based_recursion(attn=None, image_mask=None, base_top_k=0.3): 
+    """
+    Adjust Top-K threshold dynamically based on attention map entropy.
+    Args:
+        attn (torch.Tensor): Attention map of shape (num_heads, seq_len, seq_len).
+        image_mask (torch.Tensor): Binary mask to be updated.
+        base_top_k (float): Base Top-K threshold (default: 0.3).
+    Returns:
+        torch.Tensor: Updated image mask.
+    """
+    def calculate_attention_entropy(attn):
+        """
+        Calculate the entropy of the attention map.
+        """
+        # Normalize attention map along the last dimension (softmax-like normalization)
+        attn_probs = attn / attn.sum(dim=-1, keepdim=True)
+
+        # Avoid log(0) by adding a small epsilon
+        eps = 1e-9
+        attn_probs = attn_probs + eps
+
+        # Compute entropy: -sum(p * log(p))
+        entropy = -torch.sum(attn_probs * torch.log(attn_probs), dim=-1)
+
+        # Average entropy across all heads
+        return entropy.mean().item()
+
+    # Step 1: Calculate entropy of the attention map
+    entropy = calculate_attention_entropy(attn)
+
+    # Step 2: Dynamically adjust the threshold based on entropy
+    # Normalize entropy to the range [0, 1] for dynamic threshold scaling
+    max_entropy = torch.log(torch.tensor(attn.shape[-1], dtype=torch.float))  # Max entropy for uniform dist
+    normalized_entropy = entropy / max_entropy.item()
+
+    # Adjust Top-K threshold: high entropy → low Top-K, low entropy → high Top-K
+    calculated_threshold = min(base_top_k * 10 * (1 - normalized_entropy),1.0)  # Reverse relationship
+
+    # Print the entropy and calculated threshold for debugging
+    print(f"Entropy: {entropy:.4f}, Normalized Entropy: {normalized_entropy:.4f}, Calculated Top-K Threshold: {calculated_threshold:.4f}")
+
+    # Step 3: Flatten attention map and calculate Top-K threshold
+    flattened_attn = attn.view(-1).float()
+    threshold_index = int(len(flattened_attn) * calculated_threshold)
+    threshold_value = torch.topk(flattened_attn, threshold_index).values[-1]
+
+    # Step 4: Update the image mask based on the threshold
+    for row in range(attn.shape[0]):
+        for col in range(attn.shape[1]):
+            if attn[row, col] >= threshold_value:
+                image_mask[row][col] = 1
+
     return image_mask
