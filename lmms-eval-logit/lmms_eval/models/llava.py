@@ -202,7 +202,7 @@ class Llava(lmms):
         self.save_output = save_output
         self.output_json_path = output_json_path
         self.target_token_selection_strategy = target_token_selection_strategy
-        assert 0 in stages, "stages must have 0, which means stage of 336."
+        assert 0 in stages, "stages must have 0, which means stage of image size 336."
         assert sorted(stages) == stages, "stages must be sorted."
         self.stages = stages
         self.positional_embedding_type = positional_embedding_type
@@ -839,6 +839,11 @@ class Llava(lmms):
                                                    sequences = sequences,
                                                    scores = scores, 
                                                    image_mask = self.image_mask[stage+1])
+                    elif self.attention_thresholding_type == "attn_topk":
+                        self.image_mask[stage+1] = attn_entropy_topk_based_recursion(attn = ret_attn, # select token index
+                                                   base_top_k= self.attention_threshold[idx_stage], 
+                                                   image_mask = self.image_mask[stage+1])
+
                     else: 
                         self.activate_image_mask(self.stages[idx_stage + 1])
                     # self.image_mask[stage] = self.image_mask[stage] * (1 - self.image_mask[stage + 1])
