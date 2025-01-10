@@ -41,6 +41,7 @@ from llava.mm_utils import (
     get_model_name_from_path,
     process_images,
     tokenizer_image_token,
+    KeywordsStoppingCriteria,
 )
 from llava.model.builder import load_pretrained_model
 
@@ -104,13 +105,17 @@ class Llava(lmms):
         if "use_flash_attention_2" in kwargs:
             llava_model_args["use_flash_attention_2"] = kwargs["use_flash_attention_2"]
         model_name = model_name if model_name is not None else get_model_name_from_path(pretrained)
-        try:
-            # Try to load the model with the multimodal argument
-            self._tokenizer, self._model, self._image_processor, self._max_length = load_pretrained_model(pretrained, None, model_name, device_map=self.device_map, **llava_model_args)
-        except TypeError:
-            # for older versions of LLaVA that don't have multimodal argument
-            llava_model_args.pop("multimodal", None)
-            self._tokenizer, self._model, self._image_processor, self._max_length = load_pretrained_model(pretrained, None, model_name, device_map=self.device_map, **llava_model_args)
+        # try:
+        #     # Try to load the model with the multimodal argument
+        #     self._tokenizer, self._model, self._image_processor, self._max_length = load_pretrained_model(pretrained, None, model_name, device_map=self.device_map, **llava_model_args)
+        # except TypeError:
+        #     # for older versions of LLaVA that don't have multimodal argument
+        #     llava_model_args.pop("multimodal", None)
+        #     self._tokenizer, self._model, self._image_processor, self._max_length = load_pretrained_model(pretrained, None, model_name, device_map=self.device_map, **llava_model_args)
+        
+        llava_model_args.pop("multimodal", None)
+        self._tokenizer, self._model, self._image_processor, self._max_length = load_pretrained_model(pretrained, None, model_name, device_map=self.device_map, **llava_model_args)
+     
         self._config = self._model.config
         self.model.eval()
         if tie_weights:
@@ -370,11 +375,12 @@ class Llava(lmms):
                 if "llama_3" in self.conv_template:
                     conv = copy.deepcopy(conv_templates[self.conv_template])
                 else:
-                    conv = conv_templates[self.conv_template].copy()
+                    conv = conv_templates["mm_default"].copy()
                 conv.append_message(conv.roles[0], question)
                 conv.append_message(conv.roles[1], None)
                 prompt_question = conv.get_prompt()
                 question_input.append(prompt_question)
+                # question_input.append(question)
 
             # input_ids = tokenizer_image_token(prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt").unsqueeze(0).to(self.device)
             # preconfigure gen_kwargs with defaults
@@ -395,12 +401,16 @@ class Llava(lmms):
             # These steps are not in LLaVA's original code, but are necessary for generation to work
             # TODO: attention to this major generation step...
             try:
+                stop_str = conv.sep
+                keywords = [stop_str]
+                stopping_criteria = KeywordsStoppingCriteria(keywords, self.tokenizer, input_ids)
                 cont = self.model.generate(
                     input_ids,
                     attention_mask=attention_masks,
                     pad_token_id=pad_token_ids,
                     images=image_tensor,
-                    image_sizes=gen_kwargs["image_sizes"],
+                    # image_sizes=gen_kwargs["image_sizes"],
+                    stopping_criteria=[stopping_criteria],
                     do_sample=True if gen_kwargs["temperature"] > 0 else False,
                     temperature=gen_kwargs["temperature"],
                     top_p=gen_kwargs["top_p"],
@@ -408,7 +418,34 @@ class Llava(lmms):
                     max_new_tokens=gen_kwargs["max_new_tokens"],
                     use_cache=self.use_cache,
                 )
-                text_outputs = self.tokenizer.batch_decode(cont, skip_special_tokens=True)
+                text_outputs = self.tokenizer.batch_decode(cont, skip_special_tokens=True)[0]
+                # text_outputs = text_outputs.strip()
+                # text_outputs = text_outputs.replace("###", "")
+                # text_outputs = text_outputs.replace("\n", "")
+                # text_outputs = text_outputs.strip()
+
+                input_token_len = input_ids.shape[1]
+                n_diff_input_output = (input_ids != cont[:, :input_token_len]).sum().item()
+                if n_diff_input_output > 0:
+                    print(
+                        f"[Warning] {n_diff_input_output} cont are not the same as the input_ids"
+                    )
+                outputs = self.tokenizer.batch_decode(
+                    cont[:, input_token_len:], skip_special_tokens=True
+                )[0]
+                text_outputs = outputs.strip()
+                text_outputs = text_outputs.replace("###", "")
+                text_outputs = text_outputs.replace("\n", "")
+                text_outputs = text_outputs.strip()
+
+                # keyword = "Human:"
+                # if keyword in text_outputs:
+                #     text_outputs = text_outputs[:text_outputs.find(keyword)]
+                #     text_outputs = text_outputs.strip()
+
+                # print(cont[:, input_token_len:])
+                print(text_outputs)
+                text_outputs = [text_outputs]
             except Exception as e:
                 raise e
                 eval_logger.error(f"Error {e} in generating")
