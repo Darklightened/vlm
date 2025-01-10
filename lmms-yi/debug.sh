@@ -13,11 +13,11 @@
     # --device cuda:2 \
 
 python3 -m accelerate.commands.launch \
-    --num_processes=1 \
+    --num_processes=3 \
     -m lmms_eval \
     --model llava \
     --model_args pretrained="01-ai/Yi-VL-6B" \
-    --tasks vqav2_val_lite \
+    --tasks pope_pop \
     --batch_size 1 \
     --log_samples \
     --log_samples_suffix llava_v1.6_pope \

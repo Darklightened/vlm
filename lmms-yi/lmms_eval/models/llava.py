@@ -35,15 +35,16 @@ from loguru import logger as eval_logger
 # except Exception as e:
 #     eval_logger.debug("LLaVA is not installed. Please install LLaVA to use this model.\nError: %s" % e)
 
-from llava.constants import DEFAULT_IMAGE_TOKEN, IMAGE_TOKEN_INDEX
-from llava.conversation import conv_templates
-from llava.mm_utils import (
+from llava_yi.model.constants import DEFAULT_IMAGE_TOKEN, IMAGE_TOKEN_INDEX
+from llava_yi.conversation import conv_templates
+from llava_yi.mm_utils import (
     get_model_name_from_path,
     process_images,
     tokenizer_image_token,
     KeywordsStoppingCriteria,
+    load_pretrained_model
 )
-from llava.model.builder import load_pretrained_model
+# from llava_yi.model.builder import load_pretrained_model
 
 
 # inference implementation for attention, can be "sdpa", "eager", "flash_attention_2". Seems FA2 is not effective during inference: https://discuss.huggingface.co/t/flash-attention-has-no-effect-on-inference/73453/5
@@ -100,8 +101,8 @@ class Llava(lmms):
         }
         if customized_config is not None:
             llava_model_args["customized_config"] = customized_config
-        if attn_implementation is not None:
-            llava_model_args["attn_implementation"] = attn_implementation
+        # if attn_implementation is not None:
+        #     llava_model_args["attn_implementation"] = attn_implementation
         if "use_flash_attention_2" in kwargs:
             llava_model_args["use_flash_attention_2"] = kwargs["use_flash_attention_2"]
         model_name = model_name if model_name is not None else get_model_name_from_path(pretrained)
@@ -346,11 +347,14 @@ class Llava(lmms):
                 eval_logger.info(f"Setting image aspect ratio: {self._config.image_aspect_ratio}")
             # encode, pad, and truncate contexts for this batch
             if flattened_visuals:
+                # image_tensor = process_images([raw_image_data], self.image_processor, self.model.config)
+                # image_tensor = image_tensor.to(self.model.device, dtype=torch.bfloat16)
+
                 image_tensor = process_images(flattened_visuals, self._image_processor, self._config)
                 if type(image_tensor) is list:
-                    image_tensor = [_image.to(dtype=torch.float16, device=self.device) for _image in image_tensor]
+                    image_tensor = [_image.to(dtype=torch.bfloat16, device=self.device) for _image in image_tensor]
                 else:
-                    image_tensor = image_tensor.to(dtype=torch.float16, device=self.device)
+                    image_tensor = image_tensor.to(dtype=torch.bfloat16, device=self.device)
             else:
                 image_tensor = None
 
@@ -358,85 +362,94 @@ class Llava(lmms):
 
             question_input = []
 
-            for visual, context in zip(batched_visuals, contexts):
-                if image_tensor is not None and len(image_tensor) != 0 and DEFAULT_IMAGE_TOKEN not in context:
-                    """
-                    Three senarios:
-                    1. No image, and there for, no image token should be added.
-                    2. image token is already specified in the context, so we don't need to add it.
-                    3. image token is not specified in the context and there is image inputs, so we need to add it. In this case, we add the image token at the beginning of the context and add a new line.
-                    """
-                    image_tokens = [DEFAULT_IMAGE_TOKEN] * len(visual) if isinstance(visual, list) else [DEFAULT_IMAGE_TOKEN]
-                    image_tokens = " ".join(image_tokens)
-                    question = image_tokens + "\n" + context
-                else:
-                    question = context
-                # This is much safer for llama3, as we now have some object type in it
-                if "llama_3" in self.conv_template:
-                    conv = copy.deepcopy(conv_templates[self.conv_template])
-                else:
-                    conv = conv_templates["mm_default"].copy()
-                conv.append_message(conv.roles[0], question)
-                conv.append_message(conv.roles[1], None)
-                prompt_question = conv.get_prompt()
-                question_input.append(prompt_question)
-                # question_input.append(question)
+            # for visual, context in zip(batched_visuals, contexts):
+            #     if image_tensor is not None and len(image_tensor) != 0 and DEFAULT_IMAGE_TOKEN not in context:
+            #         """
+            #         Three senarios:
+            #         1. No image, and there for, no image token should be added.
+            #         2. image token is already specified in the context, so we don't need to add it.
+            #         3. image token is not specified in the context and there is image inputs, so we need to add it. In this case, we add the image token at the beginning of the context and add a new line.
+            #         """
+            #         image_tokens = [DEFAULT_IMAGE_TOKEN] * len(visual) if isinstance(visual, list) else [DEFAULT_IMAGE_TOKEN]
+            #         image_tokens = " ".join(image_tokens)
+            #         question = image_tokens + "\n" + context
+            #     else:
+            #         question = context
+            #     # This is much safer for llama3, as we now have some object type in it
+            #     if "llama_3" in self.conv_template:
+            #         conv = copy.deepcopy(conv_templates[self.conv_template])
+            #     else:
+            #         conv = conv_templates["mm_default"].copy()
+            #     conv.append_message(conv.roles[0], question)
+            #     conv.append_message(conv.roles[1], None)
+            #     prompt_question = conv.get_prompt()
+            #     question_input.append(prompt_question)
+            #     # question_input.append(question)
 
-            # input_ids = tokenizer_image_token(prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt").unsqueeze(0).to(self.device)
+            prompts_input = DEFAULT_IMAGE_TOKEN + "\n" + contexts[0]
+        
+            conv = conv_templates["mm_default"].copy()
+            conv.append_message(conv.roles[0], prompts_input)
+            conv.append_message(conv.roles[1], None)
+            prompt = conv.get_prompt()
+            stop_str = conv.sep
+
+            input_ids = tokenizer_image_token(prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt").unsqueeze(0).to(self.device)
+            
+            keywords = [stop_str]
+            stopping_criteria = KeywordsStoppingCriteria(keywords, self.tokenizer, input_ids)
+
             # preconfigure gen_kwargs with defaults
             gen_kwargs["image_sizes"] = [flattened_visuals[idx].size for idx in range(len(flattened_visuals))]
-            if "max_new_tokens" not in gen_kwargs:
-                gen_kwargs["max_new_tokens"] = 1024
-            if "temperature" not in gen_kwargs:
-                gen_kwargs["temperature"] = 0
-            if "top_p" not in gen_kwargs:
-                gen_kwargs["top_p"] = None
-            if "num_beams" not in gen_kwargs:
-                gen_kwargs["num_beams"] = 1
 
-            input_ids_list = [tokenizer_image_token(prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt") for prompt in question_input]
-            pad_token_ids = self.tokenizer.pad_token_id if self.tokenizer.pad_token_id is not None else self.tokenizer.eos_token_id
-            input_ids = self.pad_sequence(input_ids_list, batch_first=True, padding_value=pad_token_ids).to(self.device)
-            attention_masks = input_ids.ne(pad_token_ids).to(self.device)
+            # input_ids_list = [tokenizer_image_token(prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt") for prompt in question_input]
+            # pad_token_ids = self.tokenizer.pad_token_id if self.tokenizer.pad_token_id is not None else self.tokenizer.eos_token_id
+            # input_ids = self.pad_sequence(input_ids_list, batch_first=True, padding_value=pad_token_ids).to(self.device)
+            # attention_masks = input_ids.ne(pad_token_ids).to(self.device)
+
+
             # These steps are not in LLaVA's original code, but are necessary for generation to work
             # TODO: attention to this major generation step...
             try:
-                stop_str = conv.sep
-                keywords = [stop_str]
-                stopping_criteria = KeywordsStoppingCriteria(keywords, self.tokenizer, input_ids)
                 cont = self.model.generate(
                     input_ids,
-                    attention_mask=attention_masks,
-                    pad_token_id=pad_token_ids,
                     images=image_tensor,
                     # image_sizes=gen_kwargs["image_sizes"],
                     stopping_criteria=[stopping_criteria],
-                    do_sample=True if gen_kwargs["temperature"] > 0 else False,
-                    temperature=gen_kwargs["temperature"],
-                    top_p=gen_kwargs["top_p"],
-                    num_beams=gen_kwargs["num_beams"],
-                    max_new_tokens=gen_kwargs["max_new_tokens"],
                     use_cache=self.use_cache,
                 )
-                text_outputs = self.tokenizer.batch_decode(cont, skip_special_tokens=True)[0]
-                # text_outputs = text_outputs.strip()
-                # text_outputs = text_outputs.replace("###", "")
-                # text_outputs = text_outputs.replace("\n", "")
-                # text_outputs = text_outputs.strip()
 
                 input_token_len = input_ids.shape[1]
-                n_diff_input_output = (input_ids != cont[:, :input_token_len]).sum().item()
-                if n_diff_input_output > 0:
-                    print(
-                        f"[Warning] {n_diff_input_output} cont are not the same as the input_ids"
-                    )
                 outputs = self.tokenizer.batch_decode(
                     cont[:, input_token_len:], skip_special_tokens=True
                 )[0]
-                text_outputs = outputs.strip()
-                text_outputs = text_outputs.replace("###", "")
-                text_outputs = text_outputs.replace("\n", "")
-                text_outputs = text_outputs.strip()
+                outputs = outputs.strip()
+                if outputs.endswith(stop_str):
+                    outputs = outputs[: -len(stop_str)]
+                outputs = outputs.strip()
+
+                # if "no" in outputs.lower() or "not" in outputs.lower():
+                #     outputs = "no"
+                # else:
+                #     outputs = "yes"
+                # print(outputs)
+
+
+                # text_outputs = self.tokenizer.batch_decode(cont, skip_special_tokens=True)[0]
+
+                # input_token_len = input_ids.shape[1]
+                # n_diff_input_output = (input_ids != cont[:, :input_token_len]).sum().item()
+                # if n_diff_input_output > 0:
+                #     print(
+                #         f"[Warning] {n_diff_input_output} cont are not the same as the input_ids"
+                #     )
+                # outputs = self.tokenizer.batch_decode(
+                #     cont[:, input_token_len:], skip_special_tokens=True
+                # )[0]
+                # text_outputs = outputs.strip()
+                # text_outputs = text_outputs.replace("###", "")
+                # text_outputs = text_outputs.replace("\n", "")
+                # text_outputs = text_outputs.strip()
 
                 # keyword = "Human:"
                 # if keyword in text_outputs:
@@ -444,8 +457,8 @@ class Llava(lmms):
                 #     text_outputs = text_outputs.strip()
 
                 # print(cont[:, input_token_len:])
-                print(text_outputs)
-                text_outputs = [text_outputs]
+
+                text_outputs = [outputs]
             except Exception as e:
                 raise e
                 eval_logger.error(f"Error {e} in generating")
@@ -465,7 +478,7 @@ class Llava(lmms):
             #             # for seq2seq case where self.tok_decode(self.eot_token_id) = ''
             #             text_outputs = text_outputs.split(term)[0]
             res.extend(text_outputs)
-            self.cache_hook.add_partial("generate_until", (context, gen_kwargs), text_outputs)
+            self.cache_hook.add_partial("generate_until", (contexts[0], gen_kwargs), text_outputs)
             pbar.update(1)
             # reorder this group of results back to original unsorted form
         res = re_ords.get_original(res)
