@@ -457,7 +457,7 @@ class Llava(lmms):
                 #     text_outputs = text_outputs.strip()
 
                 # print(cont[:, input_token_len:])
-
+                # print(outputs)
                 text_outputs = [outputs]
             except Exception as e:
                 raise e

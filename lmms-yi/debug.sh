@@ -13,17 +13,17 @@
     # --device cuda:2 \
 
 python3 -m accelerate.commands.launch \
-    --num_processes=3 \
+    --num_processes=1 \
     -m lmms_eval \
     --model llava \
     --model_args pretrained="01-ai/Yi-VL-6B" \
-    --tasks pope_pop \
+    --tasks pope_pop,vqav2_val_lite,mmstar,mmbench_en_dev_lite \
     --batch_size 1 \
     --log_samples \
     --log_samples_suffix llava_v1.6_pope \
     --output_path ./logs/ \
     --verbosity DEBUG \
-    # --wandb_args "project=llava1.6_recursive_eval_1126,entity=VLM_Hallucination_Woohyeon,name=yi-test" \
+    --wandb_args "project=llava1.6_recursive_eval_Yi_VL_6B,entity=VLM_Hallucination_Woohyeon,name=yi-vl-6b-default" \
 
     # --save_output True \
     # --visualize_heatmap True \
