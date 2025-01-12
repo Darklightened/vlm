@@ -15,6 +15,23 @@ def calculate_entropy_for_attn_threshold(attn_map):
     entropy = -torch.sum(flattened_attn * log_probs)
     return entropy.item()
 
+def calculate_attention_entropy(attn):
+    """
+    Calculate the entropy of the attention map.
+    """
+    # Normalize attention map along the last dimension (softmax-like normalization)
+    attn_probs = attn / attn.sum(dim=-1, keepdim=True)
+
+    # Avoid log(0) by adding a small epsilon
+    eps = 1e-9
+    attn_probs = attn_probs + eps
+
+    # Compute entropy: -sum(p * log(p))
+    entropy = -torch.sum(attn_probs * torch.log(attn_probs), dim=-1)
+
+    # Average entropy across all heads
+    return entropy.mean().item()
+
 def attn_entropy_topk_based_recursion(attn=None, image_mask=None, base_top_k=0.3): 
     """
     Adjust Top-K threshold dynamically based on attention map entropy and record the entropy.
