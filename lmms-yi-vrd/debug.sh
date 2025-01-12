@@ -1,10 +1,107 @@
+
 python3 -m accelerate.commands.launch \
     --num_processes=1 \
     --main_process_port 29832 \
     -m lmms_eval \
     --model llava \
     --model_args pretrained="Yi-VL-6B" \
-    --tasks pope_pop \
+    --tasks pope_pop,vqav2_val_lite,mmstar,mmbench_en_dev_lite \
+    --batch_size 1 \
+    --log_samples \
+    --log_samples_suffix llava_v1.6_pope \
+    --output_path ./logs/ \
+    --generation_type recursion \
+    --fix_grid 2x2 \
+    --attention_thresholding_type layer_mean_topk \
+    --attention_threshold "[1.0,1.0]" \
+    --positional_embedding_type bilinear_interpolation \
+    --remove_unpadding True \
+    --attn_norm None \
+    --stages "-2" "-1" "0" \
+    --verbosity DEBUG \
+    --square 1 \
+    --contrastive_alphas "0.0" "0.0" \
+    --wandb_args "project=llava1.6_recursive_eval_Yi_VL_6B,entity=VLM_Hallucination_Woohyeon,name=yi-vl-6b-1.0" \
+
+python3 -m accelerate.commands.launch \
+    --num_processes=1 \
+    --main_process_port 29832 \
+    -m lmms_eval \
+    --model llava \
+    --model_args pretrained="Yi-VL-6B" \
+    --tasks pope_pop,vqav2_val_lite,mmstar,mmbench_en_dev_lite \
+    --batch_size 1 \
+    --log_samples \
+    --log_samples_suffix llava_v1.6_pope \
+    --output_path ./logs/ \
+    --generation_type recursion \
+    --fix_grid 2x2 \
+    --attention_thresholding_type layer_mean_topk \
+    --attention_threshold "[1.0,0.7]" \
+    --positional_embedding_type bilinear_interpolation \
+    --remove_unpadding True \
+    --attn_norm None \
+    --stages "-2" "-1" "0" \
+    --verbosity DEBUG \
+    --square 1 \
+    --contrastive_alphas "0.0" "0.0" \
+    --wandb_args "project=llava1.6_recursive_eval_Yi_VL_6B,entity=VLM_Hallucination_Woohyeon,name=yi-vl-6b-[1.0-0.7]-[0.0-0.0]" \
+
+python3 -m accelerate.commands.launch \
+    --num_processes=1 \
+    --main_process_port 29832 \
+    -m lmms_eval \
+    --model llava \
+    --model_args pretrained="Yi-VL-6B" \
+    --tasks pope_pop,vqav2_val_lite,mmstar,mmbench_en_dev_lite \
+    --batch_size 1 \
+    --log_samples \
+    --log_samples_suffix llava_v1.6_pope \
+    --output_path ./logs/ \
+    --generation_type recursion \
+    --fix_grid 2x2 \
+    --attention_thresholding_type layer_mean_topk \
+    --attention_threshold "[0.9,0.9]" \
+    --positional_embedding_type bilinear_interpolation \
+    --remove_unpadding True \
+    --attn_norm None \
+    --stages "-2" "-1" "0" \
+    --verbosity DEBUG \
+    --square 1 \
+    --contrastive_alphas "0.0" "0.0" \
+    --wandb_args "project=llava1.6_recursive_eval_Yi_VL_6B,entity=VLM_Hallucination_Woohyeon,name=yi-vl-6b-[0.9-0.9]-[0.0-0.0]" \
+
+python3 -m accelerate.commands.launch \
+    --num_processes=1 \
+    --main_process_port 29832 \
+    -m lmms_eval \
+    --model llava \
+    --model_args pretrained="Yi-VL-6B" \
+    --tasks pope_pop,vqav2_val_lite,mmstar,mmbench_en_dev_lite \
+    --batch_size 1 \
+    --log_samples \
+    --log_samples_suffix llava_v1.6_pope \
+    --output_path ./logs/ \
+    --generation_type recursion \
+    --fix_grid 2x2 \
+    --attention_thresholding_type layer_mean_topk \
+    --attention_threshold "[1.0,0.7]" \
+    --positional_embedding_type bilinear_interpolation \
+    --remove_unpadding True \
+    --attn_norm None \
+    --stages "-2" "-1" "0" \
+    --verbosity DEBUG \
+    --square 1 \
+    --contrastive_alphas "0.7" "0.7" \
+    --wandb_args "project=llava1.6_recursive_eval_Yi_VL_6B,entity=VLM_Hallucination_Woohyeon,name=yi-vl-6b-[1.0-0.7]-[0.7-0.7]" \
+
+python3 -m accelerate.commands.launch \
+    --num_processes=1 \
+    --main_process_port 29832 \
+    -m lmms_eval \
+    --model llava \
+    --model_args pretrained="Yi-VL-6B" \
+    --tasks pope_pop,vqav2_val_lite,mmstar,mmbench_en_dev_lite \
     --batch_size 1 \
     --log_samples \
     --log_samples_suffix llava_v1.6_pope \
@@ -20,3 +117,100 @@ python3 -m accelerate.commands.launch \
     --verbosity DEBUG \
     --square 1 \
     --contrastive_alphas "0.0" "0.0" \
+    --wandb_args "project=llava1.6_recursive_eval_Yi_VL_6B,entity=VLM_Hallucination_Woohyeon,name=yi-vl-6b-[1.0-0.5]-[0.0-0.0]" \
+
+python3 -m accelerate.commands.launch \
+    --num_processes=1 \
+    --main_process_port 29832 \
+    -m lmms_eval \
+    --model llava \
+    --model_args pretrained="Yi-VL-6B" \
+    --tasks pope_pop,vqav2_val_lite,mmstar,mmbench_en_dev_lite \
+    --batch_size 1 \
+    --log_samples \
+    --log_samples_suffix llava_v1.6_pope \
+    --output_path ./logs/ \
+    --generation_type recursion \
+    --fix_grid 2x2 \
+    --attention_thresholding_type layer_mean_topk \
+    --attention_threshold "[0.5,1.0]" \
+    --positional_embedding_type bilinear_interpolation \
+    --remove_unpadding True \
+    --attn_norm None \
+    --stages "-2" "-1" "0" \
+    --verbosity DEBUG \
+    --square 1 \
+    --contrastive_alphas "0.0" "0.0" \
+    --wandb_args "project=llava1.6_recursive_eval_Yi_VL_6B,entity=VLM_Hallucination_Woohyeon,name=yi-vl-6b-[0.5-1.0]-[0.0-0.0]" \
+
+python3 -m accelerate.commands.launch \
+    --num_processes=1 \
+    --main_process_port 29832 \
+    -m lmms_eval \
+    --model llava \
+    --model_args pretrained="Yi-VL-6B" \
+    --tasks pope_pop,vqav2_val_lite,mmstar,mmbench_en_dev_lite \
+    --batch_size 1 \
+    --log_samples \
+    --log_samples_suffix llava_v1.6_pope \
+    --output_path ./logs/ \
+    --generation_type recursion \
+    --fix_grid 2x2 \
+    --attention_thresholding_type layer_mean_topk \
+    --attention_threshold "[0.5,0.5]" \
+    --positional_embedding_type bilinear_interpolation \
+    --remove_unpadding True \
+    --attn_norm None \
+    --stages "-2" "-1" "0" \
+    --verbosity DEBUG \
+    --square 1 \
+    --contrastive_alphas "0.0" "0.0" \
+    --wandb_args "project=llava1.6_recursive_eval_Yi_VL_6B,entity=VLM_Hallucination_Woohyeon,name=yi-vl-6b-[0.5-0.5]-[0.0-0.0]" \
+
+python3 -m accelerate.commands.launch \
+    --num_processes=1 \
+    --main_process_port 29832 \
+    -m lmms_eval \
+    --model llava \
+    --model_args pretrained="Yi-VL-6B" \
+    --tasks pope_pop,vqav2_val_lite,mmstar,mmbench_en_dev_lite \
+    --batch_size 1 \
+    --log_samples \
+    --log_samples_suffix llava_v1.6_pope \
+    --output_path ./logs/ \
+    --generation_type recursion \
+    --fix_grid 2x2 \
+    --attention_thresholding_type layer_mean_topk \
+    --attention_threshold "[1.0,0.3]" \
+    --positional_embedding_type bilinear_interpolation \
+    --remove_unpadding True \
+    --attn_norm None \
+    --stages "-2" "-1" "0" \
+    --verbosity DEBUG \
+    --square 1 \
+    --contrastive_alphas "0.0" "0.0" \
+    --wandb_args "project=llava1.6_recursive_eval_Yi_VL_6B,entity=VLM_Hallucination_Woohyeon,name=yi-vl-6b-[1.0-0.3]-[0.0-0.0]" \
+
+python3 -m accelerate.commands.launch \
+    --num_processes=1 \
+    --main_process_port 29832 \
+    -m lmms_eval \
+    --model llava \
+    --model_args pretrained="Yi-VL-6B" \
+    --tasks pope_pop,vqav2_val_lite,mmstar,mmbench_en_dev_lite \
+    --batch_size 1 \
+    --log_samples \
+    --log_samples_suffix llava_v1.6_pope \
+    --output_path ./logs/ \
+    --generation_type recursion \
+    --fix_grid 2x2 \
+    --attention_thresholding_type layer_mean_topk \
+    --attention_threshold "[0.3,1.0]" \
+    --positional_embedding_type bilinear_interpolation \
+    --remove_unpadding True \
+    --attn_norm None \
+    --stages "-2" "-1" "0" \
+    --verbosity DEBUG \
+    --square 1 \
+    --contrastive_alphas "0.0" "0.0" \
+    --wandb_args "project=llava1.6_recursive_eval_Yi_VL_6B,entity=VLM_Hallucination_Woohyeon,name=yi-vl-6b-[0.3-1.0]-[0.0-0.0]" \

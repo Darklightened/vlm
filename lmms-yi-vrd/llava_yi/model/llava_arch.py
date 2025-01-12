@@ -285,6 +285,8 @@ class LlavaMetaForCausalLM(ABC):
         #     )
         #     assert attention_mask.shape == new_input_embeds.shape[:2]
 
+        attention_mask = torch.ones((1, new_input_embeds.shape[1]), device=new_input_embeds.device)
+
         return None, attention_mask, past_key_values, new_input_embeds, new_labels
 
     def initialize_vision_tokenizer(self, model_args, tokenizer):

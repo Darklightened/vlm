@@ -835,7 +835,7 @@ def get_heatmap(
 
             # Output
             for i in range(len(output_token_inds)):
-                target_token_ind = output_token_inds[i]        
+                target_token_ind = output_token_inds[i]
                 attn_weights_over_vis_tokens = llm_attn_matrix[target_token_ind][vision_token_start:vision_token_end]        
                 attn_weights_over_vis_tokens = attn_weights_over_vis_tokens / attn_weights_over_vis_tokens.sum()
                 
@@ -1018,16 +1018,16 @@ def get_heatmap(
             plt.close('all')
 
         # plot the trend of attention weights over the vision tokens
-        fig, ax = plt.subplots(figsize=(20, 5))
-        ax.plot(overall_attn_weights_over_vis_tokens)
-        ax.set_xticks(range(len(overall_attn_weights_over_vis_tokens)))
-        ax.set_xticklabels(
-            [tokenizer.decode(token, add_special_tokens=False).strip() for token in outputs["sequences"][0].tolist()],
-            rotation=75
-        )
-        ax.set_title("at each token, the sum of attention weights over all the vision tokens")
-        plt.savefig(f"{save_path}/by_token_{token_string}.png")
-        plt.close('all')
+        # fig, ax = plt.subplots(figsize=(20, 5))
+        # ax.plot(overall_attn_weights_over_vis_tokens)
+        # ax.set_xticks(range(len(overall_attn_weights_over_vis_tokens)))
+        # ax.set_xticklabels(
+        #     [tokenizer.decode(token, add_special_tokens=False).strip() for token in outputs["sequences"][0].tolist()],
+        #     rotation=75
+        # )
+        # ax.set_title("at each token, the sum of attention weights over all the vision tokens")
+        # plt.savefig(f"{save_path}/by_token_{token_string}.png")
+        # plt.close('all')
 
 
     return ret_attn

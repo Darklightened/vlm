@@ -416,7 +416,7 @@ class LlavaLlamaForRecursion(LlavaLlamaForCausalLM):
 
                     # Append decoded text to final output
                     final_text = tokenizer.batch_decode([final_token], skip_special_tokens=True)[0]
-                    print(f'final_text: {final_text}')
+                    # print(f'final_text: {final_text}')
 
                     # Update input_ids and attention_mask for the next token
                     input_ids = torch.cat([input_ids, best_token.unsqueeze(0)], dim=-1)
@@ -466,9 +466,18 @@ class LlavaLlamaForRecursion(LlavaLlamaForCausalLM):
                 del cont
                 torch.cuda.empty_cache()
 
+            # print(f'final_text: {final_text}')
             # Terminate if end-of-sequence (EOS) token is generated or max tokens reached
             if input_ids[0, -1] == tokenizer.eos_token_id:
                 break
+            if "###" in final_text:
+                break
+            if "\n" in final_text:
+                break
         
+        final_text = final_text.replace("###", "")
+        final_text = final_text.replace("\n", "")
+        final_text = final_text.strip()
+        print(f'final_text: {final_text}')
         return [final_text]
         

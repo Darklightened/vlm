@@ -550,7 +550,6 @@ class Llava(lmms):
             # input_ids = self.pad_sequence(input_ids_list, batch_first=True, padding_value=pad_token_ids).to(self.device)
             attention_masks = input_ids.ne(pad_token_ids).to(self.device)
 
-
             # These steps are not in LLaVA's original code, but are necessary for generation to work
             # TODO: attention to this major generation step...
             try:
@@ -558,7 +557,7 @@ class Llava(lmms):
                     input_ids,
                     images=image_tensor,
                     gen_kwargs = gen_kwargs,               
-                    max_length = 1,
+                    max_length = 5,
                     use_cache=self.use_cache,                 
                     downsampled_images = downsampled_image_tensors,
                     doc_id = doc_id,
