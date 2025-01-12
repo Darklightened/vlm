@@ -384,6 +384,7 @@ class LlavaLlamaForRecursion(LlavaLlamaForCausalLM):
                         final_logit += self.contrastive_alphas[-1]*(final_logit - noised_scores)
                     else:
                         code_adaptive = False
+                        conf_adaptive = False
 
                         if code_adaptive:
                             # Use multi-stage contrastive decoding
@@ -405,6 +406,19 @@ class LlavaLlamaForRecursion(LlavaLlamaForCausalLM):
 
                                 # Update final logits with weighted stage contributions
                                 final_logit += cd_logits
+                        elif conf_adaptive:
+                            for idx in range(len(self.stages) - 1):
+                                p_v = nn.functional.softmax(stage_logit_list[idx + 1], dim=-1)
+                                
+                                current_entropy = stage_entropy_list[idx]
+                                adaptive_cutoff = torch.tensor(2 * (1 - current_entropy), device=p_v.device, dtype=p_v.dtype)
+                                print(f"Adaptive_cutoff: {adaptive_cutoff}")
+                                
+                                logit_diff = stage_logit_list[idx + 1] - stage_logit_list[idx]
+
+                                filtered_logit_diff = logit_diff.masked_fill(p_v < adaptive_cutoff.unsqueeze(-1), 0)
+
+                                final_logit += self.contrastive_alphas[idx] * filtered_logit_diff
                         else:
                             # use multi-stage contrastive decoding
                             for idx in range(len(self.stages) - 1):
@@ -460,6 +474,15 @@ class LlavaLlamaForRecursion(LlavaLlamaForCausalLM):
                         scores=scores,
                         image_mask=self.image_mask[stage + 1]
                     )
+                elif self.attention_thresholding_type == "attn_topk":
+                        # Call the function and get the entropy for the current stage
+                        self.image_mask[stage + 1], calculated_threshold = attn_entropy_topk_based_recursion(
+                            attn=ret_attn,
+                            base_top_k=self.attention_threshold[idx_stage],
+                            image_mask=self.image_mask[stage + 1]
+                        )
+
+                        wandb.log({f"Stage_{idx_stage}_Threshold": calculated_threshold})
                 else:
                     self.activate_image_mask(self.stages[idx_stage + 1])
 

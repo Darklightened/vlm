@@ -15,6 +15,36 @@ def calculate_entropy_for_attn_threshold(attn_map):
     entropy = -torch.sum(flattened_attn * log_probs)
     return entropy.item()
 
+def attn_entropy_topk_based_recursion(attn=None, image_mask=None, base_top_k=0.3): 
+    """
+    Adjust Top-K threshold dynamically based on attention map entropy and record the entropy.
+    """
+
+    # Calculate entropy of the attention map
+    entropy = calculate_attention_entropy(attn)
+
+    # Dynamically adjust the threshold based on entropy
+    max_entropy = torch.log(torch.tensor(attn.shape[-1], dtype=torch.float))  # Max entropy for uniform dist
+    normalized_entropy = entropy / max_entropy.item()
+    calculated_threshold = (np.exp(base_top_k * normalized_entropy)-1) / (np.exp(base_top_k)-1)
+    calculated_threshold = max(min(calculated_threshold, 1.0),0.1)
+
+    # Print entropy and calculated threshold
+    print(f"Entropy: {entropy:.4f}, Normalized Entropy: {normalized_entropy:.4f}, Calculated Threshold: {calculated_threshold:.4f}")
+
+    # Flatten attention map and calculate Top-K threshold
+    flattened_attn = attn.view(-1).float()
+    threshold_index = int(len(flattened_attn) * calculated_threshold)
+    threshold_value = torch.topk(flattened_attn, threshold_index).values[-1]
+
+    # Update the image mask
+    for row in range(attn.shape[0]):
+        for col in range(attn.shape[1]):
+            if attn[row, col] >= threshold_value:
+                image_mask[row][col] = 1
+
+    return image_mask, calculated_threshold
+
 def entropy_based_threshold(attn_map, base_threshold=0.2, scaling_factor=2, max_entropy=6.0):
     # Calculate Entropy
     entropy = calculate_entropy_for_attn_threshold(attn_map)
