@@ -236,7 +236,7 @@ class Llava(lmms):
         self.model.eval()
         if tie_weights:
             self.model.tie_weights()
-        
+
         if remove_unpadding == True:
             print("remove unpadding=True, change to 'spatial'")
             self._model.config.mm_patch_merge_type = "spatial"
@@ -465,7 +465,7 @@ class Llava(lmms):
                 res.extend(["skipped"])
                 pbar.update(1)
                 continue
-            
+
             ## original model accepts several diffrent grids (e.g. 1x2, 1x3, 2x2)
             ## for recursive implementation, we only use 2x2 grid (might be updated in future)
             ## Set grid to 2x2 for recursive generation, else default
@@ -509,7 +509,7 @@ class Llava(lmms):
                 image_tensor = process_images(flattened_visuals, self._image_processor, self._config)
                 if type(image_tensor) is list:
                     image_tensor = [_image.to(dtype=torch.float16, device=self.device) for _image in image_tensor]
-                else:                    
+                else:
                     image_tensor = image_tensor.to(dtype=torch.float16, device=self.device)
                     downsampled_image_tensors = dict()
                     for stage in self.recursion_config.stages:

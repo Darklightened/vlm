@@ -378,7 +378,7 @@ class LlavaLlamaForRecursion(LlavaLlamaForCausalLM):
                             generation_type=None,
                             return_dict_in_generate=True,
                             output_attentions=False,
-                            output_scores=True                            
+                            output_scores=True,                                                        
                         )
                         noised_scores = noised_cont.scores[0]
                         final_logit += self.contrastive_alphas[-1]*(final_logit - noised_scores)
@@ -400,7 +400,9 @@ class LlavaLlamaForRecursion(LlavaLlamaForCausalLM):
                                 cutoff = kl_d * p_v.max(dim=-1, keepdim=True).values
 
                                 # Calculate stage-specific contrastive logits
-                                diffs = (1 + kld_alpha) * stage_logit_list[idx + 1] - kld_alpha * stage_logit_list[idx]
+                                print(f"code_cd: {(1 + kld_alpha)}stage({idx+1}) - {kld_alpha}stage({idx})")
+                                #diffs = (1 + kld_alpha) * stage_logit_list[idx + 1] - kld_alpha * stage_logit_list[idx]
+                                diffs = (kld_alpha) * stage_logit_list[idx + 1] - kld_alpha * stage_logit_list[idx]
                                 cd_logits = diffs.masked_fill(p_v < cutoff, -float("inf"))
 
                                 # Update final logits with weighted stage contributions
