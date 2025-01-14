@@ -496,22 +496,24 @@ class LlavaLlamaForRecursion(LlavaLlamaForCausalLM):
                                 # Update final logits with weighted stage contributions
                                 final_logit += cd_logits
                         else:
-                            # Compute cd_coef using exp for softmax-like normalization
-                            entropy_differences = [
-                                25 * (stage_entropy_list[i + 1] - stage_entropy_list[i])
-                                for i in range(len(self.stages) - 1)
-                            ]
+                            # Compute cd_coef using harmonic mean normalization
+                            entropy_differences = torch.tensor(
+                                [
+                                    abs((stage_entropy_list[i + 1] - stage_entropy_list[i]))
+                                    for i in range(len(self.stages) - 1)
+                                ],
+                                device=stage_logit_list[0].device,
+                                dtype=stage_logit_list[0].dtype
+                            )
 
-                            # Apply exp to the differences
-                            exp_differences = torch.exp(torch.tensor(entropy_differences, device=stage_logit_list[0].device, dtype=stage_logit_list[0].dtype))
-
-                            # Normalize using softmax-like approach
-                            cd_coefs = exp_differences / exp_differences.sum()
+                            # Compute harmonic mean of entropy differences
+                            harmonic_weights = 1 / (entropy_differences + 1e-8)  # Add small epsilon to avoid division by zero
+                            harmonic_weights = harmonic_weights / harmonic_weights.sum()  # Normalize to sum to 1
 
                             # Log cd_coefs to wandb
-                            for idx, coef in enumerate(cd_coefs.tolist()):
-                                wandb.log({f"cd_coef_stage_{idx}": coef})
-                                print(f"cd_coef (Stage {idx}): {coef}")
+                            for idx, coef in enumerate(harmonic_weights.tolist()):
+                                wandb.log({f"cd_coef_stage_{idx}": self.contrastive_alphas[idx] * coef})
+                                print(f"cd_coef (Stage {idx}): {self.contrastive_alphas[idx] * coef}")
 
                             # Update final logits using the new cd_coefs
                             for idx in range(len(self.stages) - 1):
@@ -526,8 +528,7 @@ class LlavaLlamaForRecursion(LlavaLlamaForCausalLM):
                                 filtered_logit_diff = logit_diff.masked_fill(p_v < adaptive_cutoff.unsqueeze(-1), 0)
 
                                 # Apply cd_coef to the filtered logit differences
-                                final_logit += cd_coefs[idx] * self.contrastive_alphas[idx] * filtered_logit_diff
-
+                                final_logit += self.contrastive_alphas[idx] * harmonic_weights[idx] * filtered_logit_diff
 
                     best_token = torch.argmax(final_logit, dim=-1)
                     final_token.append(best_token.item())
