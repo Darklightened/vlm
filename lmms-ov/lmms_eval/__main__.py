@@ -265,6 +265,27 @@ def parse_eval_args() -> argparse.Namespace:
         help="Sets trust_remote_code to True to execute code to create HF Datasets from the Hub",
     )
     parser.add_argument("--process_with_media", action="store_true", help="Whether you will process you dataset with audio, image. By default set to False" "In case some benchmarks need to be processed with media, set this flag to True.")
+    parser.add_argument(
+        "--attention_threshold",
+        type=str,
+        default="0.1",
+        help="attention threshold - float",
+    )
+    parser.add_argument(
+        "--contrastive_alphas",
+        nargs="*",
+        type=float,
+        default=[1.0, 1.0, 1.0],
+        help="alphas for contrastive decoding",
+    )
+    parser.add_argument(
+        "--use_noised_for_contrastive",        
+        type=bool,
+        default=False,
+        help="whether to use noised image for contrastive decoding",
+    )
+
+
     args = parser.parse_args()
     return args
 

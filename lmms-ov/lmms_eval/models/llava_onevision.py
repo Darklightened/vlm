@@ -52,6 +52,7 @@ from llava.mm_utils import (
 )
 from llava.model.builder import load_pretrained_model
 from llava.model.language_model.llava_recursion import LlavaRecursionConfig, LlavaQwenForRecursion
+import ast
 
 # Determine best attention implementation
 if version.parse(torch.__version__) >= version.parse("2.1.2"):
@@ -59,6 +60,15 @@ if version.parse(torch.__version__) >= version.parse("2.1.2"):
 else:
     best_fit_attn_implementation = "eager"
 
+def string_to_list(input_string):
+    try:
+        # Use ast.literal_eval for safe evaluation of string as Python literal
+        if input_string.startswith('['):
+            return ast.literal_eval(input_string)
+        else:
+            raise ValueError("The input string does not start with '['")
+    except (ValueError, SyntaxError) as e:
+        raise ValueError(f"Failed to convert string to list: {e}")
 
 @register_model("llava_onevision")
 class Llava_OneVision(lmms):
@@ -84,11 +94,31 @@ class Llava_OneVision(lmms):
         mm_spatial_pool_mode: Optional[str] = "bilinear",
         token_strategy: Optional[str] = "single",  # could be "single" or "multiple", "multiple" denotes adding multiple <image> tokens for each frame
         video_decode_backend: str = "decord",
+        attention_threshold: str = "1.0",
+        contrastive_alphas: list = [0.0, 0.0, 0.0],
+        use_noised_for_contrastive: bool = False,
         **kwargs,
     ) -> None:
         super().__init__()
         # Do not use kwargs for now
         assert kwargs == {}, f"Unexpected kwargs: {kwargs}"
+
+        if attention_threshold[0] == '[' :
+            attention_threshold = string_to_list(attention_threshold)
+        else:
+            attention_threshold = [float(attention_threshold) for i in range(3)]
+            
+        self.recursion_config = LlavaRecursionConfig()
+
+        setattr(self.recursion_config, "attention_threshold", attention_threshold)
+        setattr(self.recursion_config, "contrastive_alphas", contrastive_alphas)
+        setattr(self.recursion_config, "use_noised_for_contrastive", use_noised_for_contrastive)
+
+        # print(getattr(self.recursion_config, "attention_threshold", None))
+        # print(getattr(self.recursion_config, "contrastive_alphas", None))
+        # print(getattr(self.recursion_config, "use_noised_for_contrastive", None))
+
+        print(self.recursion_config)
 
         accelerator_kwargs = InitProcessGroupKwargs(timeout=timedelta(weeks=52))
         accelerator = Accelerator(kwargs_handlers=[accelerator_kwargs])
@@ -126,7 +156,6 @@ class Llava_OneVision(lmms):
         cfg_pretrained = AutoConfig.from_pretrained(self.pretrained)
 
         llava_model_args["overwrite_config"] = overwrite_config
-        self.recursion_config = LlavaRecursionConfig()
         try:
             # Try to load the model with the multimodal argument
             self._tokenizer, self._model, self._image_processor, self._max_length = load_pretrained_model(pretrained, None, model_name, device_map=self.device_map, recursion_config=self.recursion_config, **llava_model_args)

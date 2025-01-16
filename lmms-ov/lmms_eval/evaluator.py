@@ -170,14 +170,31 @@ def simple_evaluate(
 
     task_dict = get_task_dict(tasks, task_manager)
 
-    ModelClass = get_model(model)
-    lm = ModelClass.create_from_arg_string(
-        model_args,
-        {
-            "batch_size": batch_size,
-            "device": device,
-        },
-    )
+    if model == "llava_onevision":
+        print("initialize llava model with modification")
+
+        ModelClass = get_model(model)
+        lm = ModelClass.create_from_arg_string(
+            model_args,
+            {
+                "batch_size": batch_size,
+                "device": device,
+                "attention_threshold": cli_args.attention_threshold,
+                "contrastive_alphas": cli_args.contrastive_alphas,
+                "use_noised_for_contrastive": cli_args.use_noised_for_contrastive,
+                # "target_token_selection_strategy": cli_args.target_token_selection_strategy,
+            },
+        )
+
+    else:
+        ModelClass = get_model(model)
+        lm = ModelClass.create_from_arg_string(
+            model_args,
+            {
+                "batch_size": batch_size,
+                "device": device,
+            },
+        )
 
     # helper function to recursively apply config overrides to leaf subtasks, skipping their constituent groups.
     # (setting of num_fewshot ; bypassing metric calculation ; setting fewshot seed)
