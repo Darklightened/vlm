@@ -496,39 +496,32 @@ class LlavaLlamaForRecursion(LlavaLlamaForCausalLM):
                                 # Update final logits with weighted stage contributions
                                 final_logit += cd_logits
                         else:
-                            # Compute cd_coef using harmonic mean normalization
-                            entropy_differences = torch.tensor(
-                                [
-                                    abs((stage_entropy_list[i + 1] - stage_entropy_list[i]))
-                                    for i in range(len(self.stages) - 1)
-                                ],
-                                device=stage_logit_list[0].device,
-                                dtype=stage_logit_list[0].dtype
-                            )
+                            sorted_logits, _  = torch.sort(stage_logit_list[-1].squeeze(0), descending=True)
+                            first_place = sorted_logits[0].item()
+                            second_place = sorted_logits[1].item()
+                            difference = first_place - second_place
+                            weight = 1 / (difference + 1e-8)
 
-                            # Compute harmonic mean of entropy differences
-                            harmonic_weights = 1 / (entropy_differences + 1e-8)  # Add small epsilon to avoid division by zero
-                            harmonic_weights = harmonic_weights / harmonic_weights.sum()  # Normalize to sum to 1
-
-                            # Log cd_coefs to wandb
-                            for idx, coef in enumerate(harmonic_weights.tolist()):
-                                wandb.log({f"cd_coef_stage_{idx}": self.contrastive_alphas[idx] * coef})
-                                print(f"cd_coef (Stage {idx}): {self.contrastive_alphas[idx] * coef}")
+                            print(f"1st Logit: {first_place}, 2nd Logit: {second_place}, Weight: {weight}")
 
                             # Update final logits using the new cd_coefs
                             for idx in range(len(self.stages) - 1):
-                                p_v = nn.functional.softmax(stage_logit_list[idx + 1], dim=-1)
-
-                                # Compute adaptive cutoff
-                                adaptive_cutoff = torch.tensor(2 * (1 - stage_entropy_list[idx]), device=p_v.device, dtype=p_v.dtype)
-                                print(f"Adaptive_cutoff (Stage {idx}): {adaptive_cutoff}")
-
-                                # Calculate logit differences and filter them
+                                # Get top-20 logits and their indices for the current and next stages
+                                topk_values_nxt, topk_indices_nxt = stage_logit_list[idx + 1].topk(4, dim=-1)
+                                topk_values_crt, topk_indices_crt = stage_logit_list[idx].topk(4, dim=-1)
+                                
+                                # Compute logit differences for the top-20 logits
                                 logit_diff = stage_logit_list[idx + 1] - stage_logit_list[idx]
-                                filtered_logit_diff = logit_diff.masked_fill(p_v < adaptive_cutoff.unsqueeze(-1), 0)
 
-                                # Apply cd_coef to the filtered logit differences
-                                final_logit += self.contrastive_alphas[idx] * harmonic_weights[idx] * filtered_logit_diff
+                                # Create a mask for the top-20 logits in the next stage
+                                mask = torch.zeros_like(stage_logit_list[idx + 1], dtype=torch.bool)
+                                mask.scatter_(dim=-1, index=topk_indices_nxt, value=True)
+
+                                # Apply the mask to the logit differences
+                                masked_logit_diff = logit_diff.masked_fill(~mask, 0)
+
+                                # Apply contrastive alphas and weights to the masked logit differences
+                                final_logit += self.contrastive_alphas[idx] * weight * masked_logit_diff
 
                     best_token = torch.argmax(final_logit, dim=-1)
                     final_token.append(best_token.item())

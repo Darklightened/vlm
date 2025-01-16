@@ -230,7 +230,9 @@ class ContrastiveDecoder:
         self.pad_token_id = pad_token_id
 
     def compute_final_logits(self, stage_logit_list, contrastive_alphas, attention_maps=None, cutoff=True):
-        final_logit = stage_logit_list[-1]  # Start with the last stage logits
+        final_logit = stage_logit_list[-1].clone()  # Start with the last stage logits
+        cutoff_top_k = False
+        cutoff_top_p = False
 
         if final_logit.argmax(dim=-1).item() in {self.eos_token_id, self.pad_token_id}:
             return final_logit
@@ -276,6 +278,23 @@ class ContrastiveDecoder:
                 confidence_weight = p_v.max(dim=-1, keepdim=True).values / (p_v.max(dim=-1, keepdim=True).values + p_d.max(dim=-1, keepdim=True).values)
                 cd_logits = contrastive_alphas[idx] * (confidence_weight * stage_logit_list[idx + 1] - (1 - confidence_weight) * stage_logit_list[idx])
 
+            elif self.cd_strategy == "cutoff_top_k":
+                cutoff_top_k = True
+                cd_logits = contrastive_alphas[idx] * (stage_logit_list[idx + 1] - stage_logit_list[idx])
+
+            elif self.cd_strategy == "cutoff_top_p":
+                cutoff_top_k = True
+                cd_logits = contrastive_alphas[idx] * (stage_logit_list[idx + 1] - stage_logit_list[idx])
+            
+            elif self.cd_strategy == "diff_top_k":
+                cutoff_top_k = True
+                sorted_logits, _  = torch.sort(stage_logit_list[-1].squeeze(0), descending=True)
+                first_place = sorted_logits[0].item()
+                second_place = sorted_logits[1].item()
+                difference = first_place - second_place
+                weight = 1 / (difference + 1e-8)
+                cd_logits = contrastive_alphas[idx] * (stage_logit_list[idx + 1] - stage_logit_list[idx]) * weight
+
             else:
                 cd_logits = contrastive_alphas[idx] * (stage_logit_list[idx + 1] - stage_logit_list[idx])
 
@@ -284,9 +303,16 @@ class ContrastiveDecoder:
 
         # Apply cutoff for the last stage logits if cutoff is specified
         if cutoff:
-            cutoff_coeff = 0.8
             last_stage_logit = stage_logit_list[-1]
-            cutoff_threshold = cutoff_coeff * last_stage_logit.max(dim=-1, keepdim=True).values
+            if cutoff_top_k:
+                k = 20                
+                top_k_values, top_k_indices = last_stage_logit.topk(k, dim=-1)
+                print(f"indices: {top_k_indices}, values: {top_k_values}")
+                cutoff_threshold = top_k_values[:, -1].unsqueeze(-1)  # Smallest value in the top-k                
+            else:
+                cutoff_coeff = 0.2                
+                cutoff_threshold = cutoff_coeff * last_stage_logit.max(dim=-1, keepdim=True).values
+            
             final_logit = final_logit.masked_fill(last_stage_logit < cutoff_threshold, -float("inf"))
 
         return final_logit

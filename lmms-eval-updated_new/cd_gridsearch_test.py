@@ -81,8 +81,8 @@ args.output_path = "./"
 # response_file_path = "/workspace/vlm/lmms-eval-logit/logs/liuhaotian__llava-v1.6-vicuna-7b/20250109_064354_samples_pope_aokvqa_pop.jsonl"
 # mode = "pope_aokvqa"
 
-# logit_file_path = "/workspace/vlm/lmms-eval-logit/logit_mmbench_en_dev_lite_70_50_10_bilinear_s1.json"
-# output_path_grid_search = "/workspace/vlm/lmms-eval-logit/mmbench_cd_grid_70_50_10_bilinear_s1.json"
+# logit_file_path = "/workspace/vlm/lmms-eval-updated_new/logging/cd_grid_mmbench_2.0_2.0_2.0.json"
+# output_path_grid_search = "/workspace/vlm/lmms-eval-updated_new/logging/mmbench_2.0_2.0_2.0_cd_adaptive.json"
 
 logit_file_path = args.logit_file_path
 response_file_path = args.response_file_path
@@ -171,15 +171,53 @@ def get_prediction_cd(logits, alpha, beta, gamma):
     return predicted_answer
 
 def calculate_adjusted_logits(logits, alpha, beta, gamma):
+    stage_diff = []
+
+    # 각 Stage에서 1등과 2등 로짓의 차이 계산
+    for stage in range(4):
+        sorted_logits = sorted(logits[stage]["Top-100 Logits"], key=lambda x: x[1], reverse=True)
+        stage_diff.append(sorted_logits[0][1] - sorted_logits[1][1])  # 1등 - 2등 차이
+
+    # 각 단계의 가중치 계산 (1등-2등 차이에 반비례)
+    weights = 1 / (stage_diff[-1] + 1e-8)
+    # Default
+    # weights = 1
     adjusted_logits = {}
-    for label in logits[0]["Logits"].keys():
+
+    # 각 라벨에 대해 adjusted logits 계산
+    for label, _ in logits[0]["Top-100 Logits"]:
         adjusted_logits[label] = (
-            logits[3]["Logits"][label]
-            + alpha * (logits[3]["Logits"][label] - logits[2]["Logits"][label])
-            + beta * (logits[2]["Logits"][label] - logits[1]["Logits"][label])
-            + gamma * (logits[1]["Logits"][label] - logits[0]["Logits"][label])
+            logits[3]["Logits"].get(label, 0)
+            + weights * alpha * (logits[3]["Logits"].get(label, 0) - logits[2]["Logits"].get(label, 0))
+            + weights * beta * (logits[2]["Logits"].get(label, 0) - logits[1]["Logits"].get(label, 0))
+            + weights * gamma * (logits[1]["Logits"].get(label, 0) - logits[0]["Logits"].get(label, 0))
         )
+
     return adjusted_logits
+
+# def calculate_adjusted_logits(logits,alpha, beta, gamma):
+#     adjusted_logits = {}
+
+#     # 각 Stage에서 1등과 2등 로짓의 차이 계산
+#     stage_diff = []
+#     for stage in range(4):
+#         sorted_logits = sorted(logits[stage]["Top-100 Logits"].values(), reverse=True)
+#         stage_diff.append(sorted_logits[0] - sorted_logits[1])  # 1등 - 2등 차이
+
+#     # 각 단계의 가중치 계산 (1등-2등 차이에 반비례)
+#     # 차이가 클수록 가중치는 작게, 차이가 작을수록 가중치는 크게 설정
+#     weights = stage_diff[-1]
+#     print(weights)
+#     # 각 라벨에 대해 adjusted logits 계산
+#     for label in logits[0]["Top-100 Logits"].keys():
+#         adjusted_logits[label] = (
+#             logits[3]["Top-100 Logits"][label]
+#             + weights[3] * (logits[3]["Top-100 Logits"][label] - logits[2]["Top-100 Logits"][label])
+#             + weights[2] * (logits[2]["Top-100 Logits"][label] - logits[1]["Top-100 Logits"][label])
+#             + weights[1] * (logits[1]["Top-100 Logits"][label] - logits[0]["Top-100 Logits"][label])
+#         )
+#     print(weights[1], weights[2] , weights[3])
+#     return adjusted_logits
 
 # 그리드 서치 설정
 # grid_values = [i / 20.0 for i in range(50)]  # -1.0부터 1.0까지 0.05 간격
@@ -189,6 +227,9 @@ all_results = []
 
 # 그리드 서치 실행
 for alpha, beta, gamma in product(grid_values, repeat=3):   
+# Single CD
+# for value in grid_values:  
+#     alpha = beta = gamma = value 
     if mode == "mmstar":
         score = eval_metric_mmstar(response_data, logits_data, alpha, beta, gamma)
     elif mode == "mmbench":
@@ -221,3 +262,39 @@ with open(output_path_grid_search, "w") as f:
     json.dump(output_data, f, indent=4)
 
 print(f"Grid search completed. Best params: {best_params}")
+
+# # 결과 저장을 위한 초기화
+# best_score = 0
+# all_results = []
+
+# # 평가 루프
+# if mode == "mmstar":
+#     score = eval_metric_mmstar(response_data, logits_data)  # alpha, beta, gamma 제거
+# elif mode == "mmbench":
+#     score = eval_metric_mmbench(response_data, logits_data, 0,0,0)  # alpha, beta, gamma 제거
+# elif "pope" in mode:
+#     score = eval_metric_pope(response_data, logits_data)  # alpha, beta, gamma 제거
+
+# print(f"Adaptive CD: score={score}")
+
+# all_results.append({
+#     "adaptive": True,  # adaptive 방식 표시
+#     "score": score,
+# })
+
+# if score > best_score:
+#     best_score = score
+
+#     best_params = {
+#         "adaptive": True,  # 최적화된 adaptive 방식 표시
+#         "score": score,
+#     }
+
+# print(f"Best adaptive score: {best_score}")
+
+# # 결과 저장
+# output_data = {"best_params": best_params, "all_results": all_results}
+# with open(output_path_grid_search, "w") as f:
+#     json.dump(output_data, f, indent=4)
+
+# print(f"Grid search (adaptive) completed. Best adaptive score: {best_score}")

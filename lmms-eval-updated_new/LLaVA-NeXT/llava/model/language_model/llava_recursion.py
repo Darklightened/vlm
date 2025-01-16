@@ -315,6 +315,9 @@ class LlavaLlamaForRecursion(LlavaLlamaForCausalLM):
             ## yes, no
             tokens = ["Yes", "No"]
             token_ids = [3869, 1939]
+        else:
+            tokens = []
+            token_ids = []
         
         # print(logits[0].shape)        
         
@@ -323,12 +326,25 @@ class LlavaLlamaForRecursion(LlavaLlamaForCausalLM):
             for token, token_id in zip(tokens, token_ids)
         }
 
+        # Get top-100 logits and decoded tokens
+        all_logits = logits[0][0].cpu().detach().numpy()  # Assuming logits is a tensor
+        top_indices = all_logits.argsort()[-20:][::-1]  # Top-100 indices, descending order
+        top_logits = [(tokenizer.decode([idx]).strip(), float(all_logits[idx])) for idx in top_indices]
+
         # Prepare the entry for the current stage
         stage_entry = {
             "Stage": stage,
             "Text Output": text_output,
-            "Logits": logits_for_labels  
+            "Logits": {k: float(v) for k, v in logits_for_labels.items()},  # Ensure all values are converted to float
+            "Top-100 Logits": top_logits
         }
+
+        # # Prepare the entry for the current stage
+        # stage_entry = {
+        #     "Stage": stage,
+        #     "Text Output": text_output,
+        #     "Logits": logits_for_labels  
+        # }
 
         # Update the JSON data with the new stage information
         if doc_id not in data:
