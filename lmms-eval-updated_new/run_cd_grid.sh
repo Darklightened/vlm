@@ -1,4 +1,4 @@
-#!/bin/bash
+# !/bin/bash
 
 python cd_gridsearch_test.py \
     --logit_file_path "/workspace/vlm/lmms-eval-updated_new/logit_pope_pop_2.5_2.5_2.5_bilinear_s1.json" \
@@ -31,7 +31,7 @@ python cd_gridsearch_test.py \
 python cd_gridsearch_test.py \
     --logit_file_path "/workspace/vlm/lmms-eval-updated_new/logit_mmstar_7.0_7.0_7.0_bilinear_s1.json" \
     --response_file_path "/workspace/vlm/lmms-eval-updated_new/logs/liuhaotian__llava-v1.6-vicuna-7b/20250114_203756_samples_mmstar.jsonl" \
-    --output_path_grid_search "/workspace/vlm/lmms-eval-updated_new/logging/mmstar_10.0_10.0_10.0_cd_adaptive.json" \
+    --output_path_grid_search "/workspace/vlm/lmms-eval-updated_new/logging/mmstar_7.0_7.0_7.0_cd_adaptive.json" \
     --max 0.5 \
     --mode mmstar \
 

@@ -172,7 +172,7 @@ def get_prediction_cd(logits, alpha, beta, gamma):
 
 def calculate_adjusted_logits(logits, alpha, beta, gamma):
     adjusted_logits = {}
-    for label in logits[0]["Logits"].keys():
+    for label in logits[3]["Logits"].keys():
         adjusted_logits[label] = (
             logits[3]["Logits"][label]
             + alpha * (logits[3]["Logits"][label] - logits[2]["Logits"][label])

@@ -171,27 +171,75 @@ def get_prediction_cd(logits, alpha, beta, gamma):
     return predicted_answer
 
 def calculate_adjusted_logits(logits, alpha, beta, gamma):
-    stage_diff = []
-
-    # 각 Stage에서 1등과 2등 로짓의 차이 계산
-    for stage in range(4):
-        sorted_logits = sorted(logits[stage]["Top-100 Logits"], key=lambda x: x[1], reverse=True)
-        stage_diff.append(sorted_logits[0][1] - sorted_logits[1][1])  # 1등 - 2등 차이
-
-    # 각 단계의 가중치 계산 (1등-2등 차이에 반비례)
-    weights = 1 / (stage_diff[-1] + 1e-8)
-    # Default
-    # weights = 1
     adjusted_logits = {}
 
-    # 각 라벨에 대해 adjusted logits 계산
-    for label, _ in logits[0]["Top-100 Logits"]:
+    # Helper function to get logit value for a specific label
+    def get_logit_from_top100(label, top_100_logits):
+        for entry in top_100_logits:
+            if entry[0] == label:  # Check if label matches
+                return entry[1]  # Return the corresponding logit value
+        return 0  # Default to 0 if label not found
+
+    first_place = logits[3]["Top-100 Logits"][0][1]
+    second_place = logits[2]["Top-100 Logits"][0][1]
+
+    difference = first_place - second_place
+    weight = 1 / (difference + 1e-8)
+    
+    # Calculate adjusted logits for each label in the last stage
+    for label, _ in logits[3]["Top-100 Logits"][:4]:
         adjusted_logits[label] = (
-            logits[3]["Logits"].get(label, 0)
-            + weights * alpha * (logits[3]["Logits"].get(label, 0) - logits[2]["Logits"].get(label, 0))
-            + weights * beta * (logits[2]["Logits"].get(label, 0) - logits[1]["Logits"].get(label, 0))
-            + weights * gamma * (logits[1]["Logits"].get(label, 0) - logits[0]["Logits"].get(label, 0))
+            get_logit_from_top100(label, logits[3]["Top-100 Logits"][:4])
+            + alpha *weight* (
+                get_logit_from_top100(label, logits[3]["Top-100 Logits"][:4])
+                - get_logit_from_top100(label, logits[2]["Top-100 Logits"][:4])
+            )
+            + beta * weight*(
+                get_logit_from_top100(label, logits[2]["Top-100 Logits"][:4])
+                - get_logit_from_top100(label, logits[1]["Top-100 Logits"][:4])
+            )
+            + gamma * weight*(
+                get_logit_from_top100(label, logits[1]["Top-100 Logits"][:4])
+                - get_logit_from_top100(label, logits[0]["Top-100 Logits"][:4])
+            )
         )
+
+    return adjusted_logits
+
+def adjust_logits_with_intersections(logits, alpha, beta, gamma, top_k=20):
+    """
+    Adjust logits based on their intersections across stages with top-k filtering.
+    """
+    adjusted_logits = {}
+
+    # Iterate through each stage (except the last one)
+    for idx in range(len(logits) - 1):
+        # Get current and next stage logits
+        current_stage_logits = logits[idx]["Logits"]
+        next_stage_logits = logits[idx + 1]["Logits"]
+
+        # Sort and get the top-k labels for current and next stages
+        top_current_labels = sorted(current_stage_logits, key=current_stage_logits.get, reverse=True)[:top_k]
+        top_next_labels = sorted(next_stage_logits, key=next_stage_logits.get, reverse=True)[:top_k]
+
+        # Find the intersection of top-k labels between current and next stages
+        intersection_labels = set(top_current_labels) & set(top_next_labels)
+
+        for label in intersection_labels:
+            if label not in adjusted_logits:
+                adjusted_logits[label] = 0  # Initialize if not already present
+
+            # Adjust logits for intersecting labels
+            adjusted_logits[label] += (
+                next_stage_logits[label]
+                + alpha * (next_stage_logits[label] - current_stage_logits[label])
+            )
+
+    # Final processing: Remove non-top-k labels and set remaining to 0
+    all_top_labels = set([label for idx in range(len(logits) - 1) for label in adjusted_logits.keys()])
+    for label in adjusted_logits.keys():
+        if label not in all_top_labels:
+            adjusted_logits[label] = 0  # Set to 0 for non-top-k labels
 
     return adjusted_logits
 

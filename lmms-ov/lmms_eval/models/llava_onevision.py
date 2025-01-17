@@ -459,7 +459,7 @@ class Llava_OneVision(lmms):
                 if type(visual[0]) == PIL.Image.Image:  # For image, multi-image tasks
                     new_visual = []
                     for v in visual:
-                        new_visual.append(self.make_square_center(v, 400))
+                        new_visual.append(self.make_square_center(v, 400, 1152))
                     image_tensor = process_images(new_visual, self._image_processor, self._config)
                     stage1_grid = int(math.sqrt(image_tensor.shape[1] - 1))
                     if type(image_tensor) is list:
@@ -596,10 +596,12 @@ class Llava_OneVision(lmms):
     def generate_until_multi_round(self, requests: List[Instance]) -> List[str]:
         return res
 
-    def make_square_center(self, im, min_size, fill_color=(0, 0, 0)):
+    def make_square_center(self, im, min_size, max_size, fill_color=(0, 0, 0)):
         x, y = im.size
-        size = (max(min_size, x, y))
         size = max(min_size, x, y)
         new_im = Image.new('RGB', (size, size), fill_color)
         new_im.paste(im, (int((size - x) / 2), int((size - y) / 2)))
+        if size > max_size:
+            size = max_size
+            new_im = new_im.resize((size, size))
         return new_im

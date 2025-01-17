@@ -502,26 +502,30 @@ class LlavaLlamaForRecursion(LlavaLlamaForCausalLM):
                             difference = first_place - second_place
                             weight = 1 / (difference + 1e-8)
 
-                            print(f"1st Logit: {first_place}, 2nd Logit: {second_place}, Weight: {weight}")
-
+                            topk_values_final, topk_indices_final = stage_logit_list[-1].topk(20, dim=-1)
+                            mask_final = torch.zeros_like(stage_logit_list[-1], dtype=torch.bool)
+                            mask_final.scatter_(dim=-1, index=topk_indices_final, value=True)
+                            
                             # Update final logits using the new cd_coefs
                             for idx in range(len(self.stages) - 1):
                                 # Get top-20 logits and their indices for the current and next stages
-                                topk_values_nxt, topk_indices_nxt = stage_logit_list[idx + 1].topk(4, dim=-1)
-                                topk_values_crt, topk_indices_crt = stage_logit_list[idx].topk(4, dim=-1)
-                                
+                                topk_values_nxt, topk_indices_nxt = stage_logit_list[idx + 1].topk(20, dim=-1)
+                                topk_values_crt, topk_indices_crt = stage_logit_list[idx].topk(20, dim=-1)
+
+                                mask_crt = torch.zeros_like(stage_logit_list[idx], dtype=torch.bool)
+                                mask_nxt = torch.zeros_like(stage_logit_list[idx + 1], dtype=torch.bool)
+
+                                mask_crt.scatter_(dim=-1, index=topk_indices_crt, value=True)
+                                mask_nxt.scatter_(dim=-1, index=topk_indices_nxt, value=True)
+
+                                current_logit = stage_logit_list[idx].masked_fill(~mask_final, 0).masked_fill(~mask_crt, 0)
+                                next_logit = stage_logit_list[idx + 1].masked_fill(~mask_final, 0).masked_fill(~mask_nxt, 0)
+                                                            
                                 # Compute logit differences for the top-20 logits
-                                logit_diff = stage_logit_list[idx + 1] - stage_logit_list[idx]
-
-                                # Create a mask for the top-20 logits in the next stage
-                                mask = torch.zeros_like(stage_logit_list[idx + 1], dtype=torch.bool)
-                                mask.scatter_(dim=-1, index=topk_indices_nxt, value=True)
-
-                                # Apply the mask to the logit differences
-                                masked_logit_diff = logit_diff.masked_fill(~mask, 0)
+                                logit_diff = next_logit - current_logit
 
                                 # Apply contrastive alphas and weights to the masked logit differences
-                                final_logit += self.contrastive_alphas[idx] * weight * masked_logit_diff
+                                final_logit += self.contrastive_alphas[idx] * weight * logit_diff 
 
                     best_token = torch.argmax(final_logit, dim=-1)
                     final_token.append(best_token.item())

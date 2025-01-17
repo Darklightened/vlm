@@ -275,7 +275,7 @@ def parse_eval_args() -> argparse.Namespace:
         "--contrastive_alphas",
         nargs="*",
         type=float,
-        default=[1.0, 1.0, 1.0],
+        default=[0.0, 0.0, 0.0],
         help="alphas for contrastive decoding",
     )
     parser.add_argument(
