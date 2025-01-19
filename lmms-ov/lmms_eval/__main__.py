@@ -271,6 +271,27 @@ def parse_eval_args() -> argparse.Namespace:
         default="0.1",
         help="attention threshold - float",
     )
+
+    parser.add_argument(
+        "--save_output",
+        type=bool,
+        default=False,
+        help="save_output - bool",
+    )
+
+    parser.add_argument(
+        "--output_csv_path",
+        type=str,
+        default="generation_output.csv",
+        help="output_csv_path - str",
+    )
+
+    parser.add_argument(
+        "--output_json_path",
+        type=str,
+        default="generation_output.json",
+        help="output_json_path - str",
+    )
     parser.add_argument(
         "--contrastive_alphas",
         nargs="*",

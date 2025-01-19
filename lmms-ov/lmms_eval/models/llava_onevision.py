@@ -95,6 +95,9 @@ class Llava_OneVision(lmms):
         token_strategy: Optional[str] = "single",  # could be "single" or "multiple", "multiple" denotes adding multiple <image> tokens for each frame
         video_decode_backend: str = "decord",
         attention_threshold: str = "1.0",
+        save_output=False,
+        output_csv_path = "generation_output.csv",
+        output_json_path = "generation_output.json",
         contrastive_alphas: list = [0.0, 0.0, 0.0],
         use_noised_for_contrastive: bool = False,
         **kwargs,
@@ -109,6 +112,10 @@ class Llava_OneVision(lmms):
             attention_threshold = [float(attention_threshold) for i in range(3)]
             
         self.recursion_config = LlavaRecursionConfig()
+        
+        self.recursion_config.save_output = save_output
+        self.recursion_config.output_csv_path = output_csv_path
+        self.recursion_config.output_json_path = output_json_path
 
         setattr(self.recursion_config, "attention_threshold", attention_threshold)
         setattr(self.recursion_config, "contrastive_alphas", contrastive_alphas)
@@ -569,14 +576,16 @@ class Llava_OneVision(lmms):
                     attention_mask=attention_masks,
                     pad_token_id=pad_token_ids,
                     max_length=1,
+                    doc_id=batched_doc_id[0],
                     images=image_tensor,
                     use_cache=self.use_cache,
-                    generation_type="test",
+                    generation_type="recursion",
                     downsampled_images=downsampled_image_tensors,
                     tokenizer=self.tokenizer,
                     stage1_grid=stage1_grid,
                     question_input=question_input,
                     flattened_visuals=new_visual,
+                    task=task,
                     **gen_kwargs)
                 # cont = self.model.generate(qwen_input_ids, pad_token_id=pad_token_ids, images=image_tensor, use_cache=self.use_cache, **gen_kwargs)
 
