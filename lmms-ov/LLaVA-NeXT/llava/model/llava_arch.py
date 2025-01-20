@@ -406,10 +406,10 @@ class LlavaMetaForCausalLM(ABC):
                                 downsampled_feature = downsampled_feature * mask.unsqueeze(-1)
                                 downsampled_feature = downsampled_feature.flatten(0, 1)
                                 
-                                # for f in downsampled_feature:
-                                #     if f.min() == 0 and f.max() == 0: continue
-                                #     downsampled_features_list.append(f.unsqueeze(0))
-                                downsampled_features_list.append(downsampled_feature)
+                                for f in downsampled_feature:
+                                    if f.min() == 0 and f.max() == 0: continue
+                                    downsampled_features_list.append(f.unsqueeze(0))
+                                # downsampled_features_list.append(downsampled_feature)
                         
                         mask = image_mask[0]
                         patch_per_side, _ = mask.shape
@@ -417,9 +417,9 @@ class LlavaMetaForCausalLM(ABC):
                         stage0_feature = stage0_feature.view(patch_per_side, patch_per_side, -1)
                         stage0_feature = stage0_feature * mask.unsqueeze(-1)
                         stage0_feature = stage0_feature.flatten(0, 1)
-                        # for f in stage0_feature:
-                        #     if f.min() == 0 and f.max() == 0: continue
-                        #     stage0_features_list.append(f.unsqueeze(0))
+                        for f in stage0_feature:
+                            if f.min() == 0 and f.max() == 0: continue
+                            stage0_features_list.append(f.unsqueeze(0))
                         # stage0_features_list.append(self.model.image_newline.unsqueeze(0))
                         
                         mask = image_mask[1]
@@ -429,25 +429,25 @@ class LlavaMetaForCausalLM(ABC):
                         stage1_feature = stage1_feature.view(patch_per_side, patch_per_side, -1)
                         stage1_feature = stage1_feature * mask.unsqueeze(-1)
                         stage1_feature = stage1_feature.flatten(0, 1)
-                        # for f in stage1_feature:
-                        #     if f.min() == 0 and f.max() == 0: continue
-                        #     stage1_features_list.append(f.unsqueeze(0))
+                        for f in stage1_feature:
+                            if f.min() == 0 and f.max() == 0: continue
+                            stage1_features_list.append(f.unsqueeze(0))
                         # stage1_features_list.append(self.model.image_newline.unsqueeze(0))
                         
-                        # concat_list = []
-                        # if len(downsampled_features_list) > 0:
-                        #     downsampled_features = torch.cat(downsampled_features_list, dim=0)
-                        #     concat_list.append(downsampled_features)
-                        # if len(stage0_features_list) > 0:
-                        #     stage0_features = torch.cat(stage0_features_list, dim=0)
-                        #     concat_list.append(stage0_features)
-                        # if len(stage1_features_list) > 0:
-                        #     stage1_features = torch.cat(stage1_features_list, dim=0)
-                        #     concat_list.append(stage1_features)
-                        # image_feature = torch.cat(concat_list, dim=0)
+                        concat_list = []
+                        if len(downsampled_features_list) > 0:
+                            downsampled_features = torch.cat(downsampled_features_list, dim=0)
+                            concat_list.append(downsampled_features)
+                        if len(stage0_features_list) > 0:
+                            stage0_features = torch.cat(stage0_features_list, dim=0)
+                            concat_list.append(stage0_features)
+                        if len(stage1_features_list) > 0:
+                            stage1_features = torch.cat(stage1_features_list, dim=0)
+                            concat_list.append(stage1_features)
+                        image_feature = torch.cat(concat_list, dim=0)
 
-                        downsampled_features = torch.cat(downsampled_features_list, dim=0)
-                        image_feature = torch.cat([downsampled_features, stage0_feature, stage1_feature], dim=0)
+                        # downsampled_features = torch.cat(downsampled_features_list, dim=0)
+                        # image_feature = torch.cat([downsampled_features, stage0_feature, stage1_feature], dim=0)
                         # image_feature = torch.cat([stage0_feature, stage1_feature], dim=0)
                         image_feature = image_feature.type(torch.bfloat16)
 

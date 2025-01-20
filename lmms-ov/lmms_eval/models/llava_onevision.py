@@ -466,7 +466,7 @@ class Llava_OneVision(lmms):
                 if type(visual[0]) == PIL.Image.Image:  # For image, multi-image tasks
                     new_visual = []
                     for v in visual:
-                        new_visual.append(self.make_square_center(v, 400, 1152))
+                        new_visual.append(self.make_square_center(v, 400, 768))
                     image_tensor = process_images(new_visual, self._image_processor, self._config)
                     stage1_grid = int(math.sqrt(image_tensor.shape[1] - 1))
                     if type(image_tensor) is list:

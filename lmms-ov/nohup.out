@@ -1,0 +1,91 @@
+The following values were not passed to `accelerate launch` and had defaults used instead:
+	`--num_machines` was set to a value of `1`
+	`--mixed_precision` was set to a value of `'no'`
+	`--dynamo_backend` was set to a value of `'no'`
+To avoid this warning pass in values for each of the problematic parameters or run `accelerate config`.
+wandb: Currently logged in as: woohyeon (VLM_Hallucination_Woohyeon). Use `wandb login --relogin` to force relogin
+wandb: wandb version 0.19.4 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.16.5
+wandb: Run data is saved locally in /workspace/vlm/lmms-ov/wandb/run-20250120_033201-iienouk9
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run pope_pop_0.5_bilinear_s1
+wandb: ⭐️ View project at https://wandb.ai/VLM_Hallucination_Woohyeon/llava1.6_recursive_eval_ov_0.5_cd
+wandb: 🚀 View run at https://wandb.ai/VLM_Hallucination_Woohyeon/llava1.6_recursive_eval_ov_0.5_cd/runs/iienouk9/workspace
+[32m2025-01-20 03:32:03.435[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate[0m:[36m337[0m - [1mVerbosity set to DEBUG[0m
+[32m2025-01-20 03:32:04.414[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.tasks[0m:[36m_get_task_and_group[0m:[36m452[0m - [34m[1m`group` and `group_alias` keys in tasks' configs will no longer be used in the next release of lmms-eval. `tag` will be used to allow to call a collection of tasks just like `group`. `group` will be removed in order to not cause confusion with the new ConfigurableGroup which will be the offical way to create groups with addition of group-wide configuations.[0m
+[32m2025-01-20 03:32:04.629[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.tasks[0m:[36m_get_task_and_group[0m:[36m478[0m - [34m[1mFile illusionvqa.yaml in /workspace/vlm/lmms-ov/lmms_eval/tasks/illusionvqa could not be loaded as a task or group[0m
+[32m2025-01-20 03:32:06.593[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m420[0m - [1mEvaluation tracker args: {'output_path': './logs/'}[0m
+[32m2025-01-20 03:32:06.594[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m509[0m - [1mSelected Tasks: ['pope_pop'][0m
+[32m2025-01-20 03:32:06.597[0m | [1mINFO    [0m | [36mlmms_eval.evaluator[0m:[36msimple_evaluate[0m:[36m155[0m - [1mSetting random seed to 0 | Setting numpy seed to 1234 | Setting torch manual seed to 1234[0m
+initialize llava model with modification
+Failed to import llava_llama from llava.language_model.llava_llama. Error: invalid decimal literal (llava_arch.py, line 452)
+Failed to import llava_qwen from llava.language_model.llava_qwen. Error: invalid decimal literal (llava_arch.py, line 452)
+Failed to import llava_mistral from llava.language_model.llava_mistral. Error: invalid decimal literal (llava_arch.py, line 452)
+Failed to import llava_mixtral from llava.language_model.llava_mixtral. Error: invalid decimal literal (llava_arch.py, line 452)
+[32m2025-01-20 03:32:12.312[0m | [31m[1mERROR   [0m | [36mlmms_eval.models[0m:[36mget_model[0m:[36m75[0m - [31m[1mFailed to import Llava_OneVision from llava_onevision: cannot import name 'LlavaLlamaForCausalLM' from 'llava.model' (/workspace/vlm/lmms-ov/LLaVA-NeXT/llava/model/__init__.py)[0m
+Traceback (most recent call last):
+  File "/root/miniconda3/envs/ov/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/root/miniconda3/envs/ov/lib/python3.10/runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "/workspace/vlm/lmms-ov/lmms_eval/__main__.py", line 575, in <module>
+    cli_evaluate()
+  File "/workspace/vlm/lmms-ov/lmms_eval/__main__.py", line 388, in cli_evaluate
+    raise e
+  File "/workspace/vlm/lmms-ov/lmms_eval/__main__.py", line 372, in cli_evaluate
+    results, samples = cli_evaluate_single(args)
+  File "/workspace/vlm/lmms-ov/lmms_eval/__main__.py", line 513, in cli_evaluate_single
+    results = evaluator.simple_evaluate(
+  File "/workspace/vlm/lmms-ov/lmms_eval/utils.py", line 533, in _wrapper
+    return fn(*args, **kwargs)
+  File "/workspace/vlm/lmms-ov/lmms_eval/evaluator.py", line 176, in simple_evaluate
+    ModelClass = get_model(model)
+  File "/workspace/vlm/lmms-ov/lmms_eval/models/__init__.py", line 72, in get_model
+    module = __import__(model_module, fromlist=[model_class])
+  File "/workspace/vlm/lmms-ov/lmms_eval/models/llava_onevision.py", line 39, in <module>
+    from llava.constants import (
+  File "/workspace/vlm/lmms-ov/LLaVA-NeXT/llava/__init__.py", line 1, in <module>
+    from .model import LlavaLlamaForCausalLM
+ImportError: cannot import name 'LlavaLlamaForCausalLM' from 'llava.model' (/workspace/vlm/lmms-ov/LLaVA-NeXT/llava/model/__init__.py)
+Traceback (most recent call last):
+  File "/root/miniconda3/envs/ov/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/root/miniconda3/envs/ov/lib/python3.10/runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "/workspace/vlm/lmms-ov/lmms_eval/__main__.py", line 575, in <module>
+    cli_evaluate()
+  File "/workspace/vlm/lmms-ov/lmms_eval/__main__.py", line 388, in cli_evaluate
+    raise e
+  File "/workspace/vlm/lmms-ov/lmms_eval/__main__.py", line 372, in cli_evaluate
+    results, samples = cli_evaluate_single(args)
+  File "/workspace/vlm/lmms-ov/lmms_eval/__main__.py", line 513, in cli_evaluate_single
+    results = evaluator.simple_evaluate(
+  File "/workspace/vlm/lmms-ov/lmms_eval/utils.py", line 533, in _wrapper
+    return fn(*args, **kwargs)
+  File "/workspace/vlm/lmms-ov/lmms_eval/evaluator.py", line 176, in simple_evaluate
+    ModelClass = get_model(model)
+  File "/workspace/vlm/lmms-ov/lmms_eval/models/__init__.py", line 72, in get_model
+    module = __import__(model_module, fromlist=[model_class])
+  File "/workspace/vlm/lmms-ov/lmms_eval/models/llava_onevision.py", line 39, in <module>
+    from llava.constants import (
+  File "/workspace/vlm/lmms-ov/LLaVA-NeXT/llava/__init__.py", line 1, in <module>
+    from .model import LlavaLlamaForCausalLM
+ImportError: cannot import name 'LlavaLlamaForCausalLM' from 'llava.model' (/workspace/vlm/lmms-ov/LLaVA-NeXT/llava/model/__init__.py)
+wandb: - 0.024 MB of 0.024 MB uploadedwandb: \ 0.038 MB of 0.038 MB uploadedwandb: 🚀 View run pope_pop_0.5_bilinear_s1 at: https://wandb.ai/VLM_Hallucination_Woohyeon/llava1.6_recursive_eval_ov_0.5_cd/runs/iienouk9/workspace
+wandb: Synced 6 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./wandb/run-20250120_033201-iienouk9/logs
+Traceback (most recent call last):
+  File "/root/miniconda3/envs/ov/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/root/miniconda3/envs/ov/lib/python3.10/runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "/root/miniconda3/envs/ov/lib/python3.10/site-packages/accelerate/commands/launch.py", line 1178, in <module>
+    main()
+  File "/root/miniconda3/envs/ov/lib/python3.10/site-packages/accelerate/commands/launch.py", line 1174, in main
+    launch_command(args)
+  File "/root/miniconda3/envs/ov/lib/python3.10/site-packages/accelerate/commands/launch.py", line 1168, in launch_command
+    simple_launcher(args)
+  File "/root/miniconda3/envs/ov/lib/python3.10/site-packages/accelerate/commands/launch.py", line 763, in simple_launcher
+    raise subprocess.CalledProcessError(returncode=process.returncode, cmd=cmd)
+subprocess.CalledProcessError: Command '['/root/miniconda3/envs/ov/bin/python3', '-m', 'lmms_eval', '--model', 'llava_onevision', '--model_args', 'pretrained=lmms-lab/llava-onevision-qwen2-0.5b-ov', '--tasks', 'pope_pop', '--batch_size', '1', '--log_samples', '--log_samples_suffix', 'llava_v1.6_pope', '--output_path', './logs/', '--attention_threshold', '0.5', '--verbosity', 'DEBUG', '--save_output', 'True', '--output_json_path', './logit_pope_pop_0.5_bilinear_s1_top100.json', '--output_csv_path', './generation_output_pope_pop_0.5_bilinear_s1_top100.csv', '--wandb_args', 'project=llava1.6_recursive_eval_ov_0.5_cd,entity=VLM_Hallucination_Woohyeon,name=pope_pop_0.5_bilinear_s1']' returned non-zero exit status 1.
