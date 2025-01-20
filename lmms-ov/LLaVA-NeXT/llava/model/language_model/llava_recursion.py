@@ -357,24 +357,24 @@ class LlavaQwenForRecursion(LlavaQwenForCausalLM):
                 stage_logit_list.append(scores[0])
                 text_output_list.append(text_outputs[0])
 
-                # Save confidence for analysis
-                if self.save_output and token_idx==0:
-                    _, _, cumulative_confidences = calculate_entropy_and_all_confidences(
-                        sequences, scores=scores
-                    )
-                    self.save_stage_to_csv(doc_id, f"Stage {idx_stage}", text_outputs, cumulative_confidences)
+                # # Save confidence for analysis
+                # if self.save_output and token_idx==0:
+                #     _, _, cumulative_confidences = calculate_entropy_and_all_confidences(
+                #         sequences, scores=scores
+                #     )
+                #     self.save_stage_to_csv(doc_id, f"Stage {idx_stage}", text_outputs, cumulative_confidences)
                 
-                # Save json logits
-                if self.save_output and token_idx==0:     
-                    logits = scores                       
-                    self.save_stage_to_json(
-                        doc_id=doc_id,
-                        stage=f"Stage {idx_stage}",
-                        text_output=text_outputs[0],  # Assuming batch size = 1
-                        logits=logits,  # Logits of shape [sequence length, vocab size]
-                        tokenizer = tokenizer,
-                        task = task
-                    )
+                # # Save json logits
+                # if self.save_output and token_idx==0:     
+                #     logits = scores                       
+                #     self.save_stage_to_json(
+                #         doc_id=doc_id,
+                #         stage=f"Stage {idx_stage}",
+                #         text_output=text_outputs[0],  # Assuming batch size = 1
+                #         logits=logits,  # Logits of shape [sequence length, vocab size]
+                #         tokenizer = tokenizer,
+                #         task = task
+                #     )
 
 
                 if last_stage:
