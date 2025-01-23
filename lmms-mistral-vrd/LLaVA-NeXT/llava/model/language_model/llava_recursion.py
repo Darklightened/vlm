@@ -42,15 +42,15 @@ from llava.mm_utils import (
 @dataclass
 class LlavaRecursionConfig():    
     stages: List[int] = (-2, -1, 0, 1)
-    positional_embedding_type: str = "bilinear"
+    positional_embedding_type: str = "bilinear_interpolation"
     generation_type: str = "recursion"
-    attention_thresholding_type: str = "layer_mean_topk"
-    attn_norm: str = "norm_min_max"
-    attention_threshold: List[float] = (0.9, 0.9, 0.9)
+    attention_thresholding_type: str = "attn_topk"
+    attn_norm: str = None
+    attention_threshold: List[float] = (1.0, 1.0, 1.0)
     save_output: bool = False
     output_csv_path: Optional[str] = None
     output_json_path: Optional[str] = None
-    contrastive_alphas: List[float] = (1.0, 1.0, 1.0)
+    contrastive_alphas: List[float] = (0.0, 0.0, 0.0)
     square: int = 1
     fix_grid: Optional[str] = "2x2"
     _device: str = "cuda:0"
@@ -289,7 +289,7 @@ class LlavaMistralForRecursion(LlavaMistralForCausalLM):
             row = [doc_id, stage, text_output] + cumulative_confidences
             writer.writerow(row)
     
-    def save_stage_to_json(self, doc_id, stage, text_output, logits, tokenizer, task):
+    def save_stage_to_json(self, doc_id, stage, text_output, logits, tokenizer, task, logits_list=None, text_outputs=None):
         # Ensure the output JSON path is defined
         assert self.output_json_path is not None, "Output JSON path is not provided."
 
@@ -315,31 +315,83 @@ class LlavaMistralForRecursion(LlavaMistralForCausalLM):
             ## yes, no
             tokens = ["Yes", "No"]
             token_ids = [3869, 1939]
+        else:
+            tokens = []
+            token_ids = []
         
-        # print(logits[0].shape)        
+        # print(logits[0].shape) 
+
+        if logits_list is not None:
+            k = 100
+
+            # Get top-k indices from the last stage
+            final_logits = logits_list[-1][0].cpu().detach().numpy()
+            final_topk_indices = final_logits.argsort()[-k:][::-1]  # Top-k indices, descending order
+
+            final_topk_logits = [(tokenizer.decode([idx]).strip(), float(final_logits[idx])) for idx in final_topk_indices]
+
+            # Prepare to store the results for all stages            
+
+            for stage, (logits, text_output) in enumerate(zip(logits_list, text_outputs)):
+                # Extract logits for the top-k indices from the current stage
+                all_logits = logits[0].cpu().detach().numpy()  # Assuming logits is a tensor
+                logits_for_labels = {
+                    token: logits[0][token_id].item()
+                    for token, token_id in zip(tokens, token_ids)
+                }
+
+                # Decode tokens for the top-k indices
+                top_logits = [(tokenizer.decode([idx]).strip(), float(all_logits[idx])) for idx in final_topk_indices]
+
+                # Prepare the entry for the current stage
+                stage_entry = {
+                    "Stage": stage,
+                    "Text Output": text_output,  # Assuming text_output is defined earlier in the loop
+                    "Logits": {k: float(v) for k, v in logits_for_labels.items()},  # Logits corresponding to top-k indices
+                    "Top-100 Logits": top_logits,  # Decoded tokens and logits for top-k indices
+                }
+
+                # Update the JSON data with the new stage information
+                if doc_id not in data:
+                    data[doc_id] = []  # Initialize a list for stages if this doc_id is new
+
+                data[doc_id].append(stage_entry)
+
+            # Save the updated JSON data
+            with open(self.output_json_path, mode="w") as file:
+                json.dump(data, file, indent=4)  
         
-        logits_for_labels = {
-            token: logits[0][0][token_id].item()
-            for token, token_id in zip(tokens, token_ids)
-        }
+        else:        
+            k = 100
 
-        # Prepare the entry for the current stage
-        stage_entry = {
-            "Stage": stage,
-            "Text Output": text_output,
-            "Logits": logits_for_labels  
-        }
+            logits_for_labels = {
+                token: logits[0][0][token_id].item()
+                for token, token_id in zip(tokens, token_ids)
+            }
 
-        # Update the JSON data with the new stage information
-        if doc_id not in data:
-            data[doc_id] = []  # Initialize a list for stages if this doc_id is new
+            # Get top-100 logits and decoded tokens
+            all_logits = logits[0][0].cpu().detach().numpy()  # Assuming logits is a tensor
+            top_indices = all_logits.argsort()[-k:][::-1]  # Top-100 indices, descending order
+            top_logits = [(tokenizer.decode([idx]).strip(), float(all_logits[idx])) for idx in top_indices]
 
-        data[doc_id].append(stage_entry)
+            # Prepare the entry for the current stage
+            stage_entry = {
+                "Stage": stage,
+                "Text Output": text_output,
+                "Logits": {k: float(v) for k, v in logits_for_labels.items()},  # Ensure all values are converted to float
+                "Top-100 Logits": top_logits
+            }
 
-        # Save the updated JSON data
-        with open(self.output_json_path, mode="w") as file:
-            json.dump(data, file, indent=4)
+            # Update the JSON data with the new stage information
+            if doc_id not in data:
+                data[doc_id] = []  # Initialize a list for stages if this doc_id is new
 
+            data[doc_id].append(stage_entry)
+
+            # Save the updated JSON data
+            with open(self.output_json_path, mode="w") as file:
+                json.dump(data, file, indent=4)
+    
     @torch.no_grad()
     def generate_recursive(
         self,
@@ -370,7 +422,8 @@ class LlavaMistralForRecursion(LlavaMistralForCausalLM):
 
         for token_idx in range(max_length):
             self.reset_image_mask()
-            stage_logit_list = []            
+            stage_logit_list = []
+            text_output_list = []     
 
             for idx_stage, stage in enumerate(self.stages):
                 # Necessary for unpadding
@@ -409,29 +462,48 @@ class LlavaMistralForRecursion(LlavaMistralForCausalLM):
                 #print(f"scores: {scores}")
                 sequences = cont["sequences"][0]
                 stage_logit_list.append(scores[0])
+                text_output_list.append(text_outputs[0])
 
-                # Save confidence for analysis
-                if self.save_output and token_idx==0:
-                    _, _, cumulative_confidences = calculate_entropy_and_all_confidences(
-                        sequences, scores=scores
-                    )
-                    self.save_stage_to_csv(doc_id, f"Stage {idx_stage}", text_outputs, cumulative_confidences)
+                # # Save confidence for analysis
+                # if self.save_output and token_idx==0:
+                #     _, _, cumulative_confidences = calculate_entropy_and_all_confidences(
+                #         sequences, scores=scores
+                #     )
+                #     self.save_stage_to_csv(doc_id, f"Stage {idx_stage}", text_outputs, cumulative_confidences)
                 
-                # Save json logits
-                if self.save_output and token_idx==0:     
-                    logits = scores                       
-                    self.save_stage_to_json(
-                        doc_id=doc_id,
-                        stage=f"Stage {idx_stage}",
-                        text_output=text_outputs[0],  # Assuming batch size = 1
-                        logits=logits,  # Logits of shape [sequence length, vocab size]
-                        tokenizer = tokenizer,
-                        task = task
-                    )
+                # # Save json logits
+                # if self.save_output and token_idx==0:     
+                #     logits = scores                       
+                #     self.save_stage_to_json(
+                #         doc_id=doc_id,
+                #         stage=f"Stage {idx_stage}",
+                #         text_output=text_outputs[0],  # Assuming batch size = 1
+                #         logits=logits,  # Logits of shape [sequence length, vocab size]
+                #         tokenizer = tokenizer,
+                #         task = task
+                #     )
+
 
                 if last_stage:
+                    final_logit = scores[0].clone()
+                    # Save json logits
+                    if self.save_output and token_idx==0:     
+                        logits = scores                       
+                        self.save_stage_to_json(
+                            doc_id=doc_id,
+                            stage=f"Stage {idx_stage}",
+                            text_output=text_outputs[0],  # Assuming batch size = 1
+                            logits=logits,  # Logits of shape [sequence length, vocab size]
+                            logits_list = stage_logit_list,
+                            text_outputs = text_output_list,
+                            tokenizer = tokenizer,
+                            task = task
+                        )
                     # Contrastive decoding
-                    final_logit = scores[0]
+                    final_logit = scores[0].clone()
+                    top_100_indices = torch.topk(final_logit, 100, dim=1).indices
+                    mask = torch.full_like(final_logit, False, dtype=torch.bool)  # False로 초기화된 마스크
+                    mask.scatter_(1, top_100_indices, True)  # top_indices 위치를 True로 설정
 
                     # use noised version of image for decoding
                     if self.use_noised_for_contrastive:
@@ -455,34 +527,10 @@ class LlavaMistralForRecursion(LlavaMistralForCausalLM):
                         noised_scores = noised_cont.scores[0]
                         final_logit += self.contrastive_alphas[-1]*(final_logit - noised_scores)
                     else:
-                        # final_logit = self.contrastive_decoder.compute_final_logits(stage_logit_list, self.contrastive_alphas, cutoff=True)
-
-                        # code_adaptive = False
-
-                        # if code_adaptive:
-                        #     # Use multi-stage contrastive decoding
-                        #     for idx in range(len(self.stages) - 1):
-                        #         p_v = nn.functional.softmax(stage_logit_list[idx + 1], dim=-1)
-                        #         p_d = nn.functional.softmax(stage_logit_list[idx], dim=-1)
-
-                        #         # Calculate KL-based adaptive weight
-                        #         cd_alpha = self.contrastive_alphas[idx]
-                        #         kl_d = 0.5 * ((torch.log2(torch.abs(p_v - p_d) ** cd_alpha + 1)) * (p_v + p_d)).sum(dim=-1).unsqueeze(-1)
-                        #         kld_alpha = 1 - kl_d
-
-                        #         # Calculate cutoff threshold
-                        #         cutoff = kl_d * p_v.max(dim=-1, keepdim=True).values
-
-                        #         # Calculate stage-specific contrastive logits
-                        #         diffs = (1 + kld_alpha) * stage_logit_list[idx + 1] - kld_alpha * stage_logit_list[idx]
-                        #         cd_logits = diffs.masked_fill(p_v < cutoff, -float("inf"))
-
-                        #         # Update final logits with weighted stage contributions
-                        #         final_logit += cd_logits
-                        # else:
                         # use multi-stage contrastive decoding
                         for idx in range(len(self.stages) - 1):
                             final_logit += self.contrastive_alphas[idx] * (stage_logit_list[idx + 1] - stage_logit_list[idx])
+                        final_logit[~mask] = float('-inf')
 
                     best_token = torch.argmax(final_logit, dim=-1)
                     final_token.append(best_token.item())
@@ -490,7 +538,7 @@ class LlavaMistralForRecursion(LlavaMistralForCausalLM):
 
                     # Append decoded text to final output
                     final_text = tokenizer.batch_decode([final_token], skip_special_tokens=True)[0]
-                    print(f'final_text: {final_text}')
+                    # print(f'final_text: {final_text.strip()}')
 
                     # Update input_ids and attention_mask for the next token
                     input_ids = torch.cat([input_ids, best_token.unsqueeze(0)], dim=-1)
@@ -511,7 +559,7 @@ class LlavaMistralForRecursion(LlavaMistralForCausalLM):
                     select_token=None,
                     image=flattened_visuals[0],
                     save_path=None,
-                    attn_norm=self.attn_norm,
+                    # save_path="/workspace/vlm/temp/",
                 )
 
                 if self.attention_thresholding_type == "layer_mean":
@@ -553,5 +601,5 @@ class LlavaMistralForRecursion(LlavaMistralForCausalLM):
             if input_ids[0, -1] == tokenizer.eos_token_id:
                 break
         
-        return [final_text]
+        return [final_text.strip()]
         

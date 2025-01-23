@@ -592,7 +592,7 @@ class Llava(lmms):
                 pad_token_id=pad_token_ids,
                 images=image_tensor,
                 gen_kwargs = gen_kwargs,               
-                max_length = 3,
+                max_length = 8,
                 use_cache=self.use_cache,                 
                 downsampled_images = downsampled_image_tensors,
                 doc_id = doc_id,

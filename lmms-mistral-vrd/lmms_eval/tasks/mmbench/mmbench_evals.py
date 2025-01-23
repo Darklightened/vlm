@@ -175,28 +175,36 @@ class MMBench_Evaluator:
         if ret:
             return ret, item["prediction"]
 
-        while retry:
-            ans = self.get_chat_response(prompt)
-            if "Failed to obtain answer via API" in ans:
-                msg = "GPT API failed to answer. "
-                eval_logger.info(msg)
-                retry -= 1
-            else:
-                ret = self.can_infer(ans, choices)
-                if ret:
-                    return ret, ans
-                else:
-                    eval_logger.info(f'GPT output includes 0 / >1 letter in "ABCD": {ans}')
-                    retry -= 1
+        num_options = sum([ch in item for ch in "ABCD"])
+        if num_options >= 2:
+            chars = string.ascii_uppercase[:num_options]
+            chars = chars + "E"
+            num_options += 1
+            tmp = rd.randint(0, num_options - 1)
+            return chars[tmp], "Failed to predict, thus randomly generate one. "
 
-            if retry == 0:
-                num_options = sum([ch in item for ch in "ABCD"])
-                if num_options >= 2:
-                    chars = string.ascii_uppercase[:num_options]
-                    chars = chars + "E"
-                    num_options += 1
-                    tmp = rd.randint(0, num_options - 1)
-                    return chars[tmp], "Failed to predict, thus randomly generate one. "
+        # while retry:
+        #     ans = self.get_chat_response(prompt)
+        #     if "Failed to obtain answer via API" in ans:
+        #         msg = "GPT API failed to answer. "
+        #         eval_logger.info(msg)
+        #         retry -= 1
+        #     else:
+        #         ret = self.can_infer(ans, choices)
+        #         if ret:
+        #             return ret, ans
+        #         else:
+        #             eval_logger.info(f'GPT output includes 0 / >1 letter in "ABCD": {ans}')
+        #             retry -= 1
+
+        #     if retry == 0:
+        #         num_options = sum([ch in item for ch in "ABCD"])
+        #         if num_options >= 2:
+        #             chars = string.ascii_uppercase[:num_options]
+        #             chars = chars + "E"
+        #             num_options += 1
+        #             tmp = rd.randint(0, num_options - 1)
+        #             return chars[tmp], "Failed to predict, thus randomly generate one. "
 
     # Extract answer from multiple rolling records
     def eval_sub_data(self, sub_data, answer_map):
