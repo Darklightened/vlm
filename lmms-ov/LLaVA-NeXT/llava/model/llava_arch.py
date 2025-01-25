@@ -398,7 +398,6 @@ class LlavaMetaForCausalLM(ABC):
                             for downsampled_feature, stage in zip(encoded_downsampled_image_features, stages):
                                 mask = image_mask[stage]
                                 patch_per_side, _ = mask.shape
-                                # num_patches = patch_per_side * patch_per_side
 
                                 downsampled_feature = downsampled_feature[0]
                                 downsampled_feature = downsampled_feature.view(patch_per_side, patch_per_side, -1)
@@ -413,18 +412,15 @@ class LlavaMetaForCausalLM(ABC):
                         
                         mask = image_mask[0]
                         patch_per_side, _ = mask.shape
-                        # num_patches = patch_per_side * patch_per_side
                         stage0_feature = stage0_feature.view(patch_per_side, patch_per_side, -1)
                         stage0_feature = stage0_feature * mask.unsqueeze(-1)
                         stage0_feature = stage0_feature.flatten(0, 1)
                         for f in stage0_feature:
                             if f.min() == 0 and f.max() == 0: continue
                             stage0_features_list.append(f.unsqueeze(0))
-                        # stage0_features_list.append(self.model.image_newline.unsqueeze(0))
                         
                         mask = image_mask[1]
                         patch_per_side, _ = mask.shape
-                        # num_patches = patch_per_side * patch_per_side
                         stage1_feature = stage1_feature.permute(0, 2, 1, 3, 4).contiguous()
                         stage1_feature = stage1_feature.view(patch_per_side, patch_per_side, -1)
                         stage1_feature = stage1_feature * mask.unsqueeze(-1)
@@ -432,7 +428,7 @@ class LlavaMetaForCausalLM(ABC):
                         for f in stage1_feature:
                             if f.min() == 0 and f.max() == 0: continue
                             stage1_features_list.append(f.unsqueeze(0))
-                        # stage1_features_list.append(self.model.image_newline.unsqueeze(0))
+                        # stage1_feature = stage1_feature.flatten(0, 3)
                         
                         concat_list = []
                         if len(downsampled_features_list) > 0:
@@ -449,7 +445,8 @@ class LlavaMetaForCausalLM(ABC):
                         # downsampled_features = torch.cat(downsampled_features_list, dim=0)
                         # image_feature = torch.cat([downsampled_features, stage0_feature, stage1_feature], dim=0)
                         # image_feature = torch.cat([stage0_feature, stage1_feature], dim=0)
-                        image_feature = image_feature.type(torch.bfloat16)
+
+                        image_feature = image_feature.type(torch.float16)
 
                         new_image_features.append(image_feature)
                     

@@ -36,7 +36,7 @@ def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, l
     elif torch_dtype == "float16":
         kwargs["torch_dtype"] = torch.float16
     elif torch_dtype == "bfloat16":
-        kwargs["torch_dtype"] = torch.bfloat16
+        kwargs["torch_dtype"] = torch.float16
     else:
         import pdb;pdb.set_trace()
 
@@ -206,7 +206,7 @@ def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, l
 
             elif "qwen" in model_name.lower() or "quyen" in model_name.lower():
                 attn_implementation = 'eager'
-                kwargs["torch_dtype"] = torch.bfloat16
+                kwargs["torch_dtype"] = torch.float16
                 tokenizer = AutoTokenizer.from_pretrained(model_path)
                 if "moe" in model_name.lower() or "A14B" in model_name.lower():
                     from llava.model.language_model.llava_qwen_moe import LlavaQwenMoeConfig
@@ -224,20 +224,21 @@ def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, l
                     if overwrite_config is not None:
                         print("loading here.")
                         attn_implementation = 'eager'
-                        kwargs["torch_dtype"] = torch.bfloat16
+                        kwargs["torch_dtype"] = torch.float16
                         llava_cfg = LlavaQwenConfig.from_pretrained(model_path)
                         rank0_print(f"Overwriting config with {overwrite_config}")
                         for k, v in overwrite_config.items():
                             setattr(llava_cfg, k, v)
+
+                        model = LlavaQwenForCausalLM.from_pretrained(model_path, low_cpu_mem_usage=True, attn_implementation=attn_implementation, config=llava_cfg, **kwargs)
                         model = LlavaQwenForRecursion.from_pretrained(
                             model_path,                    
                             low_cpu_mem_usage=True,
                             attn_implementation=attn_implementation,
-                            config=llava_cfg,
+                            config=model.config,
                             **kwargs
                         )
                         model.init_all(recursion_config)
-                        # model = LlavaQwenForCausalLM.from_pretrained(model_path, low_cpu_mem_usage=True, attn_implementation=attn_implementation, config=llava_cfg, **kwargs)
                     else:
                         model = LlavaQwenForCausalLM.from_pretrained(model_path, low_cpu_mem_usage=True, attn_implementation=attn_implementation, **kwargs)
 
@@ -304,7 +305,7 @@ def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, l
         if not vision_tower.is_loaded:
             vision_tower.load_model(device_map=device_map)
         if device_map != "auto":
-            vision_tower.to(device="cuda", dtype=torch.bfloat16)
+            vision_tower.to(device="cuda", dtype=torch.float16)
         image_processor = vision_tower.image_processor
 
     if hasattr(model.config, "max_sequence_length"):

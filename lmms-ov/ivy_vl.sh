@@ -4,7 +4,7 @@ python3 -m accelerate.commands.launch \
     --main_process_port 29832 \
     -m lmms_eval \
     --model llava_onevision \
-    --model_args pretrained="AI-Safeguard/Ivy-VL-llava",model_name="llava_qwen" \
+    --model_args pretrained='AI-Safeguard/Ivy-VL-llava',model_name='llava_qwen' \
     --tasks mmstar \
     --batch_size 1 \
     --log_samples \

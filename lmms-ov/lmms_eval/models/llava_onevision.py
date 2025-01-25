@@ -309,9 +309,9 @@ class Llava_OneVision(lmms):
 
                     image_tensor = process_images(visual, self._image_processor, self._config)
                     if type(image_tensor) is list:
-                        image_tensor = [_image.to(dtype=torch.bfloat16, device=self.device) for _image in image_tensor]
+                        image_tensor = [_image.to(dtype=torch.float16, device=self.device) for _image in image_tensor]
                     else:
-                        image_tensor = image_tensor.to(dtype=torch.bfloat16, device=self.device)
+                        image_tensor = image_tensor.to(dtype=torch.float16, device=self.device)
 
                     task_type = "video"
 
@@ -319,9 +319,9 @@ class Llava_OneVision(lmms):
                 elif isinstance(visual[0], PIL.Image.Image):
                     image_tensor = process_images(visual, self._image_processor, self._config)
                     if type(image_tensor) is list:
-                        image_tensor = [_image.to(dtype=torch.bfloat16, device=self.device) for _image in image_tensor]
+                        image_tensor = [_image.to(dtype=torch.float16, device=self.device) for _image in image_tensor]
                     else:
-                        image_tensor = image_tensor.to(dtype=torch.bfloat16, device=self.device)
+                        image_tensor = image_tensor.to(dtype=torch.float16, device=self.device)
 
                     task_type = "image"
 
@@ -470,9 +470,9 @@ class Llava_OneVision(lmms):
                     image_tensor = process_images(new_visual, self._image_processor, self._config)
                     stage1_grid = int(math.sqrt(image_tensor.shape[1] - 1))
                     if type(image_tensor) is list:
-                        image_tensor = [_image.to(dtype=torch.bfloat16, device=self.device) for _image in image_tensor]
+                        image_tensor = [_image.to(dtype=torch.float16, device=self.device) for _image in image_tensor]
                     else:
-                        image_tensor = image_tensor.to(dtype=torch.bfloat16, device=self.device)
+                        image_tensor = image_tensor.to(dtype=torch.float16, device=self.device)
                         downsampled_image_tensors = dict()
                         for stage in [-2, -1]:
                             if stage == 0:
@@ -480,7 +480,7 @@ class Llava_OneVision(lmms):
                             temp_image_size = int(384 * pow(2, stage))
                             downsampled_image_tensor = torch.nn.functional.interpolate(image_tensor[0], size=(temp_image_size, temp_image_size), mode='bilinear', align_corners=False)
                             downsampled_image_tensor = downsampled_image_tensor.unsqueeze(0)
-                            downsampled_image_tensor = downsampled_image_tensor.to(dtype=torch.bfloat16, device=self.device)
+                            downsampled_image_tensor = downsampled_image_tensor.to(dtype=torch.float16, device=self.device)
                             downsampled_image_tensors[stage] = downsampled_image_tensor
 
                     task_type = "image"
@@ -564,7 +564,7 @@ class Llava_OneVision(lmms):
             #         downsampled_images=downsampled_image_tensors,
             #         **gen_kwargs)
             # text_outputs = self.tokenizer.batch_decode(cont, skip_special_tokens=True)
-            # print(text_outputs)
+            # # print(text_outputs)
 
 
             gen_kwargs.pop("max_new_tokens")
@@ -575,7 +575,7 @@ class Llava_OneVision(lmms):
                     input_ids,
                     attention_mask=attention_masks,
                     pad_token_id=pad_token_ids,
-                    max_length=1,
+                    max_length=16,
                     doc_id=batched_doc_id[0],
                     images=image_tensor,
                     use_cache=self.use_cache,
@@ -589,10 +589,11 @@ class Llava_OneVision(lmms):
                     **gen_kwargs)
                 # cont = self.model.generate(qwen_input_ids, pad_token_id=pad_token_ids, images=image_tensor, use_cache=self.use_cache, **gen_kwargs)
 
+            print(task, cont)
             text_outputs = cont
 
 
-            text_outputs = [response.strip() for response in text_outputs]
+            # text_outputs = [response.strip() for response in text_outputs]
             res.extend(text_outputs)
             self.cache_hook.add_partial("generate_until", (context, gen_kwargs), text_outputs)
             pbar.update(1)

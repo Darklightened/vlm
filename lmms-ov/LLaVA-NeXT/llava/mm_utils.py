@@ -48,7 +48,7 @@ def init_downsampled_vision_towers(vision_tower, stages, positional_embedding_ty
     
         # Modify positional embedding to match the resized image size
         if positional_embedding_type == "zero":       
-            downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions, embed_dim).to(dtype=torch.bfloat16, device=device)
+            downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions, embed_dim).to(dtype=torch.float16, device=device)
             torch.nn.init.constant_(downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding.weight, 0)
         elif positional_embedding_type == "interpolation":
             print("interpolate embedding type.")
@@ -61,14 +61,14 @@ def init_downsampled_vision_towers(vision_tower, stages, positional_embedding_ty
                 mode='linear', 
                 align_corners=False
             ).transpose(1, 2).squeeze(0)
-            downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions, embed_dim).to(dtype=torch.bfloat16, device=device)
+            downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions, embed_dim).to(dtype=torch.float16, device=device)
             downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding.weight.data.copy_(new_embedding)
         
         elif positional_embedding_type == "reduced":
             print("Reduced embedding type.")
             # Reduce the pretrained embedding by truncating
             original_embedding = downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding.weight.data
-            downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions, embed_dim).to(dtype=torch.bfloat16, device=device)
+            downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(num_positions, embed_dim).to(dtype=torch.float16, device=device)
             downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding.weight.data.copy_(original_embedding[:num_positions])
                 
         elif positional_embedding_type == "bilinear_interpolation":
@@ -89,7 +89,7 @@ def init_downsampled_vision_towers(vision_tower, stages, positional_embedding_ty
                                         )  
             resized_positional_embeddings = resized_positional_embeddings.squeeze(0).permute(1, 2, 0).reshape(-1, 1024)
             new_embedding = torch.cat([cls_token, resized_positional_embeddings], dim=0)  
-            downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(len(new_embedding), embed_dim).to(dtype=torch.bfloat16, device=device)
+            downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(len(new_embedding), embed_dim).to(dtype=torch.float16, device=device)
             downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding.weight.data.copy_(new_embedding)
             
     return downsampled_vision_towers                                
@@ -497,15 +497,15 @@ def aggregate_llm_attention(attn):
         vec = torch.concat((
             # We zero the first entry because it's what's called
             # null attention (https://aclanthology.org/W19-4808.pdf)
-            torch.tensor([0.]),
+            torch.tensor([0.], device=layer.device),
             # usually there's only one item in attns_per_head but
             # on the first generation, there's a row for each token
             # in the prompt as well, so take [-1]
-            attns_per_head[-1][1:].cpu(),
+            attns_per_head[-1][1:],
             # attns_per_head[-1].cpu(),
             # add zero for the final generated token, which never
             # gets any attention
-            torch.tensor([0.]),
+            torch.tensor([0.], device=layer.device),
         ))
         avged.append(vec / vec.sum())
     
@@ -549,14 +549,14 @@ def aggregate_vit_attention(attn, select_layer=-2, all_prev_layers=True):
             layer_attns = layer.squeeze(0)
             attns_per_head = layer_attns.mean(dim=0)
             # vec = attns_per_head[1:, 1:].cpu() # the first token is <CLS>
-            vec = attns_per_head.cpu() # the first token is <CLS>
+            vec = attns_per_head # the first token is <CLS>
             avged.append(vec / vec.sum(-1, keepdim=True))
         return torch.stack(avged).mean(dim=0)
     else:
         layer = attn[select_layer]
         layer_attns = layer.squeeze(0)
         attns_per_head = layer_attns.mean(dim=0)
-        vec = attns_per_head[1:, 1:].cpu()
+        vec = attns_per_head[1:, 1:]
         return vec / vec.sum(-1, keepdim=True)
 
 
@@ -564,7 +564,7 @@ def heterogenous_stack(vecs):
     '''Pad vectors with zeros then stack'''
     max_length = max(v.shape[0] for v in vecs)
     return torch.stack([
-        torch.concat((v, torch.zeros(max_length - v.shape[0])))
+        torch.concat((v, torch.zeros(max_length - v.shape[0], device=v.device)))
         for v in vecs
     ])
 
@@ -640,7 +640,7 @@ def get_heatmap(
     for i, layer in enumerate(outputs["attentions"][0]):
         layer_attns = layer.squeeze(0)        
         attns_per_head = layer_attns.mean(dim=0)
-        cur = attns_per_head[:-1].cpu().clone()
+        cur = attns_per_head[:-1].clone()
         cur[1:, 0] = 0.0
         cur[1:] = cur[1:] / cur[1:].sum(-1, keepdim=True)
         aggregated_prompt_attention.append(cur)
@@ -649,7 +649,7 @@ def get_heatmap(
 
     # Constructing the LLM attention matrix
     llm_attn_matrix = heterogenous_stack(
-        [torch.tensor([1])]
+        [torch.tensor([1], device=aggregated_prompt_attention.device)]
         + list(aggregated_prompt_attention) 
         + list(map(aggregate_llm_attention, outputs["attentions"]))
     )    
@@ -907,8 +907,8 @@ def get_heatmap(
     # upper_bound = 10000
     # lower_bound = lower_threshold * std + mean
 
-    # abnormal_mask = (stage_attn <= 10000000).to(torch.bfloat16)
-    # abnormal_mask = (stage_attn <= 1000  * pow(4, current_stage + 2)).to(torch.bfloat16)
+    # abnormal_mask = (stage_attn <= 10000000).to(torch.float16)
+    # abnormal_mask = (stage_attn <= 1000  * pow(4, current_stage + 2)).to(torch.float16)
     # ret_attn = ret_attn * abnormal_mask
     # stage_attn = stage_attn * abnormal_mask
     
@@ -961,14 +961,14 @@ def get_heatmap(
             plt.title(f"Histogram of 2D Tensor Values, bin: {bins}")
             plt.xlabel("Value")
             plt.ylabel("Frequency")
-            plt.savefig(f"{save_path}/{str(i).zfill(4)}_{token_string}_distribution_02.png")
+            plt.savefig(f"{save_path}/{str(i).zfill(4)}_{token_string}_{current_stage}distribution_02.png")
             plt.close('all')
             plt.hist(tensor_flattened, bins=500, alpha=0.7, edgecolor='black')
             plt.xlim(right=tensor_flattened.max())
             plt.title(f"Histogram of 2D Tensor Values, bin: {bins}")
             plt.xlabel("Value")
             plt.ylabel("Frequency")
-            plt.savefig(f"{save_path}/{str(i).zfill(4)}_{token_string}_distribution.png")
+            plt.savefig(f"{save_path}/{str(i).zfill(4)}_{token_string}_{current_stage}distribution.png")
             plt.close('all')
             
             # token_attn = sum(ret_attn_list[:-1])

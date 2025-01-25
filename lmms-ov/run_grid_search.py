@@ -15,20 +15,21 @@ def generate_command(attention_threshold, experiment_name_suffix):
         str: The generated bash command.
     """
     base_command = (
+        f"CUDA_VISIBLE_DEVICES=3 "
         f"python3 -m accelerate.commands.launch "
-        f"--num_processes=4 "
-        f"--main_process_port 29831 "
+        f"--num_processes=1 "
+        f"--main_process_port 29840 "
         f"-m lmms_eval "
         f"--model llava_onevision "
         f"--model_args pretrained='lmms-lab/llava-onevision-qwen2-0.5b-ov' "
-        f"--tasks pope_pop,pope_aokvqa_pop,pope_gqa_pop,mmstar,mmbench_en_dev_lite "
+        f"--tasks vqav2_val_lite "
         f"--batch_size 1 "
         f"--log_samples "
         f"--log_samples_suffix llava_v1.6_pope "
         f"--output_path ./logs/ "
         f"--attention_threshold '{attention_threshold}' "
         f"--verbosity DEBUG "
-        f"--wandb_args 'project=llava1.6_recursive_eval_ov_0.5b,entity=VLM_Hallucination_Woohyeon,name=exp_attn_{experiment_name_suffix}'"
+        f"--wandb_args 'project=llava1.6_recursive_eval_ov_0.5_cd,entity=VLM_Hallucination_Woohyeon,name=new_f16_attn_{experiment_name_suffix}'"
     )
     return base_command
 
@@ -37,7 +38,7 @@ def run_experiments():
     Run experiments for specified attention_threshold values with identical thresholds across all stages.
     """
     # Define the specific identical threshold values
-    uniform_threshold_values = np.arange(0.5, 10.5, 0.5)
+    uniform_threshold_values = [0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
     
     experiment_idx = 0
     total_experiments = len(uniform_threshold_values)

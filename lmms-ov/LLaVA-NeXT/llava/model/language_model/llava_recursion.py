@@ -26,6 +26,7 @@ import math
 import copy
 import wandb
 import json
+import time
 
 from llava.mm_utils import (
     get_model_name_from_path,
@@ -60,7 +61,7 @@ class LlavaQwenForRecursion(LlavaQwenForCausalLM):
 
     def __init__(self, config, *args, **kwargs):
         super().__init__(config, **kwargs)
-    
+
     def init_all(self, recursion_config, *args, **kwargs):
         # Initialize recursive generation attributes        
         self.stages = recursion_config.stages
@@ -78,7 +79,7 @@ class LlavaQwenForRecursion(LlavaQwenForCausalLM):
 
         # Image and patch size calculations
         self.patch_size = 14
-        self.model.to(dtype=torch.bfloat16)
+        self.model.to(dtype=torch.float16)
         self.image_size = getattr(
             self.model.vision_tower.vision_tower.vision_model.embeddings, "image_size", None
         )
@@ -150,7 +151,7 @@ class LlavaQwenForRecursion(LlavaQwenForCausalLM):
                                                 align_corners=False
                                             )  
                 resized_positional_embeddings = resized_positional_embeddings.squeeze(0).permute(1, 2, 0).reshape(-1, 1152)
-                downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(len(resized_positional_embeddings), embed_dim).to(dtype=torch.bfloat16, device=device)
+                downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding = torch.nn.Embedding(len(resized_positional_embeddings), embed_dim).to(dtype=torch.float16, device=device)
                 downsampled_vision_towers[str(stage)].vision_tower.vision_model.embeddings.position_embedding.weight.data.copy_(resized_positional_embeddings)
 
         return downsampled_vision_towers
@@ -162,13 +163,13 @@ class LlavaQwenForRecursion(LlavaQwenForCausalLM):
             elif stage == -1: grid_size = 13
             elif stage == 0: grid_size = 27
             elif stage == 1: grid_size = 27 * stage1_grid
-            self.image_mask[stage] = torch.ones(grid_size, grid_size, device=self.device)
+            # self.image_mask[stage] = torch.ones(grid_size, grid_size, device=self.device)
 
-            # if idx == 0:
-            #     # activate every token of the first stage
-            #     self.image_mask[stage] = torch.ones(grid_size, grid_size, device=self.device)        
-            # else:
-            #     self.image_mask[stage] = torch.zeros(grid_size, grid_size, device=self.device)
+            if idx == 0:
+                # activate every token of the first stage
+                self.image_mask[stage] = torch.ones(grid_size, grid_size, device=self.device)        
+            else:
+                self.image_mask[stage] = torch.zeros(grid_size, grid_size, device=self.device)
     
     # Method to log each stage's results
     def save_stage_to_csv(self, doc_id, stage, text_output, cumulative_confidences):
@@ -319,9 +320,10 @@ class LlavaQwenForRecursion(LlavaQwenForCausalLM):
 
             for idx_stage, stage in enumerate(self.stages):
 
-                last_stage = (stage == self.stages[-1])
+                # mask_image = self.image_mask[stage].cpu().numpy() * 255        
+                # cv2.imwrite(f"/workspace/vlm/temp/mask_{stage}.png", mask_image)
 
-                # print(kwargs)
+                last_stage = (stage == self.stages[-1])
 
                 cont = self.generate(
                     input_ids,
@@ -329,7 +331,7 @@ class LlavaQwenForRecursion(LlavaQwenForCausalLM):
                     pad_token_id=pad_token_ids,
                     max_new_tokens=1,
                     images=images,
-                    use_cache=use_cache,
+                    use_cache=False,
                     generation_type=self.generation_type,
                     downsampled_images=downsampled_images,
                     image_mask=self.image_mask,
@@ -348,6 +350,7 @@ class LlavaQwenForRecursion(LlavaQwenForCausalLM):
                 #     cont["sequences"] = cont["sequences"][0][1:].unsqueeze(0)
 
                 text_outputs = tokenizer.batch_decode(cont["sequences"], skip_special_tokens=True)
+
                 # print("text:", text_outputs.strip())
                 # if not last_stage:
                 #     print(len(cont["attentions"]))
@@ -378,7 +381,6 @@ class LlavaQwenForRecursion(LlavaQwenForCausalLM):
 
 
                 if last_stage:
-                    final_logit = scores[0].clone()
                     # Save json logits
                     if self.save_output and token_idx==0:     
                         logits = scores                       
@@ -393,6 +395,10 @@ class LlavaQwenForRecursion(LlavaQwenForCausalLM):
                             task = task
                         )
                     # Contrastive decoding
+                    final_logit = scores[0].clone()
+                    top_100_indices = torch.topk(final_logit, 100, dim=1).indices
+                    mask = torch.full_like(final_logit, False, dtype=torch.bool)  # False로 초기화된 마스크
+                    mask.scatter_(1, top_100_indices, True)  # top_indices 위치를 True로 설정
 
                     # use noised version of image for decoding
                     if self.use_noised_for_contrastive:
@@ -416,35 +422,10 @@ class LlavaQwenForRecursion(LlavaQwenForCausalLM):
                         noised_scores = noised_cont.scores[0]
                         final_logit += self.contrastive_alphas[-1]*(final_logit - noised_scores)
                     else:
-                        pass
-                        # final_logit = self.contrastive_decoder.compute_final_logits(stage_logit_list, self.contrastive_alphas, cutoff=True)
-
-                        # code_adaptive = False
-
-                        # if code_adaptive:
-                        #     # Use multi-stage contrastive decoding
-                        #     for idx in range(len(self.stages) - 1):
-                        #         p_v = nn.functional.softmax(stage_logit_list[idx + 1], dim=-1)
-                        #         p_d = nn.functional.softmax(stage_logit_list[idx], dim=-1)
-
-                        #         # Calculate KL-based adaptive weight
-                        #         cd_alpha = self.contrastive_alphas[idx]
-                        #         kl_d = 0.5 * ((torch.log2(torch.abs(p_v - p_d) ** cd_alpha + 1)) * (p_v + p_d)).sum(dim=-1).unsqueeze(-1)
-                        #         kld_alpha = 1 - kl_d
-
-                        #         # Calculate cutoff threshold
-                        #         cutoff = kl_d * p_v.max(dim=-1, keepdim=True).values
-
-                        #         # Calculate stage-specific contrastive logits
-                        #         diffs = (1 + kld_alpha) * stage_logit_list[idx + 1] - kld_alpha * stage_logit_list[idx]
-                        #         cd_logits = diffs.masked_fill(p_v < cutoff, -float("inf"))
-
-                        #         # Update final logits with weighted stage contributions
-                        #         final_logit += cd_logits
-                        # else:
-                        #     # use multi-stage contrastive decoding
-                        #     for idx in range(len(self.stages) - 1):
-                        #         final_logit += self.contrastive_alphas[idx] * (stage_logit_list[idx + 1] - stage_logit_list[idx])
+                        # use multi-stage contrastive decoding
+                        for idx in range(len(self.stages) - 1):
+                            final_logit += self.contrastive_alphas[idx] * (stage_logit_list[idx + 1] - stage_logit_list[idx])
+                        final_logit[~mask] = float('-inf')
 
                     best_token = torch.argmax(final_logit, dim=-1)
                     final_token.append(best_token.item())
@@ -460,6 +441,7 @@ class LlavaQwenForRecursion(LlavaQwenForCausalLM):
                         [attention_mask, torch.ones((attention_mask.size(0), 1), device=attention_mask.device)], dim=-1
                     )
                     break
+
 
                 ret_attn = get_heatmap(
                     self,
@@ -514,6 +496,6 @@ class LlavaQwenForRecursion(LlavaQwenForCausalLM):
             # Terminate if end-of-sequence (EOS) token is generated or max tokens reached
             if input_ids[0, -1] == tokenizer.eos_token_id:
                 break
-        
+
         return [final_text.strip()]
         
