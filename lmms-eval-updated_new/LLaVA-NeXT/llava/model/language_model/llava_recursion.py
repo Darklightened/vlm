@@ -471,7 +471,28 @@ class LlavaLlamaForRecursion(LlavaLlamaForCausalLM):
                         noised_scores = noised_cont.scores[0]
                         final_logit += self.contrastive_alphas[-1]*(final_logit - noised_scores)
                     else:
-                        final_logit = self.contrastive_decoder.compute_final_logits(stage_logit_list, self.contrastive_alphas, cutoff=True)
+                        # final_logit = self.contrastive_decoder.compute_final_logits(stage_logit_list, self.contrastive_alphas, cutoff=True)
+                        topk_values_final, topk_indices_final = stage_logit_list[-1].topk(20, dim=-1)
+
+                        # Create a final mask based on the top-20 indices of the last stage
+                        mask_final = torch.zeros_like(stage_logit_list[-1], dtype=torch.bool)
+                        mask_final.scatter_(dim=-1, index=topk_indices_final, value=True)
+
+                        # Initialize final_logit
+                        final_logit = stage_logit_list[-1].clone()
+
+                        # Iterate over stages to calculate logit differences
+                        for idx in range(len(self.stages) - 1):
+                            # Get top-20 indices for the current and next stages
+
+                            # Apply final mask to current and next logits
+                            current_logit = stage_logit_list[idx]
+                            next_logit = stage_logit_list[idx + 1]
+                            
+                            # Calculate logit difference and apply contrastive alphas
+                            logit_diff = (next_logit - current_logit)
+                            final_logit += self.contrastive_alphas[idx] * logit_diff
+                            final_logit[~mask_final] = -1e9 
 
                         # code_adaptive = False
 

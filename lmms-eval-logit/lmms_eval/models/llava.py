@@ -570,7 +570,7 @@ class Llava(lmms):
             ## original model accepts several diffrent grids (e.g. 1x2, 1x3, 2x2)
             ## for recursive implementation, we only use 2x2 grid (might be updated in future)
             ## Set grid to 2x2 for recursive generation, else default
-            if self.fix_grid == "2x2":
+            if True:
                 temp_list = []
                 for idx, visual in enumerate(flattened_visuals):
                     if idx == 0:
@@ -578,9 +578,9 @@ class Llava(lmms):
                         # squared_img.save("./test.png")
                         # exit()
                         temp_list.append(squared_img)
-                        self.set_pad_mask(size, origin_x, origin_y)
+                        # self.set_pad_mask(size, origin_x, origin_y)
                     else:
-                        squared_img, _, _ = self.make_square(visual, min_size=384, smallest_grid_size=self.smallest_grid_size)
+                        squared_img, _, _, _ = self.make_square(visual, min_size=384, smallest_grid_size=self.smallest_grid_size)
                         temp_list.append(squared_img)
                 flattened_visuals = temp_list
             else:
@@ -702,7 +702,7 @@ class Llava(lmms):
                     
                     ## for debugging with visualization
                     if self.visualize_heatmap:
-                        save_path = f"./heatmap_vis/{str(idx_chunk).zfill(6)}/{str(idx_stage).zfill(2)}_stage_{stage}/"
+                        save_path = f"./heatmap_vis/{task}/{str(idx_chunk).zfill(6)}/{str(idx_stage).zfill(2)}_stage_{stage}/"
                         os.makedirs(save_path, exist_ok=True)
                     else:
                         save_path = None
@@ -753,11 +753,13 @@ class Llava(lmms):
                         f.close()
                         for temp_stage in self.stages:
                             mask_image = self.image_mask[temp_stage]
-                            mask_image = F.interpolate(mask_image.unsqueeze(0).unsqueeze(0), size=(flattened_visuals[0].height, flattened_visuals[0].width), mode='nearest').squeeze()
+                            temp_image = flattened_visuals[0].resize((480, 480))
+                            mask_image = F.interpolate(mask_image.unsqueeze(0).unsqueeze(0), size=(temp_image.height, temp_image.width), mode='nearest').squeeze()
                             mask_image = mask_image.cpu().numpy()
                             mask_image = (1 - mask_image) * 255
                             mask_image = np.repeat(mask_image[:, :, np.newaxis], 3, axis=2)
-                            vis_image = np.array(flattened_visuals[0])
+                            vis_image = np.array(temp_image)
+                            vis_image = cv2.cvtColor(vis_image, cv2.COLOR_BGR2RGB)
                             mask_image[mask_image == (0, 0, 0)] = vis_image[mask_image == (0, 0, 0)]
                             target_token_ind = cont["sequences"][0][0] 
                             # plt.figure(figsize=(8, 8))

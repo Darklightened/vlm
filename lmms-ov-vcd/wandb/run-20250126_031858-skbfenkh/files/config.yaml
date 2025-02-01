@@ -1,0 +1,119 @@
+wandb_version: 1
+
+_wandb:
+  desc: null
+  value:
+    python_version: 3.10.16
+    cli_version: 0.16.5
+    framework: huggingface
+    huggingface_version: 4.48.0
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    start_time: 1737861538.0
+    t:
+      1:
+      - 1
+      - 5
+      - 11
+      - 41
+      - 49
+      - 51
+      - 53
+      - 55
+      - 71
+      - 95
+      - 100
+      2:
+      - 1
+      - 5
+      - 11
+      - 41
+      - 49
+      - 51
+      - 53
+      - 55
+      - 71
+      - 95
+      - 100
+      3:
+      - 2
+      - 13
+      - 23
+      - 62
+      4: 3.10.16
+      5: 0.16.5
+      6: 4.48.0
+      8:
+      - 5
+      13: linux-x86_64
+task_configs:
+  desc: null
+  value:
+    pope_pop:
+      task: pope_pop
+      dataset_path: lmms-lab/POPE
+      dataset_name: Full
+      dataset_kwargs:
+        token: true
+      test_split: popular
+      full_docs: false
+      process_results_use_image: false
+      doc_to_visual: <function pope_doc_to_visual at 0x7fff09953d90>
+      doc_to_text: <function pope_doc_to_text at 0x7fff099903a0>
+      doc_to_target: answer
+      process_results: <function pope_process_results at 0x7fff09990940>
+      description: ''
+      target_delimiter: ' '
+      fewshot_delimiter: '
+
+
+        '
+      num_fewshot: 0
+      metric_list:
+      - metric: pope_accuracy
+        aggregation: utils.pope_aggregate_accuracy
+        higher_is_better: true
+      - metric: pope_precision
+        aggregation: utils.pope_aggregate_precision
+        higher_is_better: true
+      - metric: pope_recall
+        aggregation: utils.pope_aggregate_recall
+        higher_is_better: true
+      - metric: pope_f1_score
+        aggregation: utils.pope_aggregate_f1_score
+        higher_is_better: true
+      - metric: pope_yes_ratio
+        aggregation: utils.pope_aggregate_yes_ratio
+        higher_is_better: true
+      output_type: generate_until
+      generation_kwargs:
+        max_new_tokens: 128
+        temperature: 0.0
+        top_p: 0
+        num_beams: 1
+        do_sample: false
+        until:
+        - '
+
+
+          '
+      repeats: 1
+      should_decontaminate: false
+      metadata:
+      - version: 0.0
+cli_configs:
+  desc: null
+  value:
+    model: llava_onevision
+    model_args: pretrained=lmms-lab/llava-onevision-qwen2-0.5b-ov
+    batch_size: '1'
+    batch_sizes: []
+    device: null
+    use_cache: null
+    limit: null
+    bootstrap_iters: 100000
+    gen_kwargs: ''
+    random_seed: 0
+    numpy_seed: 1234
+    torch_seed: 1234
+    fewshot_seed: 1234

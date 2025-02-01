@@ -15,6 +15,7 @@ def calculate_entropy_for_attn_threshold(attn_map):
     entropy = -torch.sum(flattened_attn * log_probs)
     return entropy.item()
 
+
 def entropy_based_threshold(attn_map, base_threshold=0.2, scaling_factor=2, max_entropy=6.0):
     # Calculate Entropy
     entropy = calculate_entropy_for_attn_threshold(attn_map)

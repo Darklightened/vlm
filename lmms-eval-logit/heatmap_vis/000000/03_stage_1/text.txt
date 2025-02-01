@@ -1,6 +1,0 @@
-A chat between a curious user and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the user's questions. USER: <image>
-Is there a frisbee in the image?
-Answer the question using a single word or phrase. ASSISTANT:
-A chat between a curious user and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the user's questions. USER: <image>
-Is there a dining table in the image?
-Answer the question using a single word or phrase. ASSISTANT:

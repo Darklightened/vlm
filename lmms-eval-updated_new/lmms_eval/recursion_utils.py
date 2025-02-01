@@ -303,7 +303,7 @@ class ContrastiveDecoder:
 
         # Apply cutoff for the last stage logits if cutoff is specified
         if cutoff:
-            last_stage_logit = stage_logit_list[-1]
+            last_stage_logit = stage_logit_list[-1].clone()
             if cutoff_top_k:
                 k = 20                
                 top_k_values, top_k_indices = last_stage_logit.topk(k, dim=-1)

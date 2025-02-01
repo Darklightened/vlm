@@ -1,0 +1,115 @@
+wandb_version: 1
+
+_wandb:
+  desc: null
+  value:
+    python_version: 3.10.16
+    cli_version: 0.16.5
+    framework: huggingface
+    huggingface_version: 4.48.0
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    start_time: 1737824373.0
+    t:
+      1:
+      - 1
+      - 5
+      - 11
+      - 41
+      - 49
+      - 51
+      - 53
+      - 55
+      - 71
+      - 95
+      - 100
+      2:
+      - 1
+      - 5
+      - 11
+      - 41
+      - 49
+      - 51
+      - 53
+      - 55
+      - 71
+      - 95
+      - 100
+      3:
+      - 2
+      - 13
+      - 23
+      - 62
+      4: 3.10.16
+      5: 0.16.5
+      6: 4.48.0
+      8:
+      - 5
+      13: linux-x86_64
+task_configs:
+  desc: null
+  value:
+    vqav2_val_lite:
+      task: vqav2_val_lite
+      dataset_path: lmms-lab/LMMs-Eval-Lite
+      dataset_name: vqav2_val
+      dataset_kwargs:
+        token: true
+      test_split: lite
+      full_docs: false
+      process_results_use_image: false
+      doc_to_visual: <function vqav2_doc_to_visual at 0x7fff0995bac0>
+      doc_to_text: <function vqav2_doc_to_text at 0x7fff09990670>
+      doc_to_target: answer
+      process_results: <function vqav2_process_results_val at 0x7fff099909d0>
+      description: ''
+      target_delimiter: ' '
+      fewshot_delimiter: '
+
+
+        '
+      num_fewshot: 0
+      metric_list:
+      - metric: exact_match
+        aggregation: mean
+        higher_is_better: true
+        ignore_case: true
+        ignore_punctuation: true
+      output_type: generate_until
+      generation_kwargs:
+        max_new_tokens: 16
+        until:
+        - '
+
+
+          '
+      repeats: 1
+      should_decontaminate: false
+      metadata:
+      - version: 0.0
+      lmms_eval_specific_kwargs:
+        default:
+          pre_prompt: ''
+          post_prompt: '
+
+            Answer the question using a single word or phrase.'
+        pre_prompt: ''
+        post_prompt: '
+
+          Answer the question using a single word or phrase.'
+cli_configs:
+  desc: null
+  value:
+    model: llava_onevision
+    model_args: pretrained=lmms-lab/llava-onevision-qwen2-0.5b-ov
+    batch_size: '1'
+    batch_sizes: []
+    device: null
+    use_cache: null
+    limit: null
+    bootstrap_iters: 100000
+    gen_kwargs: ''
+    random_seed: 0
+    numpy_seed: 1234
+    torch_seed: 1234
+    fewshot_seed: 1234

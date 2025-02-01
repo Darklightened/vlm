@@ -14,22 +14,22 @@
 python3 -m accelerate.commands.launch \
     --num_processes=1 \
     -m lmms_eval \
-    --device cuda:1 \
+    --device cuda:0 \
     --model llava \
     --model_args pretrained="liuhaotian/llava-v1.6-vicuna-7b" \
-    --tasks vqav2_val_lite \
+    --tasks pope_pop \
     --batch_size 1 \
     --log_samples \
     --log_samples_suffix llava_v1.6_pope \
     --output_path ./logs/ \
     --generation_type recursion \
     --fix_grid 2x2 \
-    --attention_thresholding_type layer_mean_topk \
-    --attention_threshold "0.6" \
+    --attention_thresholding_type attn_topk \
+    --attention_threshold "2.5" \
     --positional_embedding_type bilinear_interpolation \
     --remove_unpadding True \
     --attn_norm None \
-    --stages "-1" "0" "1" \
+    --stages "-2" "-1" "0" "1" \
     --verbosity DEBUG \
     --square 1 \
     --visualize_heatmap True \

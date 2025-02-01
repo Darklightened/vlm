@@ -1,0 +1,533 @@
+The following values were not passed to `accelerate launch` and had defaults used instead:
+	`--num_machines` was set to a value of `1`
+	`--mixed_precision` was set to a value of `'no'`
+	`--dynamo_backend` was set to a value of `'no'`
+To avoid this warning pass in values for each of the problematic parameters or run `accelerate config`.
+[32m2025-01-29 18:23:01.670[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate[0m:[36m432[0m - [1mVerbosity set to DEBUG[0m
+[32m2025-01-29 18:23:03.408[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.tasks[0m:[36m_get_task_and_group[0m:[36m452[0m - [34m[1m`group` and `group_alias` keys in tasks' configs will no longer be used in the next release of lmms-eval. `tag` will be used to allow to call a collection of tasks just like `group`. `group` will be removed in order to not cause confusion with the new ConfigurableGroup which will be the offical way to create groups with addition of group-wide configuations.[0m
+[32m2025-01-29 18:23:05.176[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m515[0m - [1mEvaluation tracker args: {'output_path': './logs/'}[0m
+[32m2025-01-29 18:23:05.177[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m604[0m - [1mSelected Tasks: ['pope_pop', 'vqav2_val_lite'][0m
+[32m2025-01-29 18:23:05.181[0m | [1mINFO    [0m | [36mlmms_eval.evaluator[0m:[36msimple_evaluate[0m:[36m155[0m - [1mSetting random seed to 0 | Setting numpy seed to 1234 | Setting torch manual seed to 1234[0m
+You are using a model of type llava to instantiate a model of type llava_llama. This is not supported for all configurations of models and can yield errors.
+initialize llava model with modification
+OpenCLIP not installed
+self.merging= None
+model_name: llava-v1.6-vicuna-7b
+Loaded LLaVA model: liuhaotian/llava-v1.6-vicuna-7b
+loding from here
+Loading vision tower: openai/clip-vit-large-patch14-336
+Loading checkpoint shards:   0%|          | 0/3 [00:00<?, ?it/s]Loading checkpoint shards:  33%|███▎      | 1/3 [00:05<00:10,  5.39s/it]Loading checkpoint shards:  67%|██████▋   | 2/3 [00:09<00:04,  4.91s/it]Loading checkpoint shards: 100%|██████████| 3/3 [00:14<00:00,  4.52s/it]Loading checkpoint shards: 100%|██████████| 3/3 [00:14<00:00,  4.67s/it]
+Model Class: LlavaLlamaForCausalLM
+device: cuda:0
+generation_type: recursion
+fix_grid: 2x2
+attention_thresholding_type: attn_topk
+attention_norm: None
+attention_threshold: 2.5
+detection_strategy: None
+detection_threshold: 0.8
+save_output: False
+save_output_json_path: generation_output.json
+target_token_selection_strategy: first
+stages: [-2, -1, 0, 1]
+positional_embedding_type: bilinear_interpolation
+visualize_heatmap: True
+square: 1
+remove unpadding=True, change to 'spatial'
+change positional embedding to bilinear_interpolation
+Bilienar interpolation embedding type.
+Bilienar interpolation embedding type.
+[32m2025-01-29 18:23:31.947[0m | [1mINFO    [0m | [36mlmms_eval.models.llava[0m:[36m__init__[0m:[36m321[0m - [1mUsing single device: cuda:0[0m
+[32m2025-01-29 18:23:31.955[0m | [1mINFO    [0m | [36mlmms_eval.evaluator_utils[0m:[36mfrom_taskdict[0m:[36m91[0m - [1mNo metadata found in task config for vqav2_val_lite, using default n_shot=0[0m
+[32m2025-01-29 18:23:31.955[0m | [1mINFO    [0m | [36mlmms_eval.evaluator_utils[0m:[36mfrom_taskdict[0m:[36m91[0m - [1mNo metadata found in task config for pope_pop, using default n_shot=0[0m
+[32m2025-01-29 18:23:31.956[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.caching.cache[0m:[36mload_from_cache[0m:[36m33[0m - [34m[1mrequests-vqav2_val_lite-0shot-rank0-world_size1-tokenizer is not cached, generating...[0m
+[32m2025-01-29 18:23:31.956[0m | [1mINFO    [0m | [36mlmms_eval.api.task[0m:[36mbuild_all_requests[0m:[36m425[0m - [1mBuilding contexts for vqav2_val_lite on rank 0...[0m
+  0%|          | 0/500 [00:00<?, ?it/s]100%|██████████| 500/500 [00:00<00:00, 137194.30it/s]
+[32m2025-01-29 18:23:33.171[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.evaluator[0m:[36mevaluate[0m:[36m457[0m - [34m[1mTask: vqav2_val_lite; number of requests on this rank: 500[0m
+[32m2025-01-29 18:23:33.171[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.caching.cache[0m:[36mload_from_cache[0m:[36m33[0m - [34m[1mrequests-pope_pop-0shot-rank0-world_size1-tokenizer is not cached, generating...[0m
+[32m2025-01-29 18:23:33.172[0m | [1mINFO    [0m | [36mlmms_eval.api.task[0m:[36mbuild_all_requests[0m:[36m425[0m - [1mBuilding contexts for pope_pop on rank 0...[0m
+  0%|          | 0/3000 [00:00<?, ?it/s]100%|██████████| 3000/3000 [00:00<00:00, 111179.06it/s]
+[32m2025-01-29 18:23:41.109[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.evaluator[0m:[36mevaluate[0m:[36m457[0m - [34m[1mTask: pope_pop; number of requests on this rank: 3000[0m
+[32m2025-01-29 18:23:41.109[0m | [1mINFO    [0m | [36mlmms_eval.evaluator[0m:[36mevaluate[0m:[36m478[0m - [1mRunning generate_until requests[0m
+Model Responding:   0%|          | 0/3500 [00:00<?, ?it/s]CLIPModel is using CLIPSdpaAttention, but `torch.nn.functional.scaled_dot_product_attention` does not support `output_attentions=True`. Falling back to the manual attention implementation, but specifying the manual implementation will be required from Transformers version v5.0.0 onwards. This warning can be removed using the argument `attn_implementation="eager"` when loading the model.
+`torch.nn.functional.scaled_dot_product_attention` does not support `output_attentions=True`. Falling back to eager attention. This warning can be removed using the argument `attn_implementation="eager"` when loading the model.
+From v4.47 onwards, when a model cache is to be returned, `generate` will return a `Cache` instance instead by default (as opposed to the legacy tuple of tuples format). If you want to keep returning the legacy format, please set `return_legacy_cache=True`.
+[ WARN:0@27.468] global loadsave.cpp:848 imwrite_ Unsupported depth image for selected encoder is fallbacked to CV_8U.
+Model Responding:   0%|          | 1/3500 [00:20<20:15:43, 20.85s/it]Model Responding:   0%|          | 2/3500 [00:41<19:52:46, 20.46s/it]Model Responding:   0%|          | 3/3500 [01:01<19:44:43, 20.33s/it]Model Responding:   0%|          | 4/3500 [01:17<18:04:24, 18.61s/it]Model Responding:   0%|          | 5/3500 [01:34<17:30:55, 18.04s/it]Model Responding:   0%|          | 6/3500 [01:50<17:03:22, 17.57s/it]Model Responding:   0%|          | 7/3500 [02:07<16:49:45, 17.34s/it]Model Responding:   0%|          | 8/3500 [02:27<17:33:53, 18.11s/it]Model Responding:   0%|          | 9/3500 [02:49<18:42:24, 19.29s/it]Model Responding:   0%|          | 10/3500 [03:05<17:46:03, 18.33s/it]Model Responding:   0%|          | 11/3500 [03:30<19:41:27, 20.32s/it]Traceback (most recent call last):
+  File "/root/miniconda3/envs/heatmap2/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/root/miniconda3/envs/heatmap2/lib/python3.10/runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "/workspace/vlm/lmms-heatmap/lmms_eval/__main__.py", line 670, in <module>
+    cli_evaluate()
+  File "/workspace/vlm/lmms-heatmap/lmms_eval/__main__.py", line 483, in cli_evaluate
+    raise e
+  File "/workspace/vlm/lmms-heatmap/lmms_eval/__main__.py", line 467, in cli_evaluate
+    results, samples = cli_evaluate_single(args)
+  File "/workspace/vlm/lmms-heatmap/lmms_eval/__main__.py", line 608, in cli_evaluate_single
+    results = evaluator.simple_evaluate(
+  File "/workspace/vlm/lmms-heatmap/lmms_eval/utils.py", line 533, in _wrapper
+    return fn(*args, **kwargs)
+  File "/workspace/vlm/lmms-heatmap/lmms_eval/evaluator.py", line 275, in simple_evaluate
+    results = evaluate(
+  File "/workspace/vlm/lmms-heatmap/lmms_eval/utils.py", line 533, in _wrapper
+    return fn(*args, **kwargs)
+  File "/workspace/vlm/lmms-heatmap/lmms_eval/evaluator.py", line 489, in evaluate
+    resps = getattr(lm, reqtype)(cloned_reqs)  # Choiszt run generate until
+  File "/workspace/vlm/lmms-heatmap/lmms_eval/models/llava.py", line 846, in generate_until
+    self.image_mask[stage+1] = attn_entropy_topk_based_recursion(attn = ret_attn, # select token index
+  File "/workspace/vlm/lmms-heatmap/lmms_eval/recursion_utils.py", line 194, in attn_entropy_topk_based_recursion
+    threshold_index = int(len(flattened_attn) * calculated_threshold)
+ValueError: cannot convert float NaN to integer
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+Model Responding:   0%|          | 11/3500 [03:35<18:57:06, 19.55s/it]
+Traceback (most recent call last):
+  File "/root/miniconda3/envs/heatmap2/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/root/miniconda3/envs/heatmap2/lib/python3.10/runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "/root/miniconda3/envs/heatmap2/lib/python3.10/site-packages/accelerate/commands/launch.py", line 1182, in <module>
+    main()
+  File "/root/miniconda3/envs/heatmap2/lib/python3.10/site-packages/accelerate/commands/launch.py", line 1178, in main
+    launch_command(args)
+  File "/root/miniconda3/envs/heatmap2/lib/python3.10/site-packages/accelerate/commands/launch.py", line 1172, in launch_command
+    simple_launcher(args)
+  File "/root/miniconda3/envs/heatmap2/lib/python3.10/site-packages/accelerate/commands/launch.py", line 762, in simple_launcher
+    raise subprocess.CalledProcessError(returncode=process.returncode, cmd=cmd)
+subprocess.CalledProcessError: Command '['/root/miniconda3/envs/heatmap2/bin/python3', '-m', 'lmms_eval', '--model', 'llava', '--model_args', 'pretrained=liuhaotian/llava-v1.6-vicuna-7b', '--tasks', 'pope_pop,vqav2_val_lite', '--batch_size', '1', '--log_samples', '--log_samples_suffix', 'llava_v1.6_pope', '--output_path', './logs/', '--generation_type', 'recursion', '--fix_grid', '2x2', '--attention_thresholding_type', 'attn_topk', '--attention_threshold', '2.5', '--positional_embedding_type', 'bilinear_interpolation', '--remove_unpadding', 'True', '--attn_norm', 'None', '--stages', '-2', '-1', '0', '1', '--verbosity', 'DEBUG', '--square', '1', '--visualize_heatmap', 'True']' returned non-zero exit status 1.
+The following values were not passed to `accelerate launch` and had defaults used instead:
+	`--num_machines` was set to a value of `1`
+	`--mixed_precision` was set to a value of `'no'`
+	`--dynamo_backend` was set to a value of `'no'`
+To avoid this warning pass in values for each of the problematic parameters or run `accelerate config`.
+[32m2025-01-29 19:27:23.391[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate[0m:[36m432[0m - [1mVerbosity set to DEBUG[0m
+[32m2025-01-29 19:27:24.397[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.tasks[0m:[36m_get_task_and_group[0m:[36m452[0m - [34m[1m`group` and `group_alias` keys in tasks' configs will no longer be used in the next release of lmms-eval. `tag` will be used to allow to call a collection of tasks just like `group`. `group` will be removed in order to not cause confusion with the new ConfigurableGroup which will be the offical way to create groups with addition of group-wide configuations.[0m
+[32m2025-01-29 19:27:26.156[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m515[0m - [1mEvaluation tracker args: {'output_path': './logs/'}[0m
+[32m2025-01-29 19:27:26.157[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m604[0m - [1mSelected Tasks: ['pope_pop'][0m
+[32m2025-01-29 19:27:26.160[0m | [1mINFO    [0m | [36mlmms_eval.evaluator[0m:[36msimple_evaluate[0m:[36m155[0m - [1mSetting random seed to 0 | Setting numpy seed to 1234 | Setting torch manual seed to 1234[0m
+You are using a model of type llava to instantiate a model of type llava_llama. This is not supported for all configurations of models and can yield errors.
+initialize llava model with modification
+OpenCLIP not installed
+self.merging= None
+model_name: llava-v1.6-vicuna-7b
+Loaded LLaVA model: liuhaotian/llava-v1.6-vicuna-7b
+loding from here
+Loading vision tower: openai/clip-vit-large-patch14-336
+Loading checkpoint shards:   0%|          | 0/3 [00:00<?, ?it/s]Loading checkpoint shards:  33%|███▎      | 1/3 [00:05<00:10,  5.47s/it]Loading checkpoint shards:  67%|██████▋   | 2/3 [00:10<00:05,  5.28s/it]Loading checkpoint shards: 100%|██████████| 3/3 [00:15<00:00,  5.03s/it]Loading checkpoint shards: 100%|██████████| 3/3 [00:15<00:00,  5.12s/it]
+Model Class: LlavaLlamaForCausalLM
+device: cuda:0
+generation_type: recursion
+fix_grid: 2x2
+attention_thresholding_type: attn_topk
+attention_norm: None
+attention_threshold: 2.5
+detection_strategy: None
+detection_threshold: 0.8
+save_output: False
+save_output_json_path: generation_output.json
+target_token_selection_strategy: first
+stages: [-2, -1, 0, 1]
+positional_embedding_type: bilinear_interpolation
+visualize_heatmap: True
+square: 1
+remove unpadding=True, change to 'spatial'
+change positional embedding to bilinear_interpolation
+Bilienar interpolation embedding type.
+Bilienar interpolation embedding type.
+[32m2025-01-29 19:28:06.817[0m | [1mINFO    [0m | [36mlmms_eval.models.llava[0m:[36m__init__[0m:[36m321[0m - [1mUsing single device: cuda:0[0m
+[32m2025-01-29 19:28:06.824[0m | [1mINFO    [0m | [36mlmms_eval.evaluator_utils[0m:[36mfrom_taskdict[0m:[36m91[0m - [1mNo metadata found in task config for pope_pop, using default n_shot=0[0m
+[32m2025-01-29 19:28:06.824[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.caching.cache[0m:[36mload_from_cache[0m:[36m33[0m - [34m[1mrequests-pope_pop-0shot-rank0-world_size1-tokenizer is not cached, generating...[0m
+[32m2025-01-29 19:28:06.825[0m | [1mINFO    [0m | [36mlmms_eval.api.task[0m:[36mbuild_all_requests[0m:[36m425[0m - [1mBuilding contexts for pope_pop on rank 0...[0m
+  0%|          | 0/3000 [00:00<?, ?it/s]100%|██████████| 3000/3000 [00:00<00:00, 113466.90it/s]
+[32m2025-01-29 19:28:15.002[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.evaluator[0m:[36mevaluate[0m:[36m457[0m - [34m[1mTask: pope_pop; number of requests on this rank: 3000[0m
+[32m2025-01-29 19:28:15.003[0m | [1mINFO    [0m | [36mlmms_eval.evaluator[0m:[36mevaluate[0m:[36m478[0m - [1mRunning generate_until requests[0m
+Model Responding:   0%|          | 0/3000 [00:00<?, ?it/s]CLIPModel is using CLIPSdpaAttention, but `torch.nn.functional.scaled_dot_product_attention` does not support `output_attentions=True`. Falling back to the manual attention implementation, but specifying the manual implementation will be required from Transformers version v5.0.0 onwards. This warning can be removed using the argument `attn_implementation="eager"` when loading the model.
+`torch.nn.functional.scaled_dot_product_attention` does not support `output_attentions=True`. Falling back to eager attention. This warning can be removed using the argument `attn_implementation="eager"` when loading the model.
+From v4.47 onwards, when a model cache is to be returned, `generate` will return a `Cache` instance instead by default (as opposed to the legacy tuple of tuples format). If you want to keep returning the legacy format, please set `return_legacy_cache=True`.
+[ WARN:0@31.087] global loadsave.cpp:848 imwrite_ Unsupported depth image for selected encoder is fallbacked to CV_8U.
+Model Responding:   0%|          | 1/3000 [00:18<15:40:30, 18.82s/it]Traceback (most recent call last):
+  File "/root/miniconda3/envs/heatmap2/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/root/miniconda3/envs/heatmap2/lib/python3.10/runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "/workspace/vlm/lmms-heatmap/lmms_eval/__main__.py", line 670, in <module>
+    cli_evaluate()
+  File "/workspace/vlm/lmms-heatmap/lmms_eval/__main__.py", line 483, in cli_evaluate
+    raise e
+  File "/workspace/vlm/lmms-heatmap/lmms_eval/__main__.py", line 467, in cli_evaluate
+    results, samples = cli_evaluate_single(args)
+  File "/workspace/vlm/lmms-heatmap/lmms_eval/__main__.py", line 608, in cli_evaluate_single
+    results = evaluator.simple_evaluate(
+  File "/workspace/vlm/lmms-heatmap/lmms_eval/utils.py", line 533, in _wrapper
+    return fn(*args, **kwargs)
+  File "/workspace/vlm/lmms-heatmap/lmms_eval/evaluator.py", line 275, in simple_evaluate
+    results = evaluate(
+  File "/workspace/vlm/lmms-heatmap/lmms_eval/utils.py", line 533, in _wrapper
+    return fn(*args, **kwargs)
+  File "/workspace/vlm/lmms-heatmap/lmms_eval/evaluator.py", line 489, in evaluate
+    resps = getattr(lm, reqtype)(cloned_reqs)  # Choiszt run generate until
+  File "/workspace/vlm/lmms-heatmap/lmms_eval/models/llava.py", line 846, in generate_until
+    self.image_mask[stage+1] = attn_entropy_topk_based_recursion(attn = ret_attn, # select token index
+  File "/workspace/vlm/lmms-heatmap/lmms_eval/recursion_utils.py", line 194, in attn_entropy_topk_based_recursion
+    threshold_index = int(len(flattened_attn) * calculated_threshold)
+ValueError: cannot convert float NaN to integer
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+Model Responding:   0%|          | 1/3000 [00:22<18:56:53, 22.75s/it]
+Traceback (most recent call last):
+  File "/root/miniconda3/envs/heatmap2/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/root/miniconda3/envs/heatmap2/lib/python3.10/runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "/root/miniconda3/envs/heatmap2/lib/python3.10/site-packages/accelerate/commands/launch.py", line 1182, in <module>
+    main()
+  File "/root/miniconda3/envs/heatmap2/lib/python3.10/site-packages/accelerate/commands/launch.py", line 1178, in main
+    launch_command(args)
+  File "/root/miniconda3/envs/heatmap2/lib/python3.10/site-packages/accelerate/commands/launch.py", line 1172, in launch_command
+    simple_launcher(args)
+  File "/root/miniconda3/envs/heatmap2/lib/python3.10/site-packages/accelerate/commands/launch.py", line 762, in simple_launcher
+    raise subprocess.CalledProcessError(returncode=process.returncode, cmd=cmd)
+subprocess.CalledProcessError: Command '['/root/miniconda3/envs/heatmap2/bin/python3', '-m', 'lmms_eval', '--model', 'llava', '--model_args', 'pretrained=liuhaotian/llava-v1.6-vicuna-7b', '--tasks', 'pope_pop', '--batch_size', '1', '--log_samples', '--log_samples_suffix', 'llava_v1.6_pope', '--output_path', './logs/', '--generation_type', 'recursion', '--fix_grid', '2x2', '--attention_thresholding_type', 'attn_topk', '--attention_threshold', '2.5', '--positional_embedding_type', 'bilinear_interpolation', '--remove_unpadding', 'True', '--attn_norm', 'None', '--stages', '-2', '-1', '0', '1', '--verbosity', 'DEBUG', '--square', '1', '--visualize_heatmap', 'True']' returned non-zero exit status 1.
+The following values were not passed to `accelerate launch` and had defaults used instead:
+	`--num_machines` was set to a value of `1`
+	`--mixed_precision` was set to a value of `'no'`
+	`--dynamo_backend` was set to a value of `'no'`
+To avoid this warning pass in values for each of the problematic parameters or run `accelerate config`.
+[32m2025-01-29 20:12:25.662[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate[0m:[36m432[0m - [1mVerbosity set to DEBUG[0m
+[32m2025-01-29 20:12:27.045[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.tasks[0m:[36m_get_task_and_group[0m:[36m452[0m - [34m[1m`group` and `group_alias` keys in tasks' configs will no longer be used in the next release of lmms-eval. `tag` will be used to allow to call a collection of tasks just like `group`. `group` will be removed in order to not cause confusion with the new ConfigurableGroup which will be the offical way to create groups with addition of group-wide configuations.[0m
+[32m2025-01-29 20:12:28.804[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m515[0m - [1mEvaluation tracker args: {'output_path': './logs/'}[0m
+[32m2025-01-29 20:12:28.805[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m604[0m - [1mSelected Tasks: ['pope_pop'][0m
+[32m2025-01-29 20:12:28.809[0m | [1mINFO    [0m | [36mlmms_eval.evaluator[0m:[36msimple_evaluate[0m:[36m155[0m - [1mSetting random seed to 0 | Setting numpy seed to 1234 | Setting torch manual seed to 1234[0m
+You are using a model of type llava to instantiate a model of type llava_llama. This is not supported for all configurations of models and can yield errors.
+initialize llava model with modification
+OpenCLIP not installed
+self.merging= None
+model_name: llava-v1.6-vicuna-7b
+Loaded LLaVA model: liuhaotian/llava-v1.6-vicuna-7b
+loding from here
+Loading vision tower: openai/clip-vit-large-patch14-336
+Loading checkpoint shards:   0%|          | 0/3 [00:00<?, ?it/s]Loading checkpoint shards:  33%|███▎      | 1/3 [00:06<00:12,  6.05s/it]Loading checkpoint shards:  67%|██████▋   | 2/3 [00:10<00:05,  5.22s/it]Loading checkpoint shards: 100%|██████████| 3/3 [00:15<00:00,  5.10s/it]Loading checkpoint shards: 100%|██████████| 3/3 [00:15<00:00,  5.22s/it]
+Model Class: LlavaLlamaForCausalLM
+device: cuda:0
+generation_type: recursion
+fix_grid: 2x2
+attention_thresholding_type: attn_topk
+attention_norm: None
+attention_threshold: 2.5
+detection_strategy: None
+detection_threshold: 0.8
+save_output: False
+save_output_json_path: generation_output.json
+target_token_selection_strategy: first
+stages: [-2, -1, 0, 1]
+positional_embedding_type: bilinear_interpolation
+visualize_heatmap: True
+square: 1
+remove unpadding=True, change to 'spatial'
+change positional embedding to bilinear_interpolation
+Bilienar interpolation embedding type.
+Bilienar interpolation embedding type.
+[32m2025-01-29 20:13:03.237[0m | [1mINFO    [0m | [36mlmms_eval.models.llava[0m:[36m__init__[0m:[36m321[0m - [1mUsing single device: cuda:0[0m
+[32m2025-01-29 20:13:03.244[0m | [1mINFO    [0m | [36mlmms_eval.evaluator_utils[0m:[36mfrom_taskdict[0m:[36m91[0m - [1mNo metadata found in task config for pope_pop, using default n_shot=0[0m
+[32m2025-01-29 20:13:03.244[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.caching.cache[0m:[36mload_from_cache[0m:[36m33[0m - [34m[1mrequests-pope_pop-0shot-rank0-world_size1-tokenizer is not cached, generating...[0m
+[32m2025-01-29 20:13:03.246[0m | [1mINFO    [0m | [36mlmms_eval.api.task[0m:[36mbuild_all_requests[0m:[36m425[0m - [1mBuilding contexts for pope_pop on rank 0...[0m
+  0%|          | 0/3000 [00:00<?, ?it/s]100%|██████████| 3000/3000 [00:00<00:00, 106985.72it/s]
+[32m2025-01-29 20:13:11.449[0m | [34m[1mDEBUG   [0m | [36mlmms_eval.evaluator[0m:[36mevaluate[0m:[36m457[0m - [34m[1mTask: pope_pop; number of requests on this rank: 3000[0m
+[32m2025-01-29 20:13:11.449[0m | [1mINFO    [0m | [36mlmms_eval.evaluator[0m:[36mevaluate[0m:[36m478[0m - [1mRunning generate_until requests[0m
+Model Responding:   0%|          | 0/3000 [00:00<?, ?it/s]CLIPModel is using CLIPSdpaAttention, but `torch.nn.functional.scaled_dot_product_attention` does not support `output_attentions=True`. Falling back to the manual attention implementation, but specifying the manual implementation will be required from Transformers version v5.0.0 onwards. This warning can be removed using the argument `attn_implementation="eager"` when loading the model.
+`torch.nn.functional.scaled_dot_product_attention` does not support `output_attentions=True`. Falling back to eager attention. This warning can be removed using the argument `attn_implementation="eager"` when loading the model.
+From v4.47 onwards, when a model cache is to be returned, `generate` will return a `Cache` instance instead by default (as opposed to the legacy tuple of tuples format). If you want to keep returning the legacy format, please set `return_legacy_cache=True`.
+[ WARN:0@29.800] global loadsave.cpp:848 imwrite_ Unsupported depth image for selected encoder is fallbacked to CV_8U.
+Traceback (most recent call last):
+  File "/root/miniconda3/envs/heatmap2/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/root/miniconda3/envs/heatmap2/lib/python3.10/runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "/workspace/vlm/lmms-heatmap/lmms_eval/__main__.py", line 670, in <module>
+    cli_evaluate()
+  File "/workspace/vlm/lmms-heatmap/lmms_eval/__main__.py", line 483, in cli_evaluate
+    raise e
+  File "/workspace/vlm/lmms-heatmap/lmms_eval/__main__.py", line 467, in cli_evaluate
+    results, samples = cli_evaluate_single(args)
+  File "/workspace/vlm/lmms-heatmap/lmms_eval/__main__.py", line 608, in cli_evaluate_single
+    results = evaluator.simple_evaluate(
+  File "/workspace/vlm/lmms-heatmap/lmms_eval/utils.py", line 533, in _wrapper
+    return fn(*args, **kwargs)
+  File "/workspace/vlm/lmms-heatmap/lmms_eval/evaluator.py", line 275, in simple_evaluate
+    results = evaluate(
+  File "/workspace/vlm/lmms-heatmap/lmms_eval/utils.py", line 533, in _wrapper
+    return fn(*args, **kwargs)
+  File "/workspace/vlm/lmms-heatmap/lmms_eval/evaluator.py", line 489, in evaluate
+    resps = getattr(lm, reqtype)(cloned_reqs)  # Choiszt run generate until
+  File "/workspace/vlm/lmms-heatmap/lmms_eval/models/llava.py", line 795, in generate_until
+    ret_attn = get_heatmap(
+  File "/workspace/vlm/lmms-heatmap/LLaVA-NeXT/llava/mm_utils.py", line 656, in get_heatmap
+    mask_patches_per_side, _ = padded_image_mask[stage].shape
+NameError: name 'padded_image_mask' is not defined
+torch.Size([2, 2, 24, 24, 4096])
+1 torch.Size([48, 48, 4096])
+2 torch.Size([48, 48, 4096])
+3 torch.Size([48, 48, 4096])
+4 torch.Size([48, 48, 4096])
+Model Responding:   0%|          | 0/3000 [00:01<?, ?it/s]
+Traceback (most recent call last):
+  File "/root/miniconda3/envs/heatmap2/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/root/miniconda3/envs/heatmap2/lib/python3.10/runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "/root/miniconda3/envs/heatmap2/lib/python3.10/site-packages/accelerate/commands/launch.py", line 1182, in <module>
+    main()
+  File "/root/miniconda3/envs/heatmap2/lib/python3.10/site-packages/accelerate/commands/launch.py", line 1178, in main
+    launch_command(args)
+  File "/root/miniconda3/envs/heatmap2/lib/python3.10/site-packages/accelerate/commands/launch.py", line 1172, in launch_command
+    simple_launcher(args)
+  File "/root/miniconda3/envs/heatmap2/lib/python3.10/site-packages/accelerate/commands/launch.py", line 762, in simple_launcher
+    raise subprocess.CalledProcessError(returncode=process.returncode, cmd=cmd)
+subprocess.CalledProcessError: Command '['/root/miniconda3/envs/heatmap2/bin/python3', '-m', 'lmms_eval', '--model', 'llava', '--model_args', 'pretrained=liuhaotian/llava-v1.6-vicuna-7b', '--tasks', 'pope_pop', '--batch_size', '1', '--log_samples', '--log_samples_suffix', 'llava_v1.6_pope', '--output_path', './logs/', '--generation_type', 'recursion', '--fix_grid', '2x2', '--attention_thresholding_type', 'attn_topk', '--attention_threshold', '2.5', '--positional_embedding_type', 'bilinear_interpolation', '--remove_unpadding', 'True', '--attn_norm', 'None', '--stages', '-2', '-1', '0', '1', '--verbosity', 'DEBUG', '--square', '1', '--visualize_heatmap', 'True']' returned non-zero exit status 1.

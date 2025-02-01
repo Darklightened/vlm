@@ -30,6 +30,7 @@ import ast
 from pathlib import Path
 import math
 import json
+import time
 
 warnings.filterwarnings("ignore")
 
@@ -463,6 +464,7 @@ class Llava(lmms):
         chunks = re_ords.get_batched(n=self.batch_size, batch_fn=None)
         num_iters = len(requests) // self.batch_size if len(requests) % self.batch_size == 0 else len(requests) // self.batch_size + 1
         pbar = tqdm(total=num_iters, disable=(self.rank != 0), desc="Model Responding")
+        start = time.time()
         for idx_chunk, chunk in enumerate(chunks):
             ## reset image mask and pad mask
             ## self.reset_image_mask()
@@ -603,6 +605,9 @@ class Llava(lmms):
             res.extend(text_outputs)
             self.cache_hook.add_partial("generate_until", (context, gen_kwargs), text_outputs)
             pbar.update(1)
+            if idx_chunk == 10:
+                print("time: ", (time.time() - start) / 10)
+                exit()
             # reorder this group of results back to original unsorted form
         res = re_ords.get_original(res)
 

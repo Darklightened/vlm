@@ -1,0 +1,335 @@
+wandb_version: 1
+
+_wandb:
+  desc: null
+  value:
+    python_version: 3.10.16
+    cli_version: 0.16.5
+    framework: huggingface
+    huggingface_version: 4.48.0
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    start_time: 1737088082.0
+    t:
+      1:
+      - 1
+      - 5
+      - 11
+      - 41
+      - 49
+      - 51
+      - 53
+      - 55
+      - 71
+      - 95
+      - 100
+      2:
+      - 1
+      - 5
+      - 11
+      - 41
+      - 49
+      - 51
+      - 53
+      - 55
+      - 71
+      - 95
+      - 100
+      3:
+      - 2
+      - 13
+      - 23
+      - 62
+      4: 3.10.16
+      5: 0.16.5
+      6: 4.48.0
+      8:
+      - 5
+      13: linux-x86_64
+task_configs:
+  desc: null
+  value:
+    mmbench_en_dev_lite:
+      task: mmbench_en_dev_lite
+      dataset_path: lmms-lab/LMMs-Eval-Lite
+      dataset_name: mmbench_en_dev
+      dataset_kwargs:
+        token: true
+      test_split: lite
+      full_docs: false
+      process_results_use_image: false
+      doc_to_visual: <function mmbench_doc_to_visual at 0x7fff09a9af80>
+      doc_to_text: <function mmbench_doc_to_text at 0x7fff09adc160>
+      doc_to_target: answer
+      process_results: <function mmbench_process_results at 0x7fff09adc670>
+      description: ''
+      target_delimiter: ' '
+      fewshot_delimiter: '
+
+
+        '
+      num_fewshot: 0
+      metric_list:
+      - metric: gpt_eval_score
+        aggregation: en_utils.mmbench_aggregate_dev_results_eval
+        higher_is_better: true
+      - metric: submission
+        aggregation: en_utils.mmbench_aggregate_dev_results_submission
+        higher_is_better: true
+      output_type: generate_until
+      generation_kwargs:
+        until:
+        - 'ASSISTANT:'
+        max_new_tokens: 1024
+        temperature: 0.0
+        top_p: 1.0
+        num_beams: 1
+        do_sample: false
+      repeats: 1
+      should_decontaminate: false
+      lmms_eval_specific_kwargs:
+        default:
+          pre_prompt: ''
+          post_prompt: '
+
+            Answer with the option''s letter from the given choices directly.'
+        pre_prompt: ''
+        post_prompt: '
+
+          Answer with the option''s letter from the given choices directly.'
+      model_specific_generation_kwargs:
+        llava:
+          image_aspect_ratio: original
+    mmstar:
+      task: mmstar
+      dataset_path: Lin-Chen/MMStar
+      dataset_kwargs:
+        token: true
+      test_split: val
+      full_docs: false
+      process_results_use_image: false
+      doc_to_visual: <function mmstar_doc_to_visual at 0x7fff081ae0e0>
+      doc_to_text: <function mmstar_doc_to_text at 0x7fff081eeb00>
+      doc_to_target: answer
+      process_results: <function mmstar_process_results at 0x7fff081eef80>
+      description: ''
+      target_delimiter: ' '
+      fewshot_delimiter: '
+
+
+        '
+      num_fewshot: 0
+      metric_list:
+      - metric: coarse perception
+        aggregation: utils.mmstar_aggregate_results
+        higher_is_better: true
+      - metric: fine-grained perception
+        aggregation: utils.mmstar_aggregate_results
+        higher_is_better: true
+      - metric: instance reasoning
+        aggregation: utils.mmstar_aggregate_results
+        higher_is_better: true
+      - metric: logical reasoning
+        aggregation: utils.mmstar_aggregate_results
+        higher_is_better: true
+      - metric: science & technology
+        aggregation: utils.mmstar_aggregate_results
+        higher_is_better: true
+      - metric: math
+        aggregation: utils.mmstar_aggregate_results
+        higher_is_better: true
+      - metric: average
+        aggregation: utils.mmstar_aggregate_results
+        higher_is_better: true
+      output_type: generate_until
+      generation_kwargs:
+        until:
+        - '
+
+
+          '
+        do_sample: false
+      repeats: 1
+      should_decontaminate: false
+      metadata:
+      - version: 0.0
+      lmms_eval_specific_kwargs:
+        default:
+          pre_prompt: ''
+          post_prompt: '
+
+            Answer with the option''s letter from the given choices directly'
+        pre_prompt: ''
+        post_prompt: '
+
+          Answer with the option''s letter from the given choices directly'
+    pope_aokvqa_pop:
+      task: pope_aokvqa_pop
+      dataset_path: darklightened/aokvqa
+      dataset_kwargs:
+        token: true
+      test_split: popular
+      full_docs: false
+      process_results_use_image: false
+      doc_to_visual: <function pope_doc_to_visual at 0x7fff081f5000>
+      doc_to_text: <function pope_doc_to_text at 0x7fff081f56c0>
+      doc_to_target: label
+      process_results: <function pope_process_results at 0x7fff081f5cf0>
+      description: ''
+      target_delimiter: ' '
+      fewshot_delimiter: '
+
+
+        '
+      num_fewshot: 0
+      metric_list:
+      - metric: pope_accuracy
+        aggregation: utils.pope_aggregate_accuracy
+        higher_is_better: true
+      - metric: pope_precision
+        aggregation: utils.pope_aggregate_precision
+        higher_is_better: true
+      - metric: pope_recall
+        aggregation: utils.pope_aggregate_recall
+        higher_is_better: true
+      - metric: pope_f1_score
+        aggregation: utils.pope_aggregate_f1_score
+        higher_is_better: true
+      - metric: pope_yes_ratio
+        aggregation: utils.pope_aggregate_yes_ratio
+        higher_is_better: true
+      output_type: generate_until
+      generation_kwargs:
+        max_new_tokens: 128
+        temperature: 0.0
+        top_p: 0
+        num_beams: 1
+        do_sample: false
+        until:
+        - '
+
+
+          '
+      repeats: 1
+      should_decontaminate: false
+      metadata:
+      - version: 0.0
+    pope_gqa_pop:
+      task: pope_gqa_pop
+      dataset_path: darklightened/gqa
+      dataset_kwargs:
+        token: true
+      test_split: popular
+      full_docs: false
+      process_results_use_image: false
+      doc_to_visual: <function pope_doc_to_visual at 0x7fff09add510>
+      doc_to_text: <function pope_doc_to_text at 0x7ffef86f8310>
+      doc_to_target: label
+      process_results: <function pope_process_results at 0x7ffef86f89d0>
+      description: ''
+      target_delimiter: ' '
+      fewshot_delimiter: '
+
+
+        '
+      num_fewshot: 0
+      metric_list:
+      - metric: pope_accuracy
+        aggregation: utils.pope_aggregate_accuracy
+        higher_is_better: true
+      - metric: pope_precision
+        aggregation: utils.pope_aggregate_precision
+        higher_is_better: true
+      - metric: pope_recall
+        aggregation: utils.pope_aggregate_recall
+        higher_is_better: true
+      - metric: pope_f1_score
+        aggregation: utils.pope_aggregate_f1_score
+        higher_is_better: true
+      - metric: pope_yes_ratio
+        aggregation: utils.pope_aggregate_yes_ratio
+        higher_is_better: true
+      output_type: generate_until
+      generation_kwargs:
+        max_new_tokens: 128
+        temperature: 0.0
+        top_p: 0
+        num_beams: 1
+        do_sample: false
+        until:
+        - '
+
+
+          '
+      repeats: 1
+      should_decontaminate: false
+      metadata:
+      - version: 0.0
+    pope_pop:
+      task: pope_pop
+      dataset_path: lmms-lab/POPE
+      dataset_name: Full
+      dataset_kwargs:
+        token: true
+      test_split: popular
+      full_docs: false
+      process_results_use_image: false
+      doc_to_visual: <function pope_doc_to_visual at 0x7ffef86fb5b0>
+      doc_to_text: <function pope_doc_to_text at 0x7ffef86fab90>
+      doc_to_target: answer
+      process_results: <function pope_process_results at 0x7ffef86fb880>
+      description: ''
+      target_delimiter: ' '
+      fewshot_delimiter: '
+
+
+        '
+      num_fewshot: 0
+      metric_list:
+      - metric: pope_accuracy
+        aggregation: utils.pope_aggregate_accuracy
+        higher_is_better: true
+      - metric: pope_precision
+        aggregation: utils.pope_aggregate_precision
+        higher_is_better: true
+      - metric: pope_recall
+        aggregation: utils.pope_aggregate_recall
+        higher_is_better: true
+      - metric: pope_f1_score
+        aggregation: utils.pope_aggregate_f1_score
+        higher_is_better: true
+      - metric: pope_yes_ratio
+        aggregation: utils.pope_aggregate_yes_ratio
+        higher_is_better: true
+      output_type: generate_until
+      generation_kwargs:
+        max_new_tokens: 128
+        temperature: 0.0
+        top_p: 0
+        num_beams: 1
+        do_sample: false
+        until:
+        - '
+
+
+          '
+      repeats: 1
+      should_decontaminate: false
+      metadata:
+      - version: 0.0
+cli_configs:
+  desc: null
+  value:
+    model: llava_onevision
+    model_args: pretrained=lmms-lab/llava-onevision-qwen2-0.5b-ov
+    batch_size: '1'
+    batch_sizes: []
+    device: null
+    use_cache: null
+    limit: null
+    bootstrap_iters: 100000
+    gen_kwargs: ''
+    random_seed: 0
+    numpy_seed: 1234
+    torch_seed: 1234
+    fewshot_seed: 1234

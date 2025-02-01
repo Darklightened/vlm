@@ -763,6 +763,8 @@ def get_heatmap(
                 attn_over_image = attn_over_image * image_mask[stage]
                 attn_over_image = attn_over_image / attn_over_image.max()
 
+
+                # attn_over_image[attn_over_image>0.9] = 0
                 attn_over_image = attn_over_image * pow(4, stage + 2 - 1) # -1 to equalize with stage0
                 
                 if stage == current_stage:
@@ -812,13 +814,14 @@ def get_heatmap(
                 else:
                     attn_over_image = torch.zeros_like(ret_attn_list[i])
                 
+                attn_over_image[attn_over_image>0.9] = 0
                 attn_over_image = attn_over_image * pow(4, stage + 2)
 
                 if stage == current_stage:
                     stage_attn_list.append(attn_over_image)
 
                 ret_attn_list[i] = ret_attn_list[i] + attn_over_image
-            
+
         if stage == current_stage:
             break
 
@@ -947,9 +950,9 @@ def get_heatmap(
             ).squeeze()
             
             # Normalize the resized heatmap
-            # resized_heatmap -= resized_heatmap.min()
-            # # resized_heatmap = torch.relu(resized_heatmap)
-            # resized_heatmap /= resized_heatmap.max()
+            resized_heatmap -= resized_heatmap.min()
+            # resized_heatmap = torch.relu(resized_heatmap)
+            resized_heatmap /= resized_heatmap.max()
             resized_heatmap = resized_heatmap.cpu().numpy()
 
             np_img = np.array(image)[:, :, ::-1]
@@ -986,7 +989,6 @@ def get_heatmap(
 # old make_square
 def make_square_center(im, min_size, smallest_grid_size, fill_color=(0, 0, 0)):
     x, y = im.size
-    size = (max(min_size, x, y))
     size = max(min_size, x, y)
     new_im = Image.new('RGB', (size, size), fill_color)
     new_im.paste(im, (int((size - x) / 2), int((size - y) / 2)))
